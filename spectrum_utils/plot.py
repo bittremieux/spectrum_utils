@@ -28,19 +28,6 @@ def spectrum(spec, color_ions=True, annotate_ions=True, ax=None):
             ax.text(mz + 5, intensity / max_intensity + 0.02, str(annotation),
                     color=color, zorder=5, rotation=90, rotation_mode='anchor')
 
-    if spec.peptide is not None:
-        title = f'{spec.peptide}'
-        if spec.precursor_charge is not None:
-            title += f'/{spec.precursor_charge}'
-        ax.text(0.5, 1.06, title,
-                horizontalalignment='center', verticalalignment='bottom',
-                fontsize='x-large', fontweight='bold', transform=ax.transAxes)
-    ax.text(0.5, 1.02,
-            f'Precursor m/z: {spec.precursor_mz:.4f}, '
-            f'Charge: {spec.precursor_charge}',
-            horizontalalignment='center', verticalalignment='bottom',
-            fontsize='large', transform=ax.transAxes)
-
     min_mz = max(0, math.floor(spec.mz[0] / 100 - 1) * 100)
     max_mz = math.ceil(spec.mz[-1] / 100 + 1) * 100
     ax.set_xlim(min_mz, max_mz)

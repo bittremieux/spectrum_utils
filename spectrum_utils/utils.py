@@ -1,4 +1,8 @@
-def mass_diff(mz1, mz2, mode: str = 'Da'):
+import numba as nb
+
+
+@nb.njit(fastmath=True)
+def mass_diff(mz1, mz2, mode_is_da):
     """
     Calculate the mass difference(s).
 
@@ -8,14 +12,11 @@ def mass_diff(mz1, mz2, mode: str = 'Da'):
         First m/z value(s).
     mz2
         Second m/z value(s).
-    mode : {'Da', 'ppm'}
-        Mass difference unit. Either 'Da' or 'ppm'.
+    mode_is_da : bool
+        Mass difference in Dalton (True) or in ppm (False).
 
     Returns
     -------
         The mass difference(s) between the given m/z values.
     """
-    if mode == 'Da':
-        return mz1 - mz2
-    elif mode == 'ppm':
-        return (mz1 - mz2) / mz2 * 10**6
+    return mz1 - mz2 if mode_is_da else (mz1 - mz2) / mz2 * 10**6

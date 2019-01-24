@@ -1,4 +1,3 @@
-import dataclasses
 import operator
 
 import numpy as np
@@ -50,14 +49,43 @@ def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
     return sorted(ions, key=operator.itemgetter(1))
 
 
-@dataclasses.dataclass
 class FragmentAnnotation:
-    ion_type: str
-    ion_index: int
-    charge: int
+    """
+    Class representing a fragment io annotation.
+    """
+
+    def __init__(self, ion_type: str, ion_index: int, charge: int):
+        """
+        Instantiate a new `FragmentAnnotation`.
+
+        Parameters
+        ----------
+        ion_type : {'a', 'b', 'c', 'x', 'y', 'z'}
+            The fragment ion type.
+        ion_index : int
+            The fragment ion index.
+        charge : int
+            The fragment ion charge.
+        """
+        self.ion_type = ion_type
+        self.ion_index = ion_index
+        self.charge = charge
+
+    def __repr__(self):
+        return f"FragmentAnnotation(ion_type='{self.ion_type}', " \
+            f"ion_index={self.ion_index}, charge={self.charge})"
 
     def __str__(self):
         return f'{self.ion_type}{self.ion_index}{"+" * self.charge}'
+
+    def __eq__(self, other):
+        if not isinstance(other, FragmentAnnotation):
+            return False
+        else:
+            return (self.ion_type == other.ion_type and
+                    self.ion_index == other.ion_index and
+                    self.charge == other.charge)
+
 
 
 class MsmsSpectrum:
@@ -118,7 +146,7 @@ class MsmsSpectrum:
                              'have equal length')
         self.annotation = (np.asarray(annotation).reshape(-1)
                            if annotation is not None else
-                           np.empty(len(self.mz), object))
+                           np.full_like(self.mz, None, object))
         if len(self.mz) != len(self.annotation):
             raise ValueError('The mass-to-charge and annotation arrays should '
                              'have equal length')

@@ -64,10 +64,14 @@ def test_round_no_merge():
     num_peaks = 150
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.49, 0.5, num_peaks)
     intensity = np.random.exponential(1, num_peaks)
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz.copy(),
+                                 intensity.copy())
     spec.round(0)
-    for i, this_mz in enumerate(spec.mz, 1):
-        assert i == pytest.approx(this_mz)
+    assert len(spec.mz) == num_peaks
+    assert len(spec.intensity) == num_peaks
+    assert len(spec.annotation) == num_peaks
+    np.testing.assert_allclose(spec.mz, mz)
+    np.testing.assert_allclose(spec.intensity, intensity)
 
 
 def test_round_merge_len():
@@ -115,12 +119,17 @@ def test_round_merge_annotation():
     mz[5] = mz[3] + 0.005
     mz[7] = mz[8] - 0.0037
     intensity = np.arange(1, 11)
-    annotation = [None, None, None, '4', None, '6', '7', None, None, '10']
+    annotation = [None, None, None, spectrum.FragmentAnnotation('b', 4, 1),
+                  None, spectrum.FragmentAnnotation('b', 6, 1),
+                  spectrum.FragmentAnnotation('b', 7, 1), None, None,
+                  spectrum.FragmentAnnotation('b', 10, 1)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation.copy())
     spec.round(1, 'max')
-    np.testing.assert_array_equal(spec.annotation, [None, None, None, '4 / 6',
-                                                    '7', None, '10'])
+    np.testing.assert_array_equal(spec.annotation, [
+        None, None, None, spectrum.FragmentAnnotation('b', 6, 1),
+        spectrum.FragmentAnnotation('b', 7, 1), None,
+        spectrum.FragmentAnnotation('b', 10, 1)])
 
 
 def test_set_mz_range_keep_all():

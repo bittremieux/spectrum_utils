@@ -124,6 +124,7 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
     if len(mz_unique) < len(mz_round):
         intensity_unique = np.zeros_like(mz_unique, np.float32)
         annotations_unique_idx = np.zeros_like(mz_unique, np.int64)
+        combine_is_sum = combine == 'sum'
         i_orig = 0
         offset = 0
         for i_unique in range(len(mz_unique)):
@@ -135,12 +136,9 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
             annotations_unique_idx[i_unique] = i_orig + np.argmax(
                 intensity[i_orig: i_orig + offset])
             # Combine the corresponding intensities.
-            if combine == 'sum':
-                intensity_unique[i_unique] =\
-                    intensity[i_orig: i_orig + offset].sum()
-            elif combine == 'max':
-                intensity_unique[i_unique] =\
-                    intensity[annotations_unique_idx[i_unique]]
+            intensity_unique[i_unique] = (
+                intensity[i_orig: i_orig + offset].sum() if combine_is_sum else
+                intensity[annotations_unique_idx[i_unique]])
 
             i_orig += offset
             offset = 0
@@ -217,11 +215,12 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
                           for charge in range(max_charge, 0, -1)
                           for iso in range(isotope + 1)], np.float32)
 
+    fragment_tol_mode_is_da = fragment_tol_mode == 'Da'
     mask = np.full_like(mz, True, np.bool_)
     mz_i = remove_i = 0
     while mz_i < len(mz) and remove_i < len(remove_mz):
         md = utils.mass_diff(mz[mz_i], remove_mz[remove_i],
-                             fragment_tol_mode == 'Da')
+                             fragment_tol_mode_is_da)
         if md < -fragment_tol_mass:
             mz_i += 1
         elif md > fragment_tol_mass:

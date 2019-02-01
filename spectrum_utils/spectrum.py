@@ -151,7 +151,7 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
 
 
 @nb.njit
-def _get_mz_range_idx(mz: np.ndarray, min_mz: float, max_mz: float)\
+def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
         -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.set_mz_range`.
@@ -168,10 +168,9 @@ def _get_mz_range_idx(mz: np.ndarray, min_mz: float, max_mz: float)\
     Returns
     -------
     np.ndarray
-        An array of indexes of the m/z values that are inside of the specified
-        m/z range.
+        Index mask specifying which peaks are inside of the given m/z range.
     """
-    return np.where(np.logical_and(min_mz <= mz, mz <= max_mz))[0]
+    return np.logical_and(min_mz <= mz, mz <= max_mz)
 
 
 @nb.njit
@@ -468,10 +467,10 @@ class MsmsSpectrum:
         -------
         self : `MsmsSpectrum`
         """
-        mz_range = _get_mz_range_idx(self.mz, min_mz, max_mz)
-        self.mz = self.mz[mz_range]
-        self.intensity = self.intensity[mz_range]
-        self.annotation = self.annotation[mz_range]
+        mz_range_mask = _get_mz_range_mask(self.mz, min_mz, max_mz)
+        self.mz = self.mz[mz_range_mask]
+        self.intensity = self.intensity[mz_range_mask]
+        self.annotation = self.annotation[mz_range_mask]
 
         return self
 

@@ -211,9 +211,10 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
         Index mask specifying which peaks are retained after precursor peak
         filtering.
     """
-    remove_mz = np.array([(pep_mass + iso) / charge + 1.0072766
-                          for charge in range(max_charge, 0, -1)
-                          for iso in range(isotope + 1)], np.float32)
+    remove_mz = []
+    for charge in range(max_charge, 0, -1):
+        for iso in range(isotope + 1):
+            remove_mz.append((pep_mass + iso) / charge + 1.0072766)
 
     fragment_tol_mode_is_da = fragment_tol_mode == 'Da'
     mask = np.full_like(mz, True, np.bool_)

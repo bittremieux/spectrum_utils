@@ -170,7 +170,16 @@ def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
     np.ndarray
         Index mask specifying which peaks are inside of the given m/z range.
     """
-    return np.logical_and(min_mz <= mz, mz <= max_mz)
+    mask = np.full_like(mz, True, np.bool_)
+    mz_i = 0
+    while mz_i < len(mz) and mz[mz_i] < min_mz:
+        mask[mz_i] = False
+        mz_i += 1
+    mz_i = len(mz) - 1
+    while mz_i > 0 and mz[mz_i] > max_mz:
+        mask[mz_i] = False
+        mz_i -= 1
+    return mask
 
 
 @nb.njit
@@ -219,7 +228,6 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
             remove_i += 1
         else:
             mask[mz_i] = False
-            print(mz[mz_i], remove_mz[remove_i])
             mz_i += 1
 
     return mask
@@ -256,7 +264,7 @@ def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
         if intens > min_intensity:
             break
     # Only retain at most the `max_num_peaks` most intense peaks.
-    mask = np.zeros_like(intensity, dtype=np.bool_)
+    mask = np.full_like(intensity, False, np.bool_)
     mask[intensity_idx[max(start_i, len(intensity_idx) - max_num_peaks):]] =\
         True
     return mask

@@ -192,6 +192,44 @@ def test_remove_precursor_peak_none():
     assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
 
 
+def test_remove_precursor_peak_charge():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    fragment_tol_mass = np.random.uniform(0, 0.5)
+    fragment_tol_mode = 'Da'
+    precursor_mz = mz[np.random.randint(0, num_peaks)] + fragment_tol_mass / 2
+    precursor_charge = 3
+    mz[-1] = ((precursor_mz - 1.0072766) * precursor_charge) / 2 + 1.0072766
+    mz[-2] = ((precursor_mz - 1.0072766) * precursor_charge) + 1.0072766
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz,
+                                 precursor_charge, mz, intensity)
+    spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
+    assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
+    assert len(spec.mz) <= num_peaks - 3
+    assert len(spec.intensity) <= num_peaks - 3
+    assert len(spec.annotation) <= num_peaks - 3
+
+
+def test_remove_precursor_peak_isotope():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    fragment_tol_mass = np.random.uniform(0, 0.5)
+    fragment_tol_mode = 'Da'
+    precursor_mz = mz[np.random.randint(0, num_peaks)] + fragment_tol_mass / 2
+    precursor_charge = 3
+    mz[-1] = precursor_mz + 1 / precursor_charge
+    mz[-2] = precursor_mz + 2 / precursor_charge
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz,
+                                 precursor_charge, mz, intensity)
+    spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode, 2)
+    assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
+    assert len(spec.mz) <= num_peaks - 3
+    assert len(spec.intensity) <= num_peaks - 3
+    assert len(spec.annotation) <= num_peaks - 3
+
+
 def test_filter_intensity_keep_all():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)

@@ -175,9 +175,10 @@ def _get_mz_range_idx(mz: np.ndarray, min_mz: float, max_mz: float)\
 
 
 @nb.njit
-def _get_non_precursor_peak_idx(mz: np.ndarray, precursor_mz: float,
-                                fragment_tol_mass: float,
-                                fragment_tol_mode: str)\
+def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
+                                 max_charge: int, isotope: int,
+                                 fragment_tol_mass: float,
+                                 fragment_tol_mode: str)\
         -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.remove_precursor_peak`.
@@ -186,8 +187,12 @@ def _get_non_precursor_peak_idx(mz: np.ndarray, precursor_mz: float,
     ----------
     mz : np.ndarray
         The mass-to-charge ratios of the spectrum fragment peaks.
-    precursor_mz : float
-        The spectrum's precursor mass-to-charge ratio.
+    pep_mass : float
+        The mono-isotopic mass of the uncharged peptide.
+    max_charge : int
+        The maximum precursor loss charge.
+    isotope : int
+        The number of isotopic peaks to be checked.
     fragment_tol_mass : float
             Fragment mass tolerance around the precursor mass to remove the
             precursor peak.
@@ -197,11 +202,28 @@ def _get_non_precursor_peak_idx(mz: np.ndarray, precursor_mz: float,
     Returns
     -------
     np.ndarray
-        An array of indexes of the m/z values without peak(s) close .to the
-        precursor mass-to-charge-ratio.
+        Index mask specifying which peaks are retained after precursor peak
+        filtering.
     """
-    mass_diff = utils.mass_diff(mz, precursor_mz, fragment_tol_mode == 'Da')
-    return np.where(np.abs(mass_diff) > fragment_tol_mass)[0]
+    remove_mz = np.array([(pep_mass + iso) / charge + 1.0072766
+                          for charge in range(max_charge, 0, -1)
+                          for iso in range(isotope + 1)], np.float32)
+
+    mask = np.full_like(mz, True, np.bool_)
+    mz_i = remove_i = 0
+    while mz_i < len(mz) and remove_i < len(remove_mz):
+        md = utils.mass_diff(mz[mz_i], remove_mz[remove_i],
+                             fragment_tol_mode == 'Da')
+        if md < -fragment_tol_mass:
+            mz_i += 1
+        elif md > fragment_tol_mass:
+            remove_i += 1
+        else:
+            mask[mz_i] = False
+            print(mz[mz_i], remove_mz[remove_i])
+            mz_i += 1
+
+    return mask
 
 
 @nb.njit
@@ -454,7 +476,8 @@ class MsmsSpectrum:
         return self
 
     def remove_precursor_peak(self, fragment_tol_mass: float,
-                              fragment_tol_mode: str) -> 'MsmsSpectrum':
+                              fragment_tol_mode: str, isotope: int = 0)\
+            -> 'MsmsSpectrum':
         """
         Remove fragment peak(s) close to the precursor mass-to-charge ratio.
 
@@ -465,14 +488,18 @@ class MsmsSpectrum:
             precursor peak.
         fragment_tol_mode : {'Da', 'ppm'}
             Fragment mass tolerance unit. Either 'Da' or 'ppm'.
+        isotope : int
+            The number of precursor isotopic peaks to be checked (the default
+            is 0 to check only the mono-isotopic peaks).
 
         Returns
         -------
         self : `MsmsSpectrum`
         """
-        peak_mask = _get_non_precursor_peak_idx(
-            self.mz, self.precursor_mz, fragment_tol_mass,
-            fragment_tol_mode)
+        pep_mass = (self.precursor_mz - 1.0072766) * self.precursor_charge
+        peak_mask = _get_non_precursor_peak_mask(
+            self.mz, pep_mass, self.precursor_charge, isotope,
+            fragment_tol_mass, fragment_tol_mode)
         self.mz = self.mz[peak_mask]
         self.intensity = self.intensity[peak_mask]
         self.annotation = self.annotation[peak_mask]

@@ -245,6 +245,7 @@ def test_filter_intensity_remove_low_intensity():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
+    max_intensity = intensity.max()
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
     min_intensity = 0.05
     assert spec.intensity.min() < min_intensity * spec.intensity.max()
@@ -252,35 +253,40 @@ def test_filter_intensity_remove_low_intensity():
     assert len(spec.mz) < num_peaks
     assert len(spec.intensity) < num_peaks
     assert len(spec.annotation) < num_peaks
-    assert spec.intensity.min() >= min_intensity * spec.intensity.max()
+    assert spec.intensity.max() == pytest.approx(max_intensity)
+    assert spec.intensity.min() >= min_intensity * max_intensity
 
 
 def test_filter_intensity_max_num_peaks():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
+    max_intensity = intensity.max()
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
     max_num_peaks = 50
     spec.filter_intensity(max_num_peaks=max_num_peaks)
     assert len(spec.mz) == max_num_peaks
     assert len(spec.intensity) == max_num_peaks
     assert len(spec.annotation) == max_num_peaks
+    assert spec.intensity.max() == pytest.approx(max_intensity)
 
 
 def test_filter_intensity_remove_low_intensity_max_num_peaks():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
+    max_intensity = intensity.max()
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
     min_intensity = 0.05
-    assert spec.intensity.min() < min_intensity * spec.intensity.max()
+    assert spec.intensity.min() < min_intensity * max_intensity
     max_num_peaks = 50
     spec.filter_intensity(min_intensity=min_intensity,
                           max_num_peaks=max_num_peaks)
     assert len(spec.mz) <= max_num_peaks
     assert len(spec.intensity) <= max_num_peaks
     assert len(spec.annotation) <= max_num_peaks
-    assert spec.intensity.min() >= min_intensity * spec.intensity.max()
+    assert spec.intensity.max() == pytest.approx(max_intensity)
+    assert spec.intensity.min() >= min_intensity * max_intensity
 
 
 def test_scale_intensity_root():

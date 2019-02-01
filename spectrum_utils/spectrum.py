@@ -226,8 +226,8 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
 
 
 @nb.njit
-def _get_filter_intensity_idx(intensity: np.ndarray, min_intensity: float,
-                              max_num_peaks: int) -> np.ndarray:
+def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
+                               max_num_peaks: int) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.filter_intensity`.
 
@@ -244,20 +244,22 @@ def _get_filter_intensity_idx(intensity: np.ndarray, min_intensity: float,
     Returns
     -------
     np.ndarray
-        An array of indexes of the at most `max_num_peaks` most intense
-        intensities above the minimum intensity threshold.
+        Index mask specifying which peaks are retained after filtering the at
+        most `max_num_peaks` most intense intensities above the minimum
+        intensity threshold.
     """
     intensity_idx = np.argsort(intensity)
-    min_intensity *= intensity[intensity_idx][-1]
+    min_intensity *= intensity[intensity_idx[-1]]
     # Discard low-intensity noise peaks.
     start_i = 0
     for start_i, intens in enumerate(intensity[intensity_idx]):
         if intens > min_intensity:
             break
     # Only retain at most the `max_num_peaks` most intense peaks.
-    # Sort to retain the original mz order.
-    return np.sort(intensity_idx[start_i: min(len(intensity_idx),
-                                              start_i + max_num_peaks)])
+    mask = np.zeros_like(intensity, dtype=np.bool_)
+    mask[intensity_idx[max(start_i, len(intensity_idx) - max_num_peaks):]] =\
+        True
+    return mask
 
 
 @nb.njit
@@ -530,11 +532,11 @@ class MsmsSpectrum:
         """
         if max_num_peaks is None:
             max_num_peaks = len(self.intensity)
-        filter_intensity = _get_filter_intensity_idx(
+        intensity_mask = _get_filter_intensity_mask(
             self.intensity, min_intensity, max_num_peaks)
-        self.mz = self.mz[filter_intensity]
-        self.intensity = self.intensity[filter_intensity]
-        self.annotation = self.annotation[filter_intensity]
+        self.mz = self.mz[intensity_mask]
+        self.intensity = self.intensity[intensity_mask]
+        self.annotation = self.annotation[intensity_mask]
 
         return self
 

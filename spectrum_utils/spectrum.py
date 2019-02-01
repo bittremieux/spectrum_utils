@@ -333,7 +333,7 @@ def _get_scaled_intensity_rank(intensity: np.ndarray, max_rank: int)\
             .astype(np.float32))
 
 
-@nb.njit(fastmath=True)
+@nb.njit(nb.float32[:](nb.float32[:], nb.float32), fastmath=True)
 def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
         -> np.ndarray:
     """

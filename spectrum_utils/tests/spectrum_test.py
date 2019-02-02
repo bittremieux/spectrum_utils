@@ -66,11 +66,12 @@ def test_round_no_merge():
     intensity = np.random.exponential(1, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz.copy(),
                                  intensity.copy())
-    spec.round(0)
+    decimals = 0
+    spec.round(decimals)
     assert len(spec.mz) == num_peaks
     assert len(spec.intensity) == num_peaks
     assert len(spec.annotation) == num_peaks
-    np.testing.assert_allclose(spec.mz, mz)
+    np.testing.assert_allclose(spec.mz, np.around(mz, decimals))
     np.testing.assert_allclose(spec.intensity, intensity)
 
 

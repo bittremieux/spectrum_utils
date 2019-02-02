@@ -145,7 +145,7 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
 
         return mz_unique, intensity_unique, annotations_unique_idx
     else:
-        return mz, intensity, np.arange(len(mz))
+        return mz_unique, intensity, np.arange(len(mz))
 
 
 @nb.njit

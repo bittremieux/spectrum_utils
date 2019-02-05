@@ -279,7 +279,7 @@ def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
     return mask
 
 
-@nb.njit
+@nb.njit(nb.float32[:](nb.float32[:], nb.int64))
 def _get_scaled_intensity_root(intensity: np.ndarray, degree: int)\
         -> np.ndarray:
     """
@@ -297,10 +297,10 @@ def _get_scaled_intensity_root(intensity: np.ndarray, degree: int)\
     np.ndarray
         The root-scaled intensities.
     """
-    return np.power(intensity, 1 / degree)
+    return np.power(intensity, 1 / degree).astype(np.float32)
 
 
-@nb.njit
+@nb.njit(nb.float32[:](nb.float32[:], nb.int64))
 def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.scale_intensity`.
@@ -317,10 +317,10 @@ def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     np.ndarray
         The log-scaled intensities.
     """
-    return np.log1p(intensity) / np.log(base)
+    return (np.log1p(intensity  ) / np.log(base)).astype(np.float32)
 
 
-@nb.njit
+@nb.njit(nb.float32[:](nb.float32[:], nb.int64))
 def _get_scaled_intensity_rank(intensity: np.ndarray, max_rank: int)\
         -> np.ndarray:
     """

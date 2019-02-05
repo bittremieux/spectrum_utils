@@ -64,8 +64,9 @@ def test_round_no_merge():
     num_peaks = 150
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.49, 0.5, num_peaks)
     intensity = np.random.exponential(1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz.copy(),
-                                 intensity.copy())
+                                 intensity.copy(), annotation.copy())
     decimals = 0
     spec.round(decimals)
     assert len(spec.mz) == num_peaks
@@ -82,7 +83,9 @@ def test_round_merge_len():
     mz[5] = mz[3] + 0.005
     mz[7] = mz[8] - 0.0037
     intensity = np.random.exponential(1, num_peaks)
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     spec.round(1)
     assert len(spec.mz) == len(mz) - 3
     assert len(spec.mz) == len(spec.intensity)
@@ -137,7 +140,9 @@ def test_set_mz_range_keep_all():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     min_mz, max_mz = 0, 1500
     spec.set_mz_range(min_mz, max_mz)
     assert len(spec.mz) == num_peaks
@@ -149,7 +154,9 @@ def test_set_mz_range_truncate():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     min_mz, max_mz = 400, 1200
     assert spec.mz.min() < min_mz
     assert spec.mz.max() > max_mz
@@ -168,8 +175,9 @@ def test_remove_precursor_peak():
     fragment_tol_mode = 'Da'
     precursor_mz = mz[np.random.randint(0, num_peaks)] + fragment_tol_mass / 2
     intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz, 2, mz,
-                                 intensity)
+                                 intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
     assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
     assert len(spec.mz) <= num_peaks - 1
@@ -184,8 +192,9 @@ def test_remove_precursor_peak_none():
     fragment_tol_mode = 'Da'
     precursor_mz = mz[np.random.randint(0, num_peaks)] + fragment_tol_mass * 2
     intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz, 2, mz,
-                                 intensity)
+                                 intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
     assert len(spec.mz) == num_peaks
     assert len(spec.intensity) == num_peaks
@@ -203,8 +212,9 @@ def test_remove_precursor_peak_charge():
     mz[-1] = ((precursor_mz - 1.0072766) * precursor_charge) / 2 + 1.0072766
     mz[-2] = ((precursor_mz - 1.0072766) * precursor_charge) + 1.0072766
     intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz,
-                                 precursor_charge, mz, intensity)
+                                 precursor_charge, mz, intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
     assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
     assert len(spec.mz) <= num_peaks - 3
@@ -222,8 +232,9 @@ def test_remove_precursor_peak_isotope():
     mz[-1] = precursor_mz + 1 / precursor_charge
     mz[-2] = precursor_mz + 2 / precursor_charge
     intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz,
-                                 precursor_charge, mz, intensity)
+                                 precursor_charge, mz, intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode, 2)
     assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
     assert len(spec.mz) <= num_peaks - 3
@@ -235,7 +246,9 @@ def test_filter_intensity_keep_all():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     spec.filter_intensity()
     assert len(spec.mz) == num_peaks
     assert len(spec.intensity) == num_peaks
@@ -247,7 +260,9 @@ def test_filter_intensity_remove_low_intensity():
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
     max_intensity = intensity.max()
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     min_intensity = 0.05
     assert spec.intensity.min() < min_intensity * spec.intensity.max()
     spec.filter_intensity(min_intensity=min_intensity)
@@ -263,7 +278,9 @@ def test_filter_intensity_max_num_peaks():
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
     max_intensity = intensity.max()
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     max_num_peaks = 50
     spec.filter_intensity(max_num_peaks=max_num_peaks)
     assert len(spec.mz) == max_num_peaks
@@ -277,7 +294,9 @@ def test_filter_intensity_remove_low_intensity_max_num_peaks():
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
     max_intensity = intensity.max()
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
     min_intensity = 0.05
     assert spec.intensity.min() < min_intensity * max_intensity
     max_num_peaks = 50

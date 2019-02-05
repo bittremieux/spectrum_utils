@@ -94,6 +94,15 @@ def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
     return sorted(ions, key=operator.itemgetter(1))
 
 
+@nb.njit(nb.types.Tuple((nb.float32[:], nb.float32[:], nb.int64[:]))
+             (nb.float32[::1], nb.float32[::1]))
+def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
+        -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    mz, intensity = mz.reshape(-1), intensity.reshape(-1)
+    order = np.argsort(mz)
+    return mz[order], intensity[order], order
+
+
 @nb.njit
 def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
         -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -406,23 +415,22 @@ class MsmsSpectrum:
         self.precursor_mz = precursor_mz
         self.precursor_charge = precursor_charge
 
-        self.mz = np.asarray(mz, np.float32).reshape(-1)
-        self.intensity = np.asarray(intensity, np.float32).reshape(-1)
-        if len(self.mz) != len(self.intensity):
+        if len(mz) != len(intensity):
             raise ValueError('The mass-to-charge and intensity arrays should '
                              'have equal length')
-        self.annotation = (np.asarray(annotation).reshape(-1)
-                           if annotation is not None else
-                           np.full_like(self.mz, None, object))
-        if len(self.mz) != len(self.annotation):
-            raise ValueError('The mass-to-charge and annotation arrays should '
-                             'have equal length')
-        # Make sure the fragment peaks are sorted in ascending mass-to-charge
-        # order.
-        order = np.argsort(self.mz)
-        self.mz = self.mz[order]
-        self.intensity = self.intensity[order]
-        self.annotation = self.annotation[order]
+
+        self.mz, self.intensity, order = _init_spectrum(
+            np.asarray(mz, np.float32), np.asarray(intensity, np.float32))
+
+        if annotation is not None:
+            self.annotation = np.asarray(annotation).reshape(-1)
+            if len(self.mz) != len(self.annotation):
+                raise ValueError('The mass-to-charge and annotation arrays '
+                                 'should have equal length')
+            else:
+                self.annotation = self.annotation[order]
+        else:
+            self.annotation = None
 
         self.retention_time = retention_time
         self.peptide = peptide
@@ -457,7 +465,8 @@ class MsmsSpectrum:
         """
         self.mz, self.intensity, annotation_idx = _round(
             self.mz, self.intensity, decimals, combine)
-        self.annotation = self.annotation[annotation_idx]
+        if self.annotation is not None:
+            self.annotation = self.annotation[annotation_idx]
 
         return self
 
@@ -480,7 +489,8 @@ class MsmsSpectrum:
         mz_range_mask = _get_mz_range_mask(self.mz, min_mz, max_mz)
         self.mz = self.mz[mz_range_mask]
         self.intensity = self.intensity[mz_range_mask]
-        self.annotation = self.annotation[mz_range_mask]
+        if self.annotation is not None:
+            self.annotation = self.annotation[mz_range_mask]
 
         return self
 
@@ -511,7 +521,8 @@ class MsmsSpectrum:
             fragment_tol_mass, fragment_tol_mode)
         self.mz = self.mz[peak_mask]
         self.intensity = self.intensity[peak_mask]
-        self.annotation = self.annotation[peak_mask]
+        if self.annotation is not None:
+            self.annotation = self.annotation[peak_mask]
 
         return self
 
@@ -544,7 +555,8 @@ class MsmsSpectrum:
             self.intensity, min_intensity, max_num_peaks)
         self.mz = self.mz[intensity_mask]
         self.intensity = self.intensity[intensity_mask]
-        self.annotation = self.annotation[intensity_mask]
+        if self.annotation is not None:
+            self.annotation = self.annotation[intensity_mask]
 
         return self
 
@@ -649,7 +661,7 @@ class MsmsSpectrum:
 
         theoretical_fragments = _get_theoretical_peptide_fragments(
             self.peptide, ion_types, max_ion_charge)
-        self.annotation = np.empty(len(self.mz), object)
+        self.annotation = np.full_like(self.mz, None, object)
         peak_i_start = 0
         for fragment_annotation, fragment_mz in theoretical_fragments:
             while (peak_i_start < len(self.mz) and

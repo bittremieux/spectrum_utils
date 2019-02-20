@@ -300,7 +300,7 @@ def _get_scaled_intensity_root(intensity: np.ndarray, degree: int)\
     return np.power(intensity, 1 / degree).astype(np.float32)
 
 
-@nb.njit(nb.float32[:](nb.float32[:], nb.int64))
+@nb.njit(nb.float32[:](nb.float32[:], nb.float64))
 def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.scale_intensity`.
@@ -317,7 +317,7 @@ def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     np.ndarray
         The log-scaled intensities.
     """
-    return (np.log1p(intensity  ) / np.log(base)).astype(np.float32)
+    return (np.log1p(intensity) / np.log(base)).astype(np.float32)
 
 
 @nb.njit(nb.float32[:](nb.float32[:], nb.int64))

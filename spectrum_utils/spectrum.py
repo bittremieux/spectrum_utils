@@ -51,6 +51,7 @@ class FragmentAnnotation:
                     self.charge == other.charge)
 
 
+@nb.jit
 def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
                                        max_charge: int = 1)\
         -> List[Tuple[FragmentAnnotation, float]]:
@@ -82,15 +83,15 @@ def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
                 if ion_type in 'abc':
                     ions.append((
                         FragmentAnnotation(ion_type, i, charge),
-                        mass.calculate_mass(sequence=''.join(amino_acids[:i]),
-                                            ion_type=ion_type,
-                                            charge=charge)))
+                        mass.fast_mass2(sequence=''.join(amino_acids[:i]),
+                                        ion_type=ion_type,
+                                        charge=charge)))
                 else:
                     ions.append((
                         FragmentAnnotation(ion_type, len(peptide) - i, charge),
-                        mass.calculate_mass(sequence=''.join(amino_acids[i:]),
-                                            ion_type=ion_type,
-                                            charge=charge)))
+                        mass.fast_mass2(sequence=''.join(amino_acids[i:]),
+                                        ion_type=ion_type,
+                                        charge=charge)))
     return sorted(ions, key=operator.itemgetter(1))
 
 
@@ -362,6 +363,70 @@ def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
         The maximum-scaled intensities.
     """
     return intensity * max_intensity / intensity.max()
+
+
+@nb.njit
+def _get_annotation_map(
+        spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
+        annotation_mz: List[float], fragment_tol_mass: float,
+        fragment_tol_mode: str, peak_assignment: str = 'most_intense')\
+        -> List[Tuple[int, int]]:
+    """
+    JIT helper function for `MsmsSpectrum.annotate_peaks`.
+
+    Parameters
+    ----------
+    spectrum_mz : np.ndarray
+        The mass-to-charge varlues of the spectrum fragment peaks.
+    spectrum_intensity : np.ndarray
+        The intensities of the spectrum fragment peaks.
+    annotation_mz : List[float]
+        A list of mass-to-charge values of the peptide fragment annotations.
+    fragment_tol_mass : float
+        Fragment mass tolerance to match spectrum peaks against theoretical
+        peaks.
+    fragment_tol_mode : {'Da', 'ppm'}
+        Fragment mass tolerance unit. Either 'Da' or 'ppm'.
+    peak_assignment : {'most_intense', 'nearest_mz'}, optional
+        In case multiple peaks occur within the given mass window around a
+        theoretical peak, only a single peak will be annotated with the
+        fragment type:
+        - 'most_intense': The most intense peak will be annotated (default).
+        - 'nearest_mz':   The peak whose m/z is closest to the theoretical m/z
+                          will be annotated.
+
+    Returns
+    -------
+    A list of (peak index, annotation index) tuples.
+    """
+    annotation_i_map = []
+    peak_i_start = 0
+    for fragment_i, fragment_mz in enumerate(annotation_mz):
+        while (peak_i_start < len(spectrum_mz) and
+               utils.mass_diff(spectrum_mz[peak_i_start], fragment_mz,
+                               fragment_tol_mode == 'Da')
+               < -fragment_tol_mass):
+            peak_i_start += 1
+        peak_i_stop = peak_i_start
+        annotation_candidates_i = []
+        while (peak_i_stop < len(spectrum_mz) and
+               utils.mass_diff(spectrum_mz[peak_i_stop], fragment_mz,
+                               fragment_tol_mode == 'Da')
+               <= fragment_tol_mass):
+            annotation_candidates_i.append(peak_i_stop)
+            peak_i_stop += 1
+        if len(annotation_candidates_i) > 0:
+            peak_annotation_i = 0
+            if peak_assignment == 'nearest_mz':
+                peak_annotation_i = np.argmin(np.abs(
+                    spectrum_mz[peak_i_start: peak_i_stop] - fragment_mz))
+            elif peak_assignment == 'most_intense':
+                peak_annotation_i = np.argmax(
+                    spectrum_intensity[peak_i_start: peak_i_stop])
+            annotation_i_map.append((peak_i_start + peak_annotation_i,
+                                     fragment_i))
+
+    return annotation_i_map
 
 
 class MsmsSpectrum:
@@ -662,30 +727,10 @@ class MsmsSpectrum:
         theoretical_fragments = _get_theoretical_peptide_fragments(
             self.peptide, ion_types, max_ion_charge)
         self.annotation = np.full_like(self.mz, None, object)
-        peak_i_start = 0
-        for fragment_annotation, fragment_mz in theoretical_fragments:
-            while (peak_i_start < len(self.mz) and
-                   utils.mass_diff(self.mz[peak_i_start], fragment_mz,
-                                   fragment_tol_mode == 'Da')
-                   < -fragment_tol_mass):
-                peak_i_start += 1
-            peak_i_stop = peak_i_start
-            annotation_candidates_i = []
-            while (peak_i_stop < len(self.mz) and
-                   utils.mass_diff(self.mz[peak_i_stop], fragment_mz,
-                                   fragment_tol_mode == 'Da')
-                   <= fragment_tol_mass):
-                annotation_candidates_i.append(peak_i_stop)
-                peak_i_stop += 1
-            if len(annotation_candidates_i) > 0:
-                peak_annotation_i = 0
-                if peak_assignment == 'nearest_mz':
-                    peak_annotation_i = np.argmin(np.abs(
-                        self.mz[peak_i_start: peak_i_stop] - fragment_mz))
-                elif peak_assignment == 'most_intense':
-                    peak_annotation_i = np.argmax(
-                        self.intensity[peak_i_start: peak_i_stop])
-                self.annotation[peak_i_start + peak_annotation_i] =\
-                    fragment_annotation
+        for annotation_i, fragment_i in _get_annotation_map(
+                self.mz, self.intensity,
+                [mz for _, mz in theoretical_fragments],
+                fragment_tol_mass, fragment_tol_mode, peak_assignment):
+            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
 
         return self

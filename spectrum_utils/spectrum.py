@@ -51,7 +51,6 @@ class FragmentAnnotation:
                     self.charge == other.charge)
 
 
-@nb.jit
 def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
                                        max_charge: int = 1)\
         -> List[Tuple[FragmentAnnotation, float]]:

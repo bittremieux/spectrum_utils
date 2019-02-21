@@ -731,6 +731,7 @@ class MsmsSpectrum:
                 self.mz, self.intensity,
                 [mz for _, mz in theoretical_fragments],
                 fragment_tol_mass, fragment_tol_mode, peak_assignment):
-            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
+            self.annotation[annotation_i] =\
+                theoretical_fragments[fragment_i][0]
 
         return self

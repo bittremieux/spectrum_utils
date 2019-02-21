@@ -3,7 +3,6 @@ import operator
 import numpy as np
 import pytest
 from pyteomics import mass
-from pyteomics import parser
 
 from spectrum_utils import spectrum
 
@@ -417,7 +416,7 @@ def test_annotate_peaks_nearest_mz():
         charge, mz, intensity, peptide=peptide)
     spec.annotate_peaks(fragment_tol_mass, fragment_tol_mode,
                         peak_assignment='nearest_mz')
-    assert spec.annotation[0] is not None
+    assert spec.annotation[0] == spectrum.FragmentAnnotation('b', 1, 1)
     assert spec.annotation[1] is None
 
 
@@ -438,4 +437,4 @@ def test_annotate_peaks_most_intense():
     spec.annotate_peaks(fragment_tol_mass, fragment_tol_mode,
                         peak_assignment='most_intense')
     assert spec.annotation[0] is None
-    assert spec.annotation[1] is not None
+    assert spec.annotation[1] == spectrum.FragmentAnnotation('b', 1, 1)

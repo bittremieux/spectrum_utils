@@ -639,20 +639,11 @@ class MsmsSpectrum:
             Method to scale the peak intensities (the default is None, which
             means that no transformation will be performed).
             Potential transformation options are:
-            - 'root': Root-transform the peak intensities. The default is a
-                      square root transformation (`degree` is 2). The degree
-                      of the root can be specified using the `degree` kwarg.
-            - 'log':  Log-transform the peak intensities. The default is a log2
-                      transformation (`base` is 2) after summing the
-                      intensities with 1 to avoid negative values after the
-                      transformation. The base of the logarithm can be
-                      specified using the `base` kwarg.
-            - 'rank': Rank-transform the peak intensities. The maximum rank of
-                      the most intense peak can be specified using the
-                      `max_rank` kwarg, by default the number of peaks in the
-                      spectrum is used as the maximum rank. Note that
-                      `max_rank` should be greater than or equal to the number
-                      of peaks in the spectrum.
+
+            - 'root': Root-transform the peak intensities. The default is a square root transformation (`degree` is 2). The degree of the root can be specified using the `degree` kwarg.
+            - 'log':  Log-transform the peak intensities. The default is a log2 transformation (`base` is 2) after summing the intensities with 1 to avoid negative values after the transformation. The base of the logarithm can be specified using the `base` kwarg.
+            - 'rank': Rank-transform the peak intensities. The maximum rank of the most intense peak can be specified using the `max_rank` kwarg, by default the number of peaks in the spectrum is used as the maximum rank. Note that `max_rank` should be greater than or equal to the number of peaks in the spectrum.
+
         max_intensity : float, optional
             Intensity of the most intense peak relative to which the peaks will
             be scaled (the default is None, which means that no scaling
@@ -689,6 +680,10 @@ class MsmsSpectrum:
                        peak_assignment: str = 'most_intense')\
             -> 'MsmsSpectrum':
         """
+        Annotate peaks with their corresponding fragment ion annotations.
+
+        `self.annotation` will be overwritten and include `FragmentAnnotation`
+        objects for matching peaks.
 
         Parameters
         ----------
@@ -709,10 +704,9 @@ class MsmsSpectrum:
             In case multiple peaks occur within the given mass window around a
             theoretical peak, only a single peak will be annotated with the
             fragment type:
-            - 'most_intense': The most intense peak will be annotated
-                              (default).
-            - 'nearest_mz':   The peak whose m/z is closest to the theoretical
-                              m/z will be annotated.
+
+            - 'most_intense': The most intense peak will be annotated (default).
+            - 'nearest_mz': The peak whose m/z is closest to the theoretical m/z will be annotated.
 
         Returns
         -------

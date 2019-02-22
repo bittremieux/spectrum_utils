@@ -6,6 +6,17 @@
 
 Simple MS/MS spectrum preprocessing and visualization in Python.
 
+## Features
+
+- Spectrum (pre)processing
+	- Precursor & noise peak removal
+	- Intensity filtering
+	- Intensity scaling
+	- Fragment ion annotating (powered by [Pyteomics](https://pyteomics.readthedocs.io/))
+- Spectrum plotting
+	- Single spectrum with annotated ions
+	- Mirror plot of matching spectra
+
 ## Example
 
 ```
@@ -37,6 +48,31 @@ plot.spectrum(spec)
 plt.show()
 plt.close()
 ```
-(Condensed example. See [here](https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/preprocess_and_plot.ipynb) for the full code.)
+(Condensed example. See [here](https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/preprocess_and_plot.ipynb) for the full code to generate the figure below.)
 
 ![spectrum_utils](spectrum_utils.png)
+
+## Installation
+
+`spectrum_utils` can be installed easily via pip:
+
+```pip install spectrum_utils```
+
+<!--Or via conda:
+
+```conda install spectrum_utils -c bioconda```-->
+
+### Dependencies
+
+`spectrum_utils` has the following dependencies:
+
+- [Matplotlib](https://matplotlib.org/)
+- [Numba](http://numba.pydata.org/)
+- [NumPy](https://www.numpy.org/)
+- [Pyteomics](https://pyteomics.readthedocs.io/)
+
+Missing dependencies will be automatically installed when you install `spectrum_utils`.
+
+## Contact
+
+For more information you can visit the [official code website](https://github.com/bittremieux/spectrum_utils/) or send an email to <wout.bittremieux@uantwerpen.be>.

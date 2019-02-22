@@ -1,7 +1,8 @@
 # spectrum_utils
 
 [![Build status](https://travis-ci.org/bittremieux/spectrum_utils.svg?master)](https://travis-ci.org/bittremieux/spectrum_utils)
-![Python version](https://img.shields.io/badge/python-3.7-brightgreen.svg)
+![Python 3.6](https://img.shields.io/badge/python-3.6-brightgreen.svg)
+![Python 3.7](https://img.shields.io/badge/python-3.7-brightgreen.svg)
 
 Simple MS/MS spectrum preprocessing and visualization in Python.
 
@@ -36,5 +37,6 @@ plot.spectrum(spec)
 plt.show()
 plt.close()
 ```
+(Condensed example. See [here](https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/preprocess_and_plot.ipynb) for the full code.)
 
 ![spectrum_utils](spectrum_utils.png)

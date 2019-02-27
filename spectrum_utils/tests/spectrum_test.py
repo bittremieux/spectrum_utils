@@ -10,6 +10,56 @@ from spectrum_utils import spectrum
 np.random.seed(13)
 
 
+def test_get_theoretical_fragments():
+    peptide = 'HPYLEDR'
+    fragments = {'b1': 138.066147, 'b2': 235.118912, 'b3': 398.182220,
+                 'b4': 511.266266, 'b5': 640.308899, 'b6': 755.335815,
+                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
+                 'y4': 532.272522, 'y5': 695.335815, 'y6': 792.388550}
+    for fragment, mz in spectrum._get_theoretical_peptide_fragments(peptide):
+        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}']
+        assert mz == pytest.approx(fragment_mz)
+
+
+def test_get_theoretical_fragments_mod():
+    peptide = 'HPYLEDR'
+    modifications = {2: 79.96633}
+    fragments = {'b1': 138.066147, 'b2': 235.118912, 'b3': 478.148590,
+                 'b4': 591.232666, 'b5': 720.275269, 'b6': 835.302185,
+                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
+                 'y4': 532.272522, 'y5': 775.302185, 'y6': 872.354980}
+    for fragment, mz in spectrum._get_theoretical_peptide_fragments(
+            peptide, modifications):
+        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}']
+        assert mz == pytest.approx(fragment_mz)
+
+
+def test_get_theoretical_fragments_mod_term():
+    peptide = 'HPYLEDR'
+    modifications = {'N-term': 42.01056}
+    fragments = {'b1': 180.076706, 'b2': 277.129486, 'b3': 440.192810,
+                 'b4': 553.276917, 'b5': 682.319519, 'b6': 797.346436,
+                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
+                 'y4': 532.272522, 'y5': 695.335815, 'y6': 792.388550}
+    for fragment, mz in spectrum._get_theoretical_peptide_fragments(
+            peptide, modifications):
+        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}']
+        assert mz == pytest.approx(fragment_mz)
+
+
+def test_get_theoretical_fragments_mod_multiple():
+    peptide = 'HPYLEDR'
+    modifications = {'N-term': 42.01056, 2: 79.96633}
+    fragments = {'b1': 180.076706, 'b2': 277.129486, 'b3': 520.159180,
+                 'b4': 633.243225, 'b5': 762.285828, 'b6': 877.312744,
+                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
+                 'y4': 532.272522, 'y5': 775.302185, 'y6': 872.354980}
+    for fragment, mz in spectrum._get_theoretical_peptide_fragments(
+            peptide, modifications):
+        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}']
+        assert mz == pytest.approx(fragment_mz)
+
+
 def test_mz_intensity_len():
     mz = np.random.uniform(100, 1400, 150)
     intensity = np.random.exponential(1, 100)
@@ -59,6 +109,55 @@ def test_init_annotation_order():
         assert this_mz == pytest.approx(float(this_annotation))
 
 
+def test_init_peptide():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    with pytest.raises(ValueError):
+        spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                              peptide='BJOUXZ')
+
+
+def test_init_modification_none():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    modifications = {0: +1, 4: -56, 'N-term': +16, 'C-term': -42}
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 peptide=None, modifications=modifications)
+    assert spec.peptide is None
+    assert spec.modifications is None
+
+
+def test_init_modification_index():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    with pytest.raises(ValueError):
+        spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                              peptide='PEPTIDER', modifications={12: 16})
+
+
+def test_init_modification_str():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    with pytest.raises(ValueError):
+        spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                              peptide='PEPTIDER', modifications={'bla': 42})
+
+
+def test_init_modification():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    modifications = {0: +1, 4: -56, 'N-term': +16, 'C-term': -42}
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 peptide='PEPTIDER',
+                                 modifications=modifications)
+    assert len(spec.modifications) == 4
+
+
 def test_round_no_merge():
     num_peaks = 150
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.49, 0.5, num_peaks)
@@ -78,9 +177,9 @@ def test_round_no_merge():
 def test_round_merge_len():
     num_peaks = 10
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.2, 0.2, num_peaks)
-    mz[4] = mz[3] + 0.002
-    mz[5] = mz[3] + 0.005
-    mz[7] = mz[8] - 0.0037
+    mz[4] = mz[3] + 0.0002
+    mz[5] = mz[3] + 0.0005
+    mz[7] = mz[8] - 0.00037
     intensity = np.random.exponential(1, num_peaks)
     annotation = np.random.randint(0, num_peaks, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
@@ -94,9 +193,9 @@ def test_round_merge_len():
 def test_round_merge_sum():
     num_peaks = 10
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.2, 0.2, num_peaks)
-    mz[4] = mz[3] + 0.002
-    mz[5] = mz[3] + 0.005
-    mz[7] = mz[8] - 0.0037
+    mz[4] = mz[3] + 0.0002
+    mz[5] = mz[3] + 0.0005
+    mz[7] = mz[8] - 0.00037
     intensity = np.random.exponential(1, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity.copy())
     spec.round(1, 'sum')
@@ -106,9 +205,9 @@ def test_round_merge_sum():
 def test_round_merge_max():
     num_peaks = 10
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.2, 0.2, num_peaks)
-    mz[4] = mz[3] + 0.002
-    mz[5] = mz[3] + 0.005
-    mz[7] = mz[8] - 0.0037
+    mz[4] = mz[3] + 0.0002
+    mz[5] = mz[3] + 0.0005
+    mz[7] = mz[8] - 0.00037
     intensity = np.arange(1, 11)
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity.copy())
     spec.round(1, 'max')
@@ -118,9 +217,9 @@ def test_round_merge_max():
 def test_round_merge_annotation():
     num_peaks = 10
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.2, 0.2, num_peaks)
-    mz[4] = mz[3] + 0.002
-    mz[5] = mz[3] + 0.005
-    mz[7] = mz[8] - 0.0037
+    mz[4] = mz[3] + 0.0002
+    mz[5] = mz[3] + 0.0005
+    mz[7] = mz[8] - 0.00037
     intensity = np.arange(1, 11)
     annotation = [None, None, None, spectrum.FragmentAnnotation('b', 4, 1),
                   None, spectrum.FragmentAnnotation('b', 6, 1),

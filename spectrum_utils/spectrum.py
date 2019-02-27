@@ -1,5 +1,6 @@
 import operator
 from typing import Any
+from typing import Dict
 from typing import Iterable
 from typing import List
 from typing import Tuple
@@ -8,7 +9,6 @@ from typing import Union
 import numba as nb
 import numpy as np
 from pyteomics import mass
-from pyteomics import parser
 
 from spectrum_utils import utils
 
@@ -51,8 +51,9 @@ class FragmentAnnotation:
                     self.charge == other.charge)
 
 
-def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
-                                       max_charge: int = 1)\
+def _get_theoretical_peptide_fragments(
+        peptide: str, modifications: Dict[Union[float, str], float] = None,
+        types: str = 'by', max_charge: int = 1)\
         -> List[Tuple[FragmentAnnotation, float]]:
     """
     Get theoretical fragments for the given peptide.
@@ -60,7 +61,12 @@ def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
     Parameters
     ----------
     peptide : str
-        The peptide sequence for which the fragments will be generated.
+        The peptide sequence for which the fragments will be generated. The
+        peptide sequence should only exist of the 20 standard amino acids.
+    modifications : Dict[Union[float, str], float], optional
+        Mapping of modification positions and mass differences. Valid positions
+        are any amino acid index in the peptide (0-based), 'N-term', and
+        'C-term'.
     types : str, optional
         The fragment type. Can be any combination of 'a', 'b', 'c', 'x', 'y',
         and 'z' (the default is 'by', which means that b-ions and y-ions will
@@ -71,26 +77,37 @@ def _get_theoretical_peptide_fragments(peptide: str, types: str = 'by',
 
     Returns
     -------
+    List[Tuple[FragmentAnnotation, float]]
         A list of all fragments as (`FragmentAnnotation`, m/z) tuples sorted in
         ascending m/z order.
     """
+    if modifications is not None:
+        mods = modifications.copy()
+        if 'N-term' in modifications:
+            mods[-1] = mods['N-term']
+            del mods['N-term']
+        if 'C-term' in modifications:
+            mods[len(peptide) + 1] = mods['C-term']
+            del mods['C-term']
+    else:
+        mods = {}
     ions = []
-    amino_acids = parser.parse(peptide)
-    for i in range(1, len(amino_acids)):
+    for i in range(1, len(peptide)):
         for ion_type in types:
+            if ion_type in 'abc':   # N-terminal fragment.
+                ion_index = i
+                sequence = peptide[:i]
+                mod_mass = sum([md for pos, md in mods.items() if pos < i])
+            else:   # C-terminal fragment.
+                ion_index = len(peptide) - i
+                sequence = peptide[i:]
+                mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
-                if ion_type in 'abc':
-                    ions.append((
-                        FragmentAnnotation(ion_type, i, charge),
-                        mass.fast_mass2(sequence=''.join(amino_acids[:i]),
-                                        ion_type=ion_type,
-                                        charge=charge)))
-                else:
-                    ions.append((
-                        FragmentAnnotation(ion_type, len(peptide) - i, charge),
-                        mass.fast_mass2(sequence=''.join(amino_acids[i:]),
-                                        ion_type=ion_type,
-                                        charge=charge)))
+                ions.append((
+                    FragmentAnnotation(ion_type, ion_index, charge),
+                    mass.fast_mass(sequence=sequence,
+                                   ion_type=ion_type,
+                                   charge=charge) + mod_mass))
     return sorted(ions, key=operator.itemgetter(1))
 
 
@@ -442,6 +459,7 @@ class MsmsSpectrum:
                  annotation: Union[np.ndarray, Iterable] = None,
                  retention_time: float = None,
                  peptide: str = None,
+                 modifications: Dict[Union[float, str], float] = None,
                  is_decoy: bool = False) -> None:
         """
         Instantiate a new `MsmsSpectrum` consisting of fragment peaks.
@@ -469,7 +487,12 @@ class MsmsSpectrum:
             None, which indicates that retention time is unspecified/unknown).
         peptide : str, optional
             The peptide sequence corresponding to the spectrum (the default is
-            None, which means that no peptide-spectrum match is specified).
+            None, which means that no peptide-spectrum match is specified). The
+            peptide sequence should only exist of the 20 standard amino acids.
+        modifications : Dict[Union[float, str], float], optional
+            Mapping of modification positions and mass differences. Valid
+            positions are any amino acid index in the peptide (0-based),
+            'N-term', and 'C-term'.
         is_decoy : bool, optional
             Flag indicating whether the `peptide` is a target or decoy
             peptide (the default is False, which implies a target peptide).
@@ -497,7 +520,25 @@ class MsmsSpectrum:
             self.annotation = None
 
         self.retention_time = retention_time
-        self.peptide = peptide
+        if peptide is not None:
+            self.peptide = peptide.upper()
+            for aa in self.peptide:
+                if aa not in mass.std_aa_mass:
+                    raise ValueError(f'Unknown amino acid: {aa}')
+        else:
+            self.peptide = None
+        if peptide is not None and modifications is not None:
+            for mod_pos in modifications.keys():
+                if mod_pos not in ('N-term', 'C-term'):
+                    if not isinstance(mod_pos, int):
+                        raise ValueError(f'Unknown modification position: '
+                                         f'{mod_pos}')
+                    elif mod_pos < 0 or mod_pos > len(peptide):
+                        raise ValueError(f'Modification position exceeds '
+                                         f'peptide bounds: {mod_pos}')
+        else:
+            modifications = None
+        self.modifications = modifications
         self.is_decoy = is_decoy
 
     def round(self, decimals: int = 0, combine: str = 'sum') -> 'MsmsSpectrum':
@@ -718,7 +759,7 @@ class MsmsSpectrum:
             max_ion_charge = self.precursor_charge - 1
 
         theoretical_fragments = _get_theoretical_peptide_fragments(
-            self.peptide, ion_types, max_ion_charge)
+            self.peptide, self.modifications, ion_types, max_ion_charge)
         self.annotation = np.full_like(self.mz, None, object)
         for annotation_i, fragment_i in _get_annotation_map(
                 self.mz, self.intensity,

@@ -266,6 +266,51 @@ def test_set_mz_range_truncate():
     assert spec.mz.max() <= max_mz
 
 
+def test_set_mz_range_truncate_left():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    min_mz, max_mz = 400, 1500
+    assert spec.mz.min() < min_mz
+    spec.set_mz_range(min_mz, max_mz)
+    assert len(spec.mz) < num_peaks
+    assert len(spec.intensity) < num_peaks
+    assert len(spec.annotation) < num_peaks
+    assert spec.mz.min() >= min_mz
+
+
+def test_set_mz_range_truncate_right():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    min_mz, max_mz = 0, 1200
+    assert spec.mz.max() > max_mz
+    spec.set_mz_range(min_mz, max_mz)
+    assert len(spec.mz) < num_peaks
+    assert len(spec.intensity) < num_peaks
+    assert len(spec.annotation) < num_peaks
+    assert spec.mz.max() <= max_mz
+
+
+def test_set_mz_range_none():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = np.random.randint(0, num_peaks, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    spec.set_mz_range(None, None)
+    assert len(spec.mz) == num_peaks
+    assert len(spec.intensity) == num_peaks
+    assert len(spec.annotation) == num_peaks
+
+
 def test_remove_precursor_peak():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
@@ -485,7 +530,8 @@ def test_annotate_peaks():
                                   spectrum._get_theoretical_peptide_fragments(
                                       peptide)])
         fragment_mz += np.random.uniform(
-            -fragment_tol_mass, fragment_tol_mass, len(fragment_mz))
+            -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass,
+            len(fragment_mz))
         num_peaks = 150
         mz = np.random.uniform(100, 1400, num_peaks)
         mz[: len(fragment_mz)] = fragment_mz

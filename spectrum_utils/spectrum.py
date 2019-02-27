@@ -578,22 +578,33 @@ class MsmsSpectrum:
 
         return self
 
-    def set_mz_range(self, min_mz: float, max_mz: float) -> 'MsmsSpectrum':
+    def set_mz_range(self, min_mz: float = None, max_mz: float = None)\
+            -> 'MsmsSpectrum':
         """
         Restrict the mass-to-charge ratios of the fragment peaks to the
         given range.
 
         Parameters
         ----------
-        min_mz : float
-            Minimum m/z (inclusive).
-        max_mz : float
-            Maximum m/z (inclusive).
+        min_mz : float, optional
+            Minimum m/z (inclusive). If not set no minimal m/z restriction will
+            occur.
+        max_mz : float, optional
+            Maximum m/z (inclusive). If not set no maximal m/z restriction will
+            occur.
 
         Returns
         -------
         self : `MsmsSpectrum`
         """
+        if min_mz is None and max_mz is None:
+            return self
+        else:
+            if min_mz is None:
+                min_mz = self.mz[0]
+            if max_mz is None:
+                max_mz = self.mz[-1]
+
         mz_range_mask = _get_mz_range_mask(self.mz, min_mz, max_mz)
         self.mz = self.mz[mz_range_mask]
         self.intensity = self.intensity[mz_range_mask]

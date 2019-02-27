@@ -8,7 +8,10 @@ from typing import Union
 
 import numba as nb
 import numpy as np
-from pyteomics import mass
+try:
+    from pyteomics import cmass as mass
+except ImportError:
+    from pyteomics import mass
 
 from spectrum_utils import utils
 

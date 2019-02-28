@@ -66,9 +66,9 @@ Installation
 
     pip install spectrum_utils
 
-.. Or via conda::
+Or via conda::
 
-.. conda install spectrum_utils -c bioconda
+    conda install -c bioconda spectrum_utils
 
 Dependencies
 ~~~~~~~~~~~~

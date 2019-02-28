@@ -55,7 +55,7 @@ Example
     plt.close()
 
 
-(Condensed example. See `here <https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/preprocess_and_plot.ipynb>`_ for the full code to generate the figure below.)
+(Condensed example. See `here <https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/quickstart.ipynb>`_ for the full code to generate the figure below.)
 
 .. image:: spectrum_utils.png
 

@@ -48,7 +48,7 @@ plot.spectrum(spec)
 plt.show()
 plt.close()
 ```
-(Condensed example. See [here](https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/preprocess_and_plot.ipynb) for the full code to generate the figure below.)
+(Condensed example. See [here](https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/quickstart.ipynb) for the full code to generate the figure below.)
 
 ![spectrum_utils](spectrum_utils.png)
 

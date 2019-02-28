@@ -1,3 +1,4 @@
+import math
 import operator
 from typing import Any
 from typing import Dict
@@ -18,10 +19,11 @@ from spectrum_utils import utils
 
 class FragmentAnnotation:
     """
-    Class representing a fragment io annotation.
+    Class representing a fragment ion annotation.
     """
 
-    def __init__(self, ion_type: str, ion_index: int, charge: int) -> None:
+    def __init__(self, ion_type: str, ion_index: int, charge: int,
+                 calc_mz: float) -> None:
         """
         Instantiate a new `FragmentAnnotation`.
 
@@ -33,14 +35,22 @@ class FragmentAnnotation:
             The fragment ion index.
         charge : int
             The fragment ion charge.
+        calc_mz : float
+            The theoretical m/z value of the fragment.
         """
+        if ion_type not in 'abcxyz':
+            raise ValueError(f'Unknown ion type: {ion_type}')
         self.ion_type = ion_type
         self.ion_index = ion_index
+        if charge <= 0:
+            raise ValueError('Charge should be strictly positive')
         self.charge = charge
+        self.calc_mz = calc_mz
 
     def __repr__(self) -> str:
         return f"FragmentAnnotation(ion_type='{self.ion_type}', " \
-            f"ion_index={self.ion_index}, charge={self.charge})"
+            f"ion_index={self.ion_index}, charge={self.charge}, " \
+            f"mz={self.calc_mz})"
 
     def __str__(self) -> str:
         return f'{self.ion_type}{self.ion_index}{"+" * self.charge}'
@@ -51,13 +61,14 @@ class FragmentAnnotation:
         else:
             return (self.ion_type == other.ion_type and
                     self.ion_index == other.ion_index and
-                    self.charge == other.charge)
+                    self.charge == other.charge and
+                    math.isclose(self.calc_mz, other.calc_mz))
 
 
 def _get_theoretical_peptide_fragments(
         peptide: str, modifications: Dict[Union[float, str], float] = None,
         types: str = 'by', max_charge: int = 1)\
-        -> List[Tuple[FragmentAnnotation, float]]:
+        -> List[FragmentAnnotation]:
     """
     Get theoretical fragments for the given peptide.
 
@@ -106,12 +117,11 @@ def _get_theoretical_peptide_fragments(
                 sequence = peptide[i:]
                 mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
-                ions.append((
-                    FragmentAnnotation(ion_type, ion_index, charge),
-                    mass.fast_mass(sequence=sequence,
-                                   ion_type=ion_type,
+                ions.append(FragmentAnnotation(
+                    ion_type, ion_index, charge,
+                    mass.fast_mass(sequence=sequence, ion_type=ion_type,
                                    charge=charge) + mod_mass))
-    return sorted(ions, key=operator.itemgetter(1))
+    return sorted(ions, key=operator.attrgetter('calc_mz'))
 
 
 @nb.njit(nb.types.Tuple((nb.float32[:], nb.float32[:], nb.int64[:]))
@@ -777,9 +787,8 @@ class MsmsSpectrum:
         self.annotation = np.full_like(self.mz, None, object)
         for annotation_i, fragment_i in _get_annotation_map(
                 self.mz, self.intensity,
-                [mz for _, mz in theoretical_fragments],
+                [fragment.calc_mz for fragment in theoretical_fragments],
                 fragment_tol_mass, fragment_tol_mode, peak_assignment):
-            self.annotation[annotation_i] =\
-                theoretical_fragments[fragment_i][0]
+            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
 
         return self

@@ -11,5 +11,5 @@ dependencies:
   - numpy=1.15.4
   - pandas=0.24.1
   - pyteomics=4.0.1
-  - spectrum-utils=0.2.0
+  - spectrum_utils=0.2.0
   - vega=1.4.0

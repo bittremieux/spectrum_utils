@@ -37,8 +37,10 @@ setuptools.setup(
         'Topic :: Scientific/Engineering :: Bio-Informatics'],
     packages=['spectrum_utils'],
     install_requires=[
+        'altair',
         'matplotlib',
         'numba',
         'numpy',
+        'pandas',
         'pyteomics'],
 )

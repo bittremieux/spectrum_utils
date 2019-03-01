@@ -1,0 +1,15 @@
+name: spectrum_utils
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - altair=2.4.1
+  - jupyter=1.0.0
+  - matplotlib=3.0.2
+  - numba=0.42.0
+  - numpy=1.15.4
+  - pandas=0.24.1
+  - pyteomics=4.0.1
+  - spectrum-utils=0.2.0
+  - vega=1.4.0

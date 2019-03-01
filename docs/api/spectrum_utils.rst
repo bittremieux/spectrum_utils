@@ -6,6 +6,7 @@ Submodules
 
 .. toctree::
 
+   spectrum_utils.iplot
    spectrum_utils.plot
    spectrum_utils.spectrum
    spectrum_utils.utils

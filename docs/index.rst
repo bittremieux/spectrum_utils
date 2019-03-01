@@ -16,10 +16,11 @@ Features
 	- Precursor & noise peak removal
 	- Intensity filtering
 	- Intensity scaling
-	- Fragment ion annotating (powered by `Pyteomics <https://pyteomics.readthedocs.io/>`_)
+	- Modification-aware fragment ion annotating (powered by `Pyteomics <https://pyteomics.readthedocs.io/>`_)
 - Spectrum plotting
 	- Single spectrum with annotated ions
 	- Mirror plot of matching spectra
+	- Interactive spectrum plots
 
 Example
 -------
@@ -75,9 +76,11 @@ Dependencies
 
 ``spectrum_utils`` has the following dependencies:
 
+- `Altair <https://altair-viz.github.io/>`_
 - `Matplotlib <https://matplotlib.org/>`_
 - `Numba <http://numba.pydata.org/>`_
 - `NumPy <https://www.numpy.org/>`_
+- `Pandas <https://pandas.pydata.org/>`_
 - `Pyteomics <https://pyteomics.readthedocs.io/>`_
 
 Missing dependencies will be automatically installed when you install ``spectrum_utils``.

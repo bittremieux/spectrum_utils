@@ -12,10 +12,11 @@ Simple MS/MS spectrum preprocessing and visualization in Python.
 	- Precursor & noise peak removal
 	- Intensity filtering
 	- Intensity scaling
-	- Fragment ion annotating (powered by [Pyteomics](https://pyteomics.readthedocs.io/))
+	- Modification-aware fragment ion annotating (powered by [Pyteomics](https://pyteomics.readthedocs.io/))
 - Spectrum plotting
 	- Single spectrum with annotated ions
 	- Mirror plot of matching spectra
+	- Interactive spectrum plots
 
 ## Example
 
@@ -66,9 +67,11 @@ Or via conda:
 
 `spectrum_utils` has the following dependencies:
 
+- [Altair](https://altair-viz.github.io/)
 - [Matplotlib](https://matplotlib.org/)
 - [Numba](http://numba.pydata.org/)
 - [NumPy](https://www.numpy.org/)
+- [Pandas](https://pandas.pydata.org/)
 - [Pyteomics](https://pyteomics.readthedocs.io/)
 
 Missing dependencies will be automatically installed when you install `spectrum_utils`.

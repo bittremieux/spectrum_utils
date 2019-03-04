@@ -7,7 +7,8 @@ import matplotlib.ticker as mticker
 from spectrum_utils.spectrum import MsmsSpectrum
 
 
-colors = {'a': '#388E3C', 'b': '#1976D2', 'y': '#D32F2F',
+colors = {'a': '#388E3C', 'b': '#1976D2', 'c': '#00796B',
+          'x': '#7B1FA2', 'y': '#D32F2F', 'z': '#F57C00',
           'unknown': '#212121', None: '#212121'}
 zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
            None: 1}
@@ -132,7 +133,7 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
                   math.ceil(spec_bottom.mz[-1] / 100 + 1) * 100])
     ax.set_xlim(min_mz, max_mz)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(
-        lambda x, pos: '{:.0%}'.format(abs(x))))
+        lambda x, pos: f'{abs(x):.0%}'))
     ax.set_ylim(-1.15 if annotate_ions else -1.05,
                 1.15 if annotate_ions else 1.05)
 

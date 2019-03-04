@@ -120,7 +120,7 @@ def _get_theoretical_peptide_fragments(
                 ions.append(FragmentAnnotation(
                     ion_type, ion_index, charge,
                     mass.fast_mass(sequence=sequence, ion_type=ion_type,
-                                   charge=charge) + mod_mass))
+                                   charge=charge) + mod_mass / charge))
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 
 

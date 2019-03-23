@@ -83,7 +83,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
 
     ax.tick_params(axis='both', which='both', labelsize='small')
 
-    ax.set_xlabel('m/z')
+    ax.set_xlabel('m/z', style='italic')
     ax.set_ylabel('Intensity')
 
     return ax

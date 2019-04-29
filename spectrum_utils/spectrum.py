@@ -9,6 +9,8 @@ from typing import Union
 
 import numba as nb
 import numpy as np
+import numpy.polynomial.polynomial as polynomial
+from scipy.stats import chisquare
 try:
     from pyteomics import cmass as mass
 except ImportError:
@@ -217,6 +219,19 @@ def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
         mask[mz_i] = False
         mz_i -= 1
     return mask
+
+
+# Parameters for the polynomial model to calculate the theoretical intensity
+# ratios for subsequent isotopic peaks by Valkenborg et al. (2008).
+# doi:10.1016/j.jasms.2008.01.009
+_isotope_model_betas = [
+    np.asarray([-0.00142320578040, 0.53158267080224, 0.00572776591574,
+                -0.00040226083326, -0.00007968737684]),
+    np.asarray([0.06258138406507, 0.24252967352808, 0.01729736525102,
+                -0.00427641490976, 0.00038011211412]),
+    np.asarray([0.03092092306220, 0.22353930450345, -0.02630395501009,
+                0.00728183023772, -0.00073155573939])
+]
 
 
 @nb.njit
@@ -620,6 +635,87 @@ class MsmsSpectrum:
         self.intensity = self.intensity[mz_range_mask]
         if self.annotation is not None:
             self.annotation = self.annotation[mz_range_mask]
+
+        return self
+
+    def deisotope(self, tol_mass: float, tol_mode: str,
+                  statistic_threshold: float,
+                  combine : Union[bool, str] = False)\
+            -> 'MsmsSpectrum':
+        """
+        Deisotope the spectrum. Non-monoisotopic peaks are removed for detected
+        isotopic peak sequences.
+
+        TODO: Needs more information on how isotopic peak sequences are
+              detected, caveats about the greedy search, ...
+
+        Parameters
+        ----------
+        tol_mass : float
+            Mass tolerance to determine whether two subsequent peaks are at an
+            isotopic mass difference of each other..
+        tol_mode : {'Da', 'ppm'}
+            Mass tolerance unit. Either 'Da' or 'ppm'.
+        statistic_threshold : float
+            Threshold for the X² statistic to determine whether the observed
+            isotopic peak intensity ratios correspond to the theoretical
+            isotopic peak intensity ratios.
+        combine : Union[bool, str]
+            TODO: Options: monoisotopic peak only (False), sum intensities
+                  ('sum'), max intensity ('max').
+
+        Returns
+        -------
+        self : `MsmsSpectrum`
+        """
+        mask = np.full_like(self.mz, True, np.bool)
+        # Greedy search for sequences of isotopic peaks.
+        for start_i in range(len(self.mz)):
+            if not mask[start_i]:
+                continue
+            # Find the longest continuous sequence of equidistant peaks,
+            # starting from the current peak, whose mass difference equals an
+            # isotopic mass difference at a specific charge.
+            sequence_idx = None
+            for charge in range(self.precursor_charge, 0, -1):
+                charge_sequence_idx = [start_i]
+                current_i, next_i = start_i, start_i + 1
+                while mask[next_i] and next_i < len(self.mz):
+                    # Check whether the next peak is at a mass difference
+                    # corresponding to an isotopic peak at the current charge.
+                    md = utils.mass_diff(self.mz[next_i] - 1.00235 / charge,
+                                         self.mz[current_i], tol_mode == 'Da')
+                    if -tol_mass <= md <= tol_mass:
+                        charge_sequence_idx.append(next_i)
+                        current_i = next_i
+                        next_i += 1
+                    elif md <= tol_mass:
+                        # Skip intermediate peaks that are too close and don't
+                        # belong to the isotopic sequence.
+                        next_i += 1
+                    else:
+                        # Greedy selection of the longest isotopic sequence.
+                        if ((sequence_idx is None or
+                             len(charge_sequence_idx) > len(sequence_idx))
+                                and len(charge_sequence_idx) > 1):
+                            sequence_idx = charge_sequence_idx
+                        break
+            # Test whether the intensity ratios between the isotopic peaks
+            # adhere to the theoretical intensity ratios.
+            if sequence_idx is not None:
+                obs_ratios = (self.intensity[sequence_idx[1:]] /
+                              self.intensity[sequence_idx[:-1]])
+                exp_ratios = [polynomial.polyval(
+                    self.mz[sequence_idx[0]] / 1000, beta)
+                    for beta in _isotope_model_betas[:min(
+                        len(obs_ratios), len(_isotope_model_betas[0]))]]
+                # Mark all non-monoisotopic peaks for removal.
+                chisquare_error = chisquare(obs_ratios, exp_ratios).statistic
+                if chisquare_error <= statistic_threshold:
+                    mask[sequence_idx[1:]] = False
+
+        self.mz = self.mz[mask]
+        self.intensity = self.intensity[mask]
 
         return self
 

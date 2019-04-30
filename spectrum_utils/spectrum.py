@@ -680,7 +680,7 @@ class MsmsSpectrum:
             for charge in range(self.precursor_charge, 0, -1):
                 charge_sequence_idx = [start_i]
                 current_i, next_i = start_i, start_i + 1
-                while mask[next_i] and next_i < len(self.mz):
+                while next_i < len(self.mz) and mask[next_i]:
                     # Check whether the next peak is at a mass difference
                     # corresponding to an isotopic peak at the current charge.
                     md = utils.mass_diff(self.mz[next_i] - 1.00235 / charge,

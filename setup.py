@@ -42,5 +42,6 @@ setuptools.setup(
         'numba',
         'numpy',
         'pandas',
-        'pyteomics'],
+        'pyteomics',
+        'scipy'],
 )

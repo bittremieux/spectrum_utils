@@ -716,6 +716,8 @@ class MsmsSpectrum:
 
         self.mz = self.mz[mask]
         self.intensity = self.intensity[mask]
+        if self.annotation is not None:
+            self.annotation = self.annotation[mask]
 
         return self
 

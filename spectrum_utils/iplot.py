@@ -6,8 +6,8 @@ from spectrum_utils.spectrum import MsmsSpectrum
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
-             annotate_ions: bool = True, mirror_intensity: bool = False)\
-        -> altair.LayerChart:
+             annotate_ions: bool = True, mirror_intensity: bool = False,
+             grid: bool = True) -> altair.LayerChart:
     """
     Plot an MS/MS spectrum.
 
@@ -23,6 +23,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
         is True.
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
+    grid : bool, optional
+        Draw grid lines or not.
 
     Returns
     -------
@@ -46,10 +48,11 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
                             'calc_mz': calc_mz, 'fragment': fragment,
                             'color': color})
 
-    x_axis = altair.X('exp_mz', axis=altair.Axis(title='m/z'),
+    x_axis = altair.X('exp_mz', axis=altair.Axis(title='m/z', grid=grid),
                       scale=altair.Scale(nice=True, padding=5, zero=False))
     y_axis = altair.Y('intensity',
-                      axis=altair.Axis(title='Intensity', format='%'),
+                      axis=altair.Axis(title='Intensity', format='%',
+                                       grid=grid),
                       scale=altair.Scale(nice=True, padding=5))
     color = altair.Color('color', scale=None, legend=None)
     tooltip_not_annotated = [altair.Tooltip('exp_mz', format='.4f',

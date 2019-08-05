@@ -81,7 +81,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     max_mz = math.ceil(spec.mz[-1] / 100 + 1) * 100
     ax.set_xlim(min_mz, max_mz)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.))
-    ax.set_ylim(0, 1.15 if annotate_ions else 1.05)
+    y_max = 1.15 if annotate_ions else 1.05
+    ax.set_ylim(*(0, y_max) if not mirror_intensity else (-y_max, 0))
 
     ax.xaxis.set_minor_locator(mticker.AutoLocator())
     ax.yaxis.set_minor_locator(mticker.AutoLocator())
@@ -104,8 +105,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
 
 
 def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
-           color_ions: bool = True, annotate_ions: bool = True,
-           ax: plt.Axes = None):
+           spectrum_kws: Dict = None, ax: plt.Axes = None):
     """
     Mirror plot two MS/MS spectra.
 
@@ -115,12 +115,8 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
         The spectrum to be plotted on the top.
     spec_bottom : MsmsSpectrum
         The spectrum to be plotted on the bottom.
-    color_ions : bool, optional
-        Flag indicating whether or not to color annotated fragment ions. The
-        default is True.
-    annotate_ions : bool, optional
-        Flag indicating whether or not to annotate fragment ions. The default
-        is True.
+    spectrum_kws : Dict, optional
+        Keyword arguments for `plot.spectrum`.
     ax : plt.Axes, optional
         Axes instance on which to plot the spectrum. If None the current Axes
         instance is used.
@@ -133,10 +129,15 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
     if ax is None:
         ax = plt.gca()
 
+    if spectrum_kws is None:
+        spectrum_kws = {}
     # Top spectrum.
-    spectrum(spec_top, color_ions, annotate_ions, False, ax)
+    spectrum(spec_top, mirror_intensity=False, ax=ax, **spectrum_kws)
+    y_max = ax.get_ylim()[1]
     # Mirrored bottom spectrum.
-    spectrum(spec_bottom, color_ions, annotate_ions, True, ax)
+    spectrum(spec_bottom, mirror_intensity=True, ax=ax, **spectrum_kws)
+    y_min = ax.get_ylim()[0]
+    ax.set_ylim(y_min, y_max)
 
     ax.axhline(0, color='#9E9E9E', zorder=10)
 
@@ -148,7 +149,5 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
     ax.set_xlim(min_mz, max_mz)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(
         lambda x, pos: f'{abs(x):.0%}'))
-    ax.set_ylim(-1.15 if annotate_ions else -1.05,
-                1.15 if annotate_ions else 1.05)
 
     return ax

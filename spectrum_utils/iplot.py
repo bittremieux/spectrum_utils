@@ -48,7 +48,9 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
                             'calc_mz': calc_mz, 'fragment': fragment,
                             'color': color})
 
-    x_axis = altair.X('exp_mz', axis=altair.Axis(title='m/z', grid=grid),
+    x_axis = altair.X('exp_mz', axis=altair.Axis(title='m/z',
+                                                 titleFontStyle='italic',
+                                                 grid=grid),
                       scale=altair.Scale(nice=True, padding=5, zero=False))
     y_axis = altair.Y('intensity',
                       axis=altair.Axis(title='Intensity', format='%',

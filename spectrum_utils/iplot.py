@@ -9,7 +9,7 @@ from spectrum_utils.spectrum import MsmsSpectrum
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
              annotate_ions: bool = True, annot_kws: Dict = None,
-             mirror_intensity: bool = False, grid: bool = True)\
+             mirror_intensity: bool = False, grid: bool = True, *_)\
         -> altair.LayerChart:
     """
     Plot an MS/MS spectrum.
@@ -31,6 +31,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
         Flag indicating whether to flip the intensity axis or not.
     grid : bool, optional
         Draw grid lines or not.
+    *_
+        Ignored, for consistency with the `plot.spectrum` API.
 
     Returns
     -------
@@ -97,7 +99,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
 
 
 def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
-           spectrum_kws: Dict = None) -> altair.LayerChart:
+           spectrum_kws: Dict = None, *_) -> altair.LayerChart:
     """
     Mirror plot two MS/MS spectra.
 
@@ -109,6 +111,8 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
         The spectrum to be plotted on the bottom.
     spectrum_kws : Dict, optional
         Keyword arguments for `iplot.spectrum`.
+    *_
+        Ignored, for consistency with the `plot.mirror` API.
 
     Returns
     -------

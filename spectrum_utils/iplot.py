@@ -1,3 +1,5 @@
+from typing import Dict
+
 import altair
 import pandas as pd
 
@@ -6,8 +8,9 @@ from spectrum_utils.spectrum import MsmsSpectrum
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
-             annotate_ions: bool = True, mirror_intensity: bool = False,
-             grid: bool = True) -> altair.LayerChart:
+             annotate_ions: bool = True, annot_kws: Dict = None,
+             mirror_intensity: bool = False, grid: bool = True)\
+        -> altair.LayerChart:
     """
     Plot an MS/MS spectrum.
 
@@ -21,6 +24,9 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     annotate_ions : bool, optional
         Flag indicating whether or not to annotate fragment ions. The default
         is True.
+    annot_kws : Dict, optional
+        Keyword arguments for `altair.Chart.mark_text` to customize peak
+        annotations.
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
     grid : bool, optional
@@ -73,13 +79,17 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
                  .mark_rule(size=2).encode(x=x_axis, y=y_axis, color=color,
                                            tooltip=tooltip_not_annotated))
     # Annotated peaks.
+    annotation_kws = {
+        'align': 'left' if not mirror_intensity else 'right',
+        'angle': 270, 'baseline': 'middle'}
+    if annot_kws is not None:
+        annotation_kws.update(annot_kws)
     spec_plot += (altair.Chart(spec_df[~spec_df['fragment'].isna()])
                   .mark_rule(size=2).encode(x=x_axis, y=y_axis, color=color,
                                             tooltip=tooltip_annotated))
     spec_plot += (altair.Chart(spec_df[~spec_df['fragment'].isna()])
-                  .mark_text(align='right' if mirror_intensity else 'left',
-                             angle=270, baseline='middle',
-                             dx=-5 if mirror_intensity else 5)
+                  .mark_text(dx=-5 if mirror_intensity else 5,
+                             **annotation_kws)
                   .encode(x=x_axis, y=y_axis, text='fragment', color=color,
                           tooltip=tooltip_annotated))
 

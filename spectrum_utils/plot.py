@@ -1,5 +1,6 @@
 import itertools
 import math
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -15,7 +16,8 @@ zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
-             annotate_ions: bool = True, mirror_intensity: bool = False,
+             annotate_ions: bool = True, annot_kws: Dict = None,
+             mirror_intensity: bool = False,
              ax: plt.Axes = None) -> plt.Axes:
     """
     Plot an MS/MS spectrum.
@@ -30,6 +32,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     annotate_ions : bool, optional
         Flag indicating whether or not to annotate fragment ions. The default
         is True.
+    annot_kws : Dict, optional
+        Keyword arguments for `ax.text` to customize peak annotations.
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
     ax : plt.Axes, optional
@@ -47,6 +51,12 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     max_intensity = spec.intensity.max()
     annotations = (spec.annotation if spec.annotation is not None else
                    itertools.repeat(None))
+    annotation_kws = {
+        'horizontalalignment': 'left' if not mirror_intensity else 'right',
+        'verticalalignment': 'center', 'rotation': 90,
+        'rotation_mode': 'anchor', 'zorder': 5}
+    if annot_kws is not None:
+        annotation_kws.update(annot_kws)
     for mz, intensity, annotation in zip(spec.mz, spec.intensity, annotations):
         ion_type = annotation.ion_type if annotation is not None else None
         color = colors.get(ion_type) if color_ions else colors.get(None)
@@ -60,10 +70,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
         if annotate_ions and annotation is not None:
             annotation_pos = (peak_intensity + 0.02 if not mirror_intensity
                               else peak_intensity)
-            ax.text(mz, annotation_pos, str(annotation), color=color, zorder=5,
-                    horizontalalignment=('left' if not mirror_intensity else
-                                         'right'), verticalalignment='center',
-                    rotation=90, rotation_mode='anchor')
+            ax.text(mz, annotation_pos, str(annotation), color=color,
+                    **annotation_kws)
 
     min_mz = max(0, math.floor(spec.mz[0] / 100 - 1) * 100)
     max_mz = math.ceil(spec.mz[-1] / 100 + 1) * 100

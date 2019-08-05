@@ -97,8 +97,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
 
 
 def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
-           color_ions: bool = True, annotate_ions: bool = True)\
-        -> altair.LayerChart:
+           spectrum_kws: Dict = None) -> altair.LayerChart:
     """
     Mirror plot two MS/MS spectra.
 
@@ -108,22 +107,20 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
         The spectrum to be plotted on the top.
     spec_bottom : MsmsSpectrum
         The spectrum to be plotted on the bottom.
-    color_ions : bool, optional
-        Flag indicating whether or not to color annotated fragment ions. The
-        default is True.
-    annotate_ions : bool, optional
-        Flag indicating whether or not to annotate fragment ions. The default
-        is True.
+    spectrum_kws : Dict, optional
+        Keyword arguments for `iplot.spectrum`.
 
     Returns
     -------
     altair.LayerChart
         The Altair chart instance with the plotted spectrum.
     """
+    if spectrum_kws is None:
+        spectrum_kws = {}
     # Top spectrum.
-    spec_plot = spectrum(spec_top, color_ions, annotate_ions, False)
+    spec_plot = spectrum(spec_top, mirror_intensity=False, **spectrum_kws)
     # Mirrored bottom spectrum.
-    spec_plot += spectrum(spec_bottom, color_ions, annotate_ions, True)
+    spec_plot += spectrum(spec_bottom, mirror_intensity=True, **spectrum_kws)
 
     spec_plot += (altair.Chart(pd.DataFrame({'sep': [0]}))
                   .mark_rule(size=3).encode(

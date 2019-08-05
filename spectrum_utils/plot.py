@@ -1,6 +1,6 @@
 import itertools
 import math
-from typing import Dict
+from typing import Dict, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -17,7 +17,7 @@ zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
              annotate_ions: bool = True, annot_kws: Dict = None,
-             mirror_intensity: bool = False,
+             mirror_intensity: bool = False, grid: Union[bool, str] = True,
              ax: plt.Axes = None) -> plt.Axes:
     """
     Plot an MS/MS spectrum.
@@ -36,6 +36,10 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
         Keyword arguments for `ax.text` to customize peak annotations.
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
+    grid : Union[bool, str], optional
+        Draw grid lines or not. Either a boolean to enable/disable both major
+        and minor grid lines or 'major'/'minor' to enable major or minor grid
+        lines respectively.
     ax : plt.Axes, optional
         Axes instance on which to plot the spectrum. If None the current Axes
         instance is used.
@@ -83,10 +87,12 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     ax.yaxis.set_minor_locator(mticker.AutoLocator())
     ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
-    ax.grid(b=True, which='major', color='#9E9E9E',
-            linestyle='--', linewidth=1.0)
-    ax.grid(b=True, which='minor', color='#9E9E9E',
-            linestyle='--', linewidth=0.5)
+    if grid in (True, 'both', 'major'):
+        ax.grid(b=True, which='major', color='#9E9E9E',
+                linestyle='--', linewidth=1.0)
+    if grid in (True, 'both', 'minor'):
+        ax.grid(b=True, which='minor', color='#9E9E9E',
+                linestyle='--', linewidth=0.5)
     ax.set_axisbelow(True)
 
     ax.tick_params(axis='both', which='both', labelsize='small')

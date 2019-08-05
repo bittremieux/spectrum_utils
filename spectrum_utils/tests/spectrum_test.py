@@ -129,6 +129,65 @@ def test_init_annotation_order():
         assert this_mz == pytest.approx(this_annotation.calc_mz)
 
 
+def test_mz_array():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks).tolist()
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = [spectrum.PeptideFragmentAnnotation('y', i, 1, this_mz)
+                  for i, this_mz in enumerate(mz)]
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    assert type(spec.mz) == np.ndarray
+    spec.mz = np.random.uniform(100, 1400, num_peaks).tolist()
+    assert type(spec.mz) == np.ndarray
+    with pytest.raises(ValueError):
+        spec.mz = 14
+
+
+def test_intensity_array():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks).tolist()
+    annotation = [spectrum.PeptideFragmentAnnotation('y', i, 1, this_mz)
+                  for i, this_mz in enumerate(mz)]
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    assert type(spec.intensity) == np.ndarray
+    spec.intensity = np.random.lognormal(0, 1, num_peaks).tolist()
+    assert type(spec.intensity) == np.ndarray
+    with pytest.raises(ValueError):
+        spec.intensity = 14
+
+
+def test_annotation_array():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = [spectrum.PeptideFragmentAnnotation('y', i, 1, this_mz)
+                  for i, this_mz in enumerate(mz)]
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    assert type(spec.annotation) == np.ndarray
+    spec.annotation = annotation
+    assert type(spec.annotation) == np.ndarray
+    with pytest.raises(ValueError):
+        spec.annotation = 14
+
+
+def test_annotation_none():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
+    assert spec.annotation is None
+    annotation = [spectrum.PeptideFragmentAnnotation('y', i, 1, this_mz)
+                  for i, this_mz in enumerate(mz)]
+    spec.annotation = annotation
+    assert type(spec.annotation) == np.ndarray
+    spec.annotation = None
+    assert spec.annotation is None
+
+
 def test_init_peptide():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)

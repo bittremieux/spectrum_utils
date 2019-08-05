@@ -519,18 +519,18 @@ class MsmsSpectrum:
             raise ValueError('The mass-to-charge and intensity arrays should '
                              'have equal length')
 
-        self.mz, self.intensity, order = _init_spectrum(
+        self._mz, self._intensity, order = _init_spectrum(
             np.asarray(mz, np.float32), np.asarray(intensity, np.float32))
 
         if annotation is not None:
-            self.annotation = np.asarray(annotation).reshape(-1)
+            self._annotation = np.asarray(annotation).reshape(-1)
             if len(self.mz) != len(self.annotation):
                 raise ValueError('The mass-to-charge and annotation arrays '
                                  'should have equal length')
             else:
-                self.annotation = self.annotation[order]
+                self._annotation = self.annotation[order]
         else:
-            self.annotation = None
+            self._annotation = None
 
         self.retention_time = retention_time
         if peptide is not None:
@@ -553,6 +553,41 @@ class MsmsSpectrum:
             modifications = None
         self.modifications = modifications
         self.is_decoy = is_decoy
+
+    @property
+    def mz(self):
+        return self._mz
+
+    @mz.setter
+    def mz(self, mz):
+        if np.asarray(mz).ndim > 0:
+            self._mz = np.asarray(mz)
+        else:
+            raise ValueError('Invalid mz values')
+
+    @property
+    def intensity(self):
+        return self._intensity
+
+    @intensity.setter
+    def intensity(self, intensity):
+        if np.asarray(intensity).ndim > 0:
+            self._intensity = np.asarray(intensity)
+        else:
+            raise ValueError('Invalid intensity values')
+
+    @property
+    def annotation(self):
+        return self._annotation
+
+    @annotation.setter
+    def annotation(self, annotation):
+        if annotation is None:
+            self._annotation = None
+        elif np.asarray(annotation).ndim > 0:
+            self._annotation = np.asarray(annotation)
+        else:
+            raise ValueError('Invalid annotation values')
 
     def round(self, decimals: int = 0, combine: str = 'sum') -> 'MsmsSpectrum':
         """

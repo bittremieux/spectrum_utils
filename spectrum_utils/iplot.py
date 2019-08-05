@@ -1,7 +1,13 @@
 from typing import Dict, Optional
 
-import altair
-import pandas as pd
+try:
+    import altair
+    import pandas as pd
+except ImportError:
+    raise ImportError('Missing dependencies for interactive plotting. Install '
+                      'using `pip install spectrum_utils[iplot]`, manually '
+                      'install Altair and Pandas, or use the default '
+                      'Matplotlib (`spectrum_utils.plot`) plotting backend.')
 
 from spectrum_utils.plot import colors
 from spectrum_utils.spectrum import MsmsSpectrum

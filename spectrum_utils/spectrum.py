@@ -17,26 +17,26 @@ except ImportError:
 from spectrum_utils import utils
 
 
-class FragmentAnnotation:
+class PeptideFragmentAnnotation:
     """
-    Class representing a fragment ion annotation.
+    Class representing a peptide fragment ion annotation.
     """
 
     def __init__(self, ion_type: str, ion_index: int, charge: int,
                  calc_mz: float) -> None:
         """
-        Instantiate a new `FragmentAnnotation`.
+        Instantiate a new `PeptideFragmentAnnotation`.
 
         Parameters
         ----------
         ion_type : {'a', 'b', 'c', 'x', 'y', 'z'}
-            The fragment ion type.
+            The peptide fragment ion type.
         ion_index : int
-            The fragment ion index.
+            The peptide fragment ion index.
         charge : int
-            The fragment ion charge.
+            The peptide fragment ion charge.
         calc_mz : float
-            The theoretical m/z value of the fragment.
+            The theoretical m/z value of the peptide fragment.
         """
         if ion_type not in 'abcxyz':
             raise ValueError(f'Unknown ion type: {ion_type}')
@@ -48,7 +48,7 @@ class FragmentAnnotation:
         self.calc_mz = calc_mz
 
     def __repr__(self) -> str:
-        return f"FragmentAnnotation(ion_type='{self.ion_type}', " \
+        return f"PeptideFragmentAnnotation(ion_type='{self.ion_type}', " \
             f"ion_index={self.ion_index}, charge={self.charge}, " \
             f"mz={self.calc_mz})"
 
@@ -56,7 +56,7 @@ class FragmentAnnotation:
         return f'{self.ion_type}{self.ion_index}{"+" * self.charge}'
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FragmentAnnotation):
+        if not isinstance(other, PeptideFragmentAnnotation):
             return False
         else:
             return (self.ion_type == other.ion_type and
@@ -68,9 +68,9 @@ class FragmentAnnotation:
 def _get_theoretical_peptide_fragments(
         peptide: str, modifications: Dict[Union[float, str], float] = None,
         types: str = 'by', max_charge: int = 1)\
-        -> List[FragmentAnnotation]:
+        -> List[PeptideFragmentAnnotation]:
     """
-    Get theoretical fragments for the given peptide.
+    Get theoretical peptide fragments for the given peptide.
 
     Parameters
     ----------
@@ -91,9 +91,9 @@ def _get_theoretical_peptide_fragments(
 
     Returns
     -------
-    List[Tuple[FragmentAnnotation, float]]
-        A list of all fragments as (`FragmentAnnotation`, m/z) tuples sorted in
-        ascending m/z order.
+    List[Tuple[PeptideFragmentAnnotation, float]]
+        A list of all fragments as (`PeptideFragmentAnnotation`, m/z) tuples
+        sorted in ascending m/z order.
     """
     if modifications is not None:
         mods = modifications.copy()
@@ -117,7 +117,7 @@ def _get_theoretical_peptide_fragments(
                 sequence = peptide[i:]
                 mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
-                ions.append(FragmentAnnotation(
+                ions.append(PeptideFragmentAnnotation(
                     ion_type, ion_index, charge,
                     mass.fast_mass(sequence=sequence, ion_type=ion_type,
                                    charge=charge) + mod_mass / charge))
@@ -740,15 +740,21 @@ class MsmsSpectrum:
 
         return self
 
-    def annotate_peaks(self, fragment_tol_mass: float, fragment_tol_mode: str,
-                       ion_types: str = 'by', max_ion_charge: int = None,
-                       peak_assignment: str = 'most_intense')\
+    def annotate_peaks(self, *args, **kwargs):
+        raise DeprecationWarning('Renamed to annotate_peptide_fragments')
+
+    def annotate_peptide_fragments(self, fragment_tol_mass: float,
+                                   fragment_tol_mode: str,
+                                   ion_types: str = 'by',
+                                   max_ion_charge: int = None,
+                                   peak_assignment: str = 'most_intense')\
             -> 'MsmsSpectrum':
         """
-        Annotate peaks with their corresponding fragment ion annotations.
+        Annotate peaks with their corresponding peptide fragment ion
+        annotations.
 
-        `self.annotation` will be overwritten and include `FragmentAnnotation`
-        objects for matching peaks.
+        `self.annotation` will be overwritten and include
+        `PeptideFragmentAnnotation` objects for matching peaks.
 
         Parameters
         ----------

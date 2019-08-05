@@ -1,6 +1,6 @@
 import itertools
 import math
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -16,9 +16,9 @@ zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
-             annotate_ions: bool = True, annot_kws: Dict = None,
+             annotate_ions: bool = True, annot_kws: Optional[Dict] = None,
              mirror_intensity: bool = False, grid: Union[bool, str] = True,
-             ax: plt.Axes = None) -> plt.Axes:
+             ax: Optional[plt.Axes] = None) -> plt.Axes:
     """
     Plot an MS/MS spectrum.
 
@@ -32,7 +32,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     annotate_ions : bool, optional
         Flag indicating whether or not to annotate fragment ions. The default
         is True.
-    annot_kws : Dict, optional
+    annot_kws : Optional[Dict], optional
         Keyword arguments for `ax.text` to customize peak annotations.
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
@@ -40,7 +40,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
         Draw grid lines or not. Either a boolean to enable/disable both major
         and minor grid lines or 'major'/'minor' to enable major or minor grid
         lines respectively.
-    ax : plt.Axes, optional
+    ax : Optional[plt.Axes], optional
         Axes instance on which to plot the spectrum. If None the current Axes
         instance is used.
 
@@ -105,7 +105,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
 
 
 def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
-           spectrum_kws: Dict = None, ax: plt.Axes = None):
+           spectrum_kws: Optional[Dict] = None, ax: Optional[plt.Axes] = None)\
+        -> plt.Axes:
     """
     Mirror plot two MS/MS spectra.
 
@@ -115,9 +116,9 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
         The spectrum to be plotted on the top.
     spec_bottom : MsmsSpectrum
         The spectrum to be plotted on the bottom.
-    spectrum_kws : Dict, optional
+    spectrum_kws : Optional[Dict], optional
         Keyword arguments for `plot.spectrum`.
-    ax : plt.Axes, optional
+    ax : Optional[plt.Axes], optional
         Axes instance on which to plot the spectrum. If None the current Axes
         instance is used.
 

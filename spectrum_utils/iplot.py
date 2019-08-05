@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 import altair
 import pandas as pd
@@ -8,7 +8,7 @@ from spectrum_utils.spectrum import MsmsSpectrum
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
-             annotate_ions: bool = True, annot_kws: Dict = None,
+             annotate_ions: bool = True, annot_kws: Optional[Dict] = None,
              mirror_intensity: bool = False, grid: bool = True, *_)\
         -> altair.LayerChart:
     """
@@ -24,7 +24,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     annotate_ions : bool, optional
         Flag indicating whether or not to annotate fragment ions. The default
         is True.
-    annot_kws : Dict, optional
+    annot_kws : Optional[Dict], optional
         Keyword arguments for `altair.Chart.mark_text` to customize peak
         annotations.
     mirror_intensity : bool, optional
@@ -99,7 +99,7 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
 
 
 def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
-           spectrum_kws: Dict = None, *_) -> altair.LayerChart:
+           spectrum_kws: Dict = Optional[None], *_) -> altair.LayerChart:
     """
     Mirror plot two MS/MS spectra.
 
@@ -109,7 +109,7 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
         The spectrum to be plotted on the top.
     spec_bottom : MsmsSpectrum
         The spectrum to be plotted on the bottom.
-    spectrum_kws : Dict, optional
+    spectrum_kws : Optional[Dict], optional
         Keyword arguments for `iplot.spectrum`.
     *_
         Ignored, for consistency with the `plot.mirror` API.

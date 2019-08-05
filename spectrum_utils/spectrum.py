@@ -1,11 +1,6 @@
 import math
 import operator
-from typing import Any
-from typing import Dict
-from typing import Iterable
-from typing import List
-from typing import Tuple
-from typing import Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
 import numpy as np
@@ -66,7 +61,8 @@ class PeptideFragmentAnnotation:
 
 
 def _get_theoretical_peptide_fragments(
-        peptide: str, modifications: Dict[Union[float, str], float] = None,
+        peptide: str,
+        modifications: Optional[Dict[Union[float, str], float]] = None,
         types: str = 'by', max_charge: int = 1)\
         -> List[PeptideFragmentAnnotation]:
     """
@@ -77,7 +73,7 @@ def _get_theoretical_peptide_fragments(
     peptide : str
         The peptide sequence for which the fragments will be generated. The
         peptide sequence should only exist of the 20 standard amino acids.
-    modifications : Dict[Union[float, str], float], optional
+    modifications : Optional[Dict[Union[float, str], float]], optional
         Mapping of modification positions and mass differences. Valid positions
         are any amino acid index in the peptide (0-based), 'N-term', and
         'C-term'.
@@ -469,10 +465,10 @@ class MsmsSpectrum:
                  precursor_charge: int,
                  mz: Union[np.ndarray, Iterable],
                  intensity: Union[np.ndarray, Iterable],
-                 annotation: Union[np.ndarray, Iterable] = None,
-                 retention_time: float = None,
-                 peptide: str = None,
-                 modifications: Dict[Union[float, str], float] = None,
+                 annotation: Optional[Union[np.ndarray, Iterable]] = None,
+                 retention_time: Optional[float] = None,
+                 peptide: Optional[str] = None,
+                 modifications: Optional[Dict[Union[float, str], float]] = None,
                  is_decoy: bool = False) -> None:
         """
         Instantiate a new `MsmsSpectrum` consisting of fragment peaks.
@@ -491,18 +487,18 @@ class MsmsSpectrum:
             Mass-to-charge ratios of the fragment peaks.
         intensity : array_like
             Intensities of the corresponding fragment peaks in `mz`.
-        annotation : array_like, optional
+        annotation : Optional[array_like], optional
             Annotations of the corresponding fragment peaks in `mz` (the
             default is None, which indicates that the fragment peaks are not
             annotated).
-        retention_time : float, optional
+        retention_time : Optional[float], optional
             Retention time at which the spectrum was acquired (the default is
             None, which indicates that retention time is unspecified/unknown).
-        peptide : str, optional
+        peptide : Optional[str], optional
             The peptide sequence corresponding to the spectrum (the default is
             None, which means that no peptide-spectrum match is specified). The
             peptide sequence should only exist of the 20 standard amino acids.
-        modifications : Dict[Union[float, str], float], optional
+        modifications : Optional[Dict[Union[float, str], float]], optional
             Mapping of modification positions and mass differences. Valid
             positions are any amino acid index in the peptide (0-based),
             'N-term', and 'C-term'.
@@ -623,18 +619,18 @@ class MsmsSpectrum:
 
         return self
 
-    def set_mz_range(self, min_mz: float = None, max_mz: float = None)\
-            -> 'MsmsSpectrum':
+    def set_mz_range(self, min_mz: Optional[float] = None,
+                     max_mz: Optional[float] = None) -> 'MsmsSpectrum':
         """
         Restrict the mass-to-charge ratios of the fragment peaks to the
         given range.
 
         Parameters
         ----------
-        min_mz : float, optional
+        min_mz : Optional[float], optional
             Minimum m/z (inclusive). If not set no minimal m/z restriction will
             occur.
-        max_mz : float, optional
+        max_mz : Optional[float], optional
             Maximum m/z (inclusive). If not set no maximal m/z restriction will
             occur.
 
@@ -691,7 +687,8 @@ class MsmsSpectrum:
         return self
 
     def filter_intensity(self, min_intensity: float = 0.0,
-                         max_num_peaks: int = None) -> 'MsmsSpectrum':
+                         max_num_peaks: Optional[int] = None)\
+            -> 'MsmsSpectrum':
         """
         Remove low-intensity fragment peaks.
 
@@ -705,7 +702,7 @@ class MsmsSpectrum:
             Remove peaks whose intensity is below `min_intensity` percentage
             of the intensity of the most intense peak (the default is 0, which
             means that no minimum intensity filter will be applied).
-        max_num_peaks : int, optional
+        max_num_peaks : Optional[int], optional
             Only retain the `max_num_peaks` most intense peaks (the default is
             None, which retains all peaks).
 
@@ -724,7 +721,8 @@ class MsmsSpectrum:
 
         return self
 
-    def scale_intensity(self, scaling: str = None, max_intensity: float = None,
+    def scale_intensity(self, scaling: Optional[str] = None,
+                        max_intensity: Optional[float] = None,
                         **kwargs) -> 'MsmsSpectrum':
         """
         Scale the intensity of the fragment peaks.
@@ -744,7 +742,7 @@ class MsmsSpectrum:
             - 'log':  Log-transform the peak intensities. The default is a log2 transformation (`base` is 2) after summing the intensities with 1 to avoid negative values after the transformation. The base of the logarithm can be specified using the `base` kwarg.
             - 'rank': Rank-transform the peak intensities. The maximum rank of the most intense peak can be specified using the `max_rank` kwarg, by default the number of peaks in the spectrum is used as the maximum rank. Note that `max_rank` should be greater than or equal to the number of peaks in the spectrum.
 
-        max_intensity : float, optional
+        max_intensity : Optional[float], optional
             Intensity of the most intense peak relative to which the peaks will
             be scaled (the default is None, which means that no scaling
             relative to the most intense peak will be performed).
@@ -781,7 +779,7 @@ class MsmsSpectrum:
     def annotate_peptide_fragments(self, fragment_tol_mass: float,
                                    fragment_tol_mode: str,
                                    ion_types: str = 'by',
-                                   max_ion_charge: int = None,
+                                   max_ion_charge: Optional[int] = None,
                                    peak_assignment: str = 'most_intense')\
             -> 'MsmsSpectrum':
         """
@@ -802,7 +800,7 @@ class MsmsSpectrum:
             Fragment type to annotate. Can be any combination of 'a', 'b', 'c',
             'x', 'y', and 'z' (the default is 'by', which means that b-ions and
             y-ions will be annotated).
-        max_ion_charge : int, optional
+        max_ion_charge : Optional[int], optional
             All fragments up to and including the given charge will be
             annotated (by default all fragments with a charge up to the
             precursor minus one will be annotated).

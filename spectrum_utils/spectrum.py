@@ -59,6 +59,45 @@ class PeptideFragmentAnnotation:
                     self.charge == other.charge and
                     math.isclose(self.calc_mz, other.calc_mz))
 
+class MoleculeFragmentAnnotation:
+    """
+    Class representing a molecule fragment ion annotation.
+    """
+
+    def __init__(self, smiles: str, charge: int,
+                 calc_mz: float) -> None:
+        """
+        Instantiate a new `MoleculeFragmentAnnotation`.
+
+        Parameters
+        ----------
+        smiles : str
+            The SMILES representation of the molecule.
+        charge : int
+            The molecule fragment ion charge.
+        calc_mz : float
+            The theoretical m/z value of the molecule fragment.
+        """
+        self.ion_type = 'mol'
+        self.smiles = smiles
+        self.charge = charge
+        self.calc_mz = calc_mz
+
+    def __repr__(self) -> str:
+        return f"MoleculeFragmentAnnotation(smiles='{self.smiles}', " \
+            f"charge={self.charge}, mz={self.calc_mz})"
+
+    def __str__(self) -> str:
+        return f'{self.smiles}{"+" * self.charge}'
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, MoleculeFragmentAnnotation):
+            return False
+        else:
+            return (self.smiles == other.smiles and
+                    self.charge == other.charge and
+                    math.isclose(self.calc_mz, other.calc_mz))
+
 
 def _get_theoretical_peptide_fragments(
         peptide: str,
@@ -829,5 +868,128 @@ class MsmsSpectrum:
                 [fragment.calc_mz for fragment in theoretical_fragments],
                 fragment_tol_mass, fragment_tol_mode, peak_assignment):
             self.annotation[annotation_i] = theoretical_fragments[fragment_i]
+
+        return self
+
+    def annotate_peptide_fragments(self, fragment_tol_mass: float,
+                                   fragment_tol_mode: str,
+                                   ion_types: str = 'by',
+                                   max_ion_charge: Optional[int] = None,
+                                   peak_assignment: str = 'most_intense')\
+            -> 'MsmsSpectrum':
+        """
+        Annotate peaks with their corresponding peptide fragment ion
+        annotations.
+
+        `self.annotation` will be overwritten and include
+        `PeptideFragmentAnnotation` objects for matching peaks.
+
+        Parameters
+        ----------
+        fragment_tol_mass : float
+            Fragment mass tolerance to match spectrum peaks against theoretical
+            peaks.
+        fragment_tol_mode : {'Da', 'ppm'}
+            Fragment mass tolerance unit. Either 'Da' or 'ppm'.
+        ion_types : str, optional
+            Fragment type to annotate. Can be any combination of 'a', 'b', 'c',
+            'x', 'y', and 'z' (the default is 'by', which means that b-ions and
+            y-ions will be annotated).
+        max_ion_charge : Optional[int], optional
+            All fragments up to and including the given charge will be
+            annotated (by default all fragments with a charge up to the
+            precursor minus one will be annotated).
+        peak_assignment : {'most_intense', 'nearest_mz'}, optional
+            In case multiple peaks occur within the given mass window around a
+            theoretical peak, only a single peak will be annotated with the
+            fragment type:
+
+            - 'most_intense': The most intense peak will be annotated (default).
+            - 'nearest_mz': The peak whose m/z is closest to the theoretical m/z will be annotated.
+
+        Returns
+        -------
+        self : `MsmsSpectrum`
+        """
+        if self.peptide is None:
+            raise ValueError('No peptide sequence available for the spectrum')
+        if max_ion_charge is None:
+            max_ion_charge = self.precursor_charge - 1
+
+        theoretical_fragments = _get_theoretical_peptide_fragments(
+            self.peptide, self.modifications, ion_types, max_ion_charge)
+        self.annotation = np.full_like(self.mz, None, object)
+        for annotation_i, fragment_i in _get_annotation_map(
+                self.mz, self.intensity,
+                [fragment.calc_mz for fragment in theoretical_fragments],
+                fragment_tol_mass, fragment_tol_mode, peak_assignment):
+            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
+
+        return self
+
+    def annotate_molecule_fragment(self, smiles: str, fragment_mz: float,
+                                   fragment_tol_mass: float,
+                                   fragment_tol_mode: str,
+                                   peak_assignment: str = 'most_intense')\
+            -> 'MsmsSpectrum':
+        """
+        Annotate a peak (if present) with its corresponding molecule.
+
+        The matching position in `self.annotation` will be overwritten by the
+        provided molecule.
+
+        Parameters
+        ----------
+        smiles : str
+            The fragment molecule that will be annotated in SMILES format.
+        mz : float
+            The expected mass of the molecule.
+        fragment_tol_mass : float
+            Fragment mass tolerance to match spectrum peaks against the
+            theoretical molecule mass.
+        fragment_tol_mode : {'Da', 'ppm'}
+            Fragment mass tolerance unit. Either 'Da' or 'ppm'.
+        peak_assignment : {'most_intense', 'nearest_mz'}, optional
+            In case multiple peaks occur within the given mass window around
+            the molecule's theoretical peak, only a single peak will be
+            annotated:
+
+            - 'most_intense': The most intense peak will be annotated (default).
+            - 'nearest_mz': The peak whose m/z is closest to the theoretical m/z will be annotated.
+
+        Returns
+        -------
+        self : `MsmsSpectrum`
+        """
+        # Find the best matching peak.
+        peak_i_start = 0
+        while (peak_i_start < len(self.mz) and
+               utils.mass_diff(self.mz[peak_i_start], fragment_mz,
+                               fragment_tol_mode == 'Da')
+               < -fragment_tol_mass):
+            peak_i_start += 1
+        peak_i_stop = peak_i_start
+        annotation_candidates_i = []
+        while (peak_i_stop < len(self.mz) and
+               utils.mass_diff(self.mz[peak_i_stop], fragment_mz,
+                               fragment_tol_mode == 'Da')
+               <= fragment_tol_mass):
+            annotation_candidates_i.append(peak_i_stop)
+            peak_i_stop += 1
+        if len(annotation_candidates_i) == 0:
+            raise ValueError(f'No matching peak found for "{smiles}"')
+        else:
+            peak_annotation_i = 0
+            if peak_assignment == 'nearest_mz':
+                peak_annotation_i = np.argmin(np.abs(
+                    self.mz[peak_i_start: peak_i_stop] - fragment_mz))
+            elif peak_assignment == 'most_intense':
+                peak_annotation_i = np.argmax(
+                    self.intensity[peak_i_start: peak_i_stop])
+            # Initialize the annotations if they don't exist yet.
+            if self.annotation is None:
+                self.annotation = np.full_like(self.mz, None, object)
+            # Set the molecule's annotation.
+            self.annotation[peak_i_start + peak_annotation_i] = MoleculeFragmentAnnotation(smiles, 1, fragment_mz)
 
         return self

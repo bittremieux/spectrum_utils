@@ -4,15 +4,76 @@ from typing import Dict, Optional, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
+from rdkit import Chem
+from rdkit.Chem import Draw
 
-from spectrum_utils.spectrum import MsmsSpectrum
+from spectrum_utils.spectrum import MsmsSpectrum, MoleculeFragmentAnnotation, PeptideFragmentAnnotation
 
 
 colors = {'a': '#388E3C', 'b': '#1976D2', 'c': '#00796B',
           'x': '#7B1FA2', 'y': '#D32F2F', 'z': '#F57C00',
-          'unknown': '#212121', None: '#212121'}
+          'unknown': '#212121', 'mol': '#212121', None: '#212121'}
 zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
-           None: 1}
+           'mol': 5, None: 1}
+
+
+_mol_annotation_size = 200
+
+
+def _annotate_ion(mz, intensity, annotation, color_ions, annotate_ions,
+                  annotation_kws, ax):
+    # No annotation -> just return peak styling information.
+    if annotation is None:
+        return colors.get(None), zorders.get(None)
+    # Else: add the textual or figure annotation.
+    else:
+        color = (colors.get(annotation.ion_type) if color_ions else
+                 colors.get(None))
+        zorder = zorders.get(annotation.ion_type)
+
+        if annotate_ions:
+            annotation_pos = intensity
+            if annotation_pos > 0:
+                annotation_pos += 0.02
+            if type(annotation) == PeptideFragmentAnnotation:
+                ax.text(mz, annotation_pos, str(annotation), color=color,
+                        **annotation_kws)
+            elif type(annotation) == MoleculeFragmentAnnotation:
+                im = _smiles_to_im(annotation.smiles)
+                x_range = ax.get_xlim()[1] - ax.get_xlim()[0]
+                width = (x_range / 3) / _mol_annotation_size * im.shape[1]
+                height = (1/3) / _mol_annotation_size * im.shape[0]
+                ax.imshow(im, aspect='auto', extent=(mz - width // 2,
+                                                     mz + width // 2,
+                                                     annotation_pos,
+                                                     annotation_pos + height),
+                          zorder=zorder)
+
+        return color, zorder
+
+
+def _smiles_to_im(smiles):
+    # Draw the molecule and make the white background transparent.
+    # https://stackoverflow.com/a/54148416
+    options = Draw.DrawingOptions()
+    options.dotsPerAngstrom = 100
+    im = Draw.MolToImage(Chem.MolFromSmiles(smiles),
+                         size=(_mol_annotation_size, _mol_annotation_size),
+                         options=options)
+    im = np.asarray(im).copy()
+    im[:, :, 3] = (255 * (im[:, :, :3] != 255).any(axis=2)).astype(np.uint8)
+    # Crop the image by removing white lines.
+    bottom, top, left, right = 0, im.shape[0] - 1, 0, im.shape[1] - 1
+    while bottom < im.shape[0] and im[bottom:bottom+1, :, :3].min() == 255:
+        bottom += 1
+    while top > 0 and im[top-1:top, :, :3].min() == 255:
+        top -= 1
+    while left < im.shape[1] and im[:, left:left+1, :3].min() == 255:
+        left += 1
+    while right > 0 and im[:, right-1:right, :3].min() == 255:
+        right -= 1
+    return im[bottom:top:, left:right, :]
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
@@ -52,6 +113,13 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     if ax is None:
         ax = plt.gca()
 
+    min_mz = max(0, math.floor(spec.mz[0] / 100 - 1) * 100)
+    max_mz = math.ceil(spec.mz[-1] / 100 + 1) * 100
+    ax.set_xlim(min_mz, max_mz)
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.))
+    y_max = 1.15 if annotate_ions else 1.05
+    ax.set_ylim(*(0, y_max) if not mirror_intensity else (-y_max, 0))
+
     max_intensity = spec.intensity.max()
     annotations = (spec.annotation if spec.annotation is not None else
                    itertools.repeat(None))
@@ -62,27 +130,14 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     if annot_kws is not None:
         annotation_kws.update(annot_kws)
     for mz, intensity, annotation in zip(spec.mz, spec.intensity, annotations):
-        ion_type = annotation.ion_type if annotation is not None else None
-        color = colors.get(ion_type) if color_ions else colors.get(None)
-        zorder = zorders.get(ion_type)
-
         peak_intensity = intensity / max_intensity
         if mirror_intensity:
             peak_intensity *= -1
+
+        color, zorder = _annotate_ion(
+            mz, peak_intensity if not mirror_intensity else -peak_intensity,
+            annotation, color_ions, annotate_ions, annotation_kws, ax)
         ax.plot([mz, mz], [0, peak_intensity], color=color, zorder=zorder)
-
-        if annotate_ions and annotation is not None:
-            annotation_pos = (peak_intensity + 0.02 if not mirror_intensity
-                              else peak_intensity)
-            ax.text(mz, annotation_pos, str(annotation), color=color,
-                    **annotation_kws)
-
-    min_mz = max(0, math.floor(spec.mz[0] / 100 - 1) * 100)
-    max_mz = math.ceil(spec.mz[-1] / 100 + 1) * 100
-    ax.set_xlim(min_mz, max_mz)
-    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.))
-    y_max = 1.15 if annotate_ions else 1.05
-    ax.set_ylim(*(0, y_max) if not mirror_intensity else (-y_max, 0))
 
     ax.xaxis.set_minor_locator(mticker.AutoLocator())
     ax.yaxis.set_minor_locator(mticker.AutoLocator())

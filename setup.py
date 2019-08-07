@@ -38,7 +38,7 @@ setuptools.setup(
     packages=['spectrum_utils'],
     install_requires=[
         'matplotlib',
-        'numba',
+        'numba>=0.41',
         'numpy',
         'pyteomics'],
     extras_require={

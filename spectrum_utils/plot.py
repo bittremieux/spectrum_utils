@@ -35,8 +35,8 @@ _mol_font_size = 2.5
 
 
 def _annotate_ion(mz: float, intensity: float,
-                  annotation: Optional[MoleculeFragmentAnnotation,
-                                       PeptideFragmentAnnotation],
+                  annotation: Optional[Union[MoleculeFragmentAnnotation,
+                                             PeptideFragmentAnnotation]],
                   color_ions: bool, annotate_ions: bool,
                   annotation_kws: Dict[str, object], ax: plt.Axes)\
         -> Tuple[str, int]:
@@ -82,8 +82,10 @@ def _annotate_ion(mz: float, intensity: float,
                 annotation_pos += 0.02
             # Textual peptide fragment annotation.
             if type(annotation) == PeptideFragmentAnnotation:
+                kws = annotation_kws.copy()
+                del kws['zorder']
                 ax.text(mz, annotation_pos, str(annotation), color=color,
-                        zorder=zorder, **annotation_kws)
+                        zorder=zorder, **kws)
             # Graphic molecule fragment annotation.
             elif type(annotation) == MoleculeFragmentAnnotation:
                 im = _smiles_to_im(annotation.smiles)

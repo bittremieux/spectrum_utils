@@ -610,7 +610,6 @@ def _get_mz_peak_index(
     if peak_i_start == peak_i_stop:
         return None
     else:
-        print(peak_i_start, peak_i_stop)
         peak_annotation_i = 0
         if peak_assignment == 'nearest_mz':
             peak_annotation_i = np.argmin(np.abs(

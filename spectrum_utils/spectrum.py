@@ -13,6 +13,35 @@ except ImportError:
 from spectrum_utils import utils
 
 
+_aa_mass = mass.std_aa_mass.copy()
+
+
+def static_modification(amino_acid: str, mass_diff: float) -> None:
+    """
+    Globally modify the monoisotopic mass of an amino acid to set a static
+    modification.
+
+    Parameters
+    ----------
+    amino_acid : str
+        The amino acid whose monoisotopic mass is modified.
+    mass_diff : float
+        The _mass difference_ to be added to the amino acid's original
+        monoisotopic mass.
+    """
+    global _aa_mass
+    _aa_mass[amino_acid] += mass_diff
+
+
+def reset_modifications() -> None:
+    """
+    Undo all static modifications and reset to the standard amino acid
+    monoisotopic masses.
+    """
+    global _aa_mass
+    _aa_mass = mass.std_aa_mass.copy()
+
+
 class FragmentAnnotation:
     """
     Class representing a general fragment ion annotation.
@@ -200,7 +229,7 @@ def _get_theoretical_peptide_fragments(
                 ions.append(PeptideFragmentAnnotation(
                     charge, mass.fast_mass(
                         sequence=sequence, ion_type=ion_type,
-                        charge=charge) + mod_mass / charge,
+                        charge=charge, aa_mass=_aa_mass) + mod_mass / charge,
                     ion_type, ion_index))
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 

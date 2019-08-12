@@ -31,6 +31,31 @@ def test_get_theoretical_fragments():
         assert fragment.calc_mz == pytest.approx(fragment_mz)
 
 
+def test_get_theoretical_fragments_static_mod():
+    spectrum.static_modification('Y', 79.96633)
+    peptide = 'HPYLEDR'
+    fragments = {'b1_1': 138.066147, 'b2_1': 235.118912, 'b3_1': 478.148590,
+                 'b4_1': 591.232666, 'b5_1': 720.275269, 'b6_1': 835.302185,
+                 'y1_1': 175.118912, 'y2_1': 290.145844, 'y3_1': 419.188446,
+                 'y4_1': 532.272522, 'y5_1': 775.302185, 'y6_1': 872.354980,
+                 'b1_2': 69.536731,  'b2_2': 118.063111, 'b3_2': 239.577941,
+                 'b4_2': 296.119971, 'b5_2': 360.641266, 'b6_2': 418.154736,
+                 'y1_2': 88.063114,  'y2_2': 145.576584, 'y3_2': 210.097879,
+                 'y4_2': 266.639909, 'y5_2': 388.154739, 'y6_2': 436.681119,
+                 'b1_3': 46.693580,  'b2_3': 79.044500,  'b3_3': 160.054386,
+                 'b4_3': 197.749073, 'b5_3': 240.763270, 'b6_3': 279.105583,
+                 'y1_3': 59.044501,  'y2_3': 97.386815,  'y3_3': 140.401011,
+                 'y4_3': 178.095698, 'y5_3': 259.105585, 'y6_3': 291.456505}
+    for fragment in spectrum._get_theoretical_peptide_fragments(
+            peptide, None, max_charge=3):
+        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}'
+                                f'_{fragment.charge}']
+        assert fragment.calc_mz == pytest.approx(fragment_mz)
+    assert spectrum._aa_mass['Y'] == pytest.approx(163.06333 + 79.96633)
+    spectrum.reset_modifications()
+    assert spectrum._aa_mass['Y'] == pytest.approx(163.06333)
+
+
 def test_get_theoretical_fragments_mod():
     peptide = 'HPYLEDR'
     modifications = {2: 79.96633}

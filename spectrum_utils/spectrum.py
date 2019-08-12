@@ -530,31 +530,22 @@ def _get_mz_peak_index(
         None if no peak was found within the given m/z window, else the index
         of the best m/z peak relative to the given m/z value.
     """
-    # Find the best matching peak.
-    peak_i_start = 0
-    while (peak_i_start < len(spectrum_mz) and
-           utils.mass_diff(spectrum_mz[peak_i_start], fragment_mz,
-                           fragment_tol_mode == 'Da')
-           < -fragment_tol_mass):
-        peak_i_start += 1
-    peak_i_stop = peak_i_start
-    annotation_candidates_i = []
-    while (peak_i_stop < len(spectrum_mz) and
-           utils.mass_diff(spectrum_mz[peak_i_stop], fragment_mz,
-                           fragment_tol_mode == 'Da')
-           <= fragment_tol_mass):
-        annotation_candidates_i.append(peak_i_stop)
-        peak_i_stop += 1
-    if len(annotation_candidates_i) == 0:
+    # Binary search to find the best matching peak.
+    md = (fragment_tol_mass if fragment_tol_mode == 'Da' else
+          fragment_tol_mass / 10**6 * fragment_mz)
+    peak_i_start, peak_i_stop = np.searchsorted(
+        spectrum_mz, [fragment_mz - md, fragment_mz + md])
+    if peak_i_start == peak_i_stop:
         return None
     else:
+        peak_i_stop -= 1
         peak_annotation_i = 0
         if peak_assignment == 'nearest_mz':
             peak_annotation_i = np.argmin(np.abs(
-                spectrum_mz[peak_i_start: peak_i_stop] - fragment_mz))
+                spectrum_mz[peak_i_start:peak_i_stop] - fragment_mz))
         elif peak_assignment == 'most_intense':
             peak_annotation_i = np.argmax(
-                spectrum_intensity[peak_i_start: peak_i_stop])
+                spectrum_intensity[peak_i_start:peak_i_stop])
         return peak_i_start + peak_annotation_i
 
 

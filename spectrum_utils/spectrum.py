@@ -158,7 +158,7 @@ class MoleculeFragmentAnnotation(FragmentAnnotation):
         super().__init__(charge, calc_mz)
         self.ion_type = 'molecule'
         self.smiles = smiles
-        self.annotation = f'{self.smiles}{self._charge_to_str()}'
+        self.annotation = self.smiles
 
     def __repr__(self) -> str:
         return f"MoleculeFragmentAnnotation(smiles='{self.smiles}', " \

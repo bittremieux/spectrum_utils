@@ -15,9 +15,9 @@ from spectrum_utils.spectrum import MsmsSpectrum, MoleculeFragmentAnnotation,\
 
 colors = {'a': '#388E3C', 'b': '#1976D2', 'c': '#00796B',
           'x': '#7B1FA2', 'y': '#D32F2F', 'z': '#F57C00',
-          'unknown': '#212121', 'mol': '#212121', None: '#212121'}
+          'unknown': '#212121', 'molecule': '#212121', None: '#212121'}
 zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
-           'mol': 5, None: 1}
+           'molecule': 5, None: 1}
 
 
 # Default molecule size is 300x300 px.
@@ -80,14 +80,8 @@ def _annotate_ion(mz: float, intensity: float,
             annotation_pos = intensity
             if annotation_pos > 0:
                 annotation_pos += 0.02
-            # Textual peptide fragment annotation.
-            if type(annotation) == PeptideFragmentAnnotation:
-                kws = annotation_kws.copy()
-                del kws['zorder']
-                ax.text(mz, annotation_pos, str(annotation), color=color,
-                        zorder=zorder, **kws)
             # Graphic molecule fragment annotation.
-            elif type(annotation) == MoleculeFragmentAnnotation:
+            if type(annotation) == MoleculeFragmentAnnotation:
                 im = _smiles_to_im(annotation.smiles)
                 # Rescale the molecule to fill 1/3th of the plot vertically
                 # and horizontally.
@@ -98,6 +92,12 @@ def _annotate_ion(mz: float, intensity: float,
                           extent=(mz - width // 2, mz + width // 2,
                                   annotation_pos, annotation_pos + height),
                           zorder=zorder)
+            # Textual fragment annotation.
+            else:
+                kws = annotation_kws.copy()
+                del kws['zorder']
+                ax.text(mz, annotation_pos, str(annotation), color=color,
+                        zorder=zorder, **kws)
 
         return color, zorder
 

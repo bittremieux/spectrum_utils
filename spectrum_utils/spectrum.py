@@ -4,6 +4,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
 import numpy as np
+from rdkit import Chem
 try:
     from pyteomics import cmass as mass
 except ImportError:
@@ -12,43 +13,90 @@ except ImportError:
 from spectrum_utils import utils
 
 
-class PeptideFragmentAnnotation:
+class FragmentAnnotation:
+    """
+    Class representing a general fragment ion annotation.
+    """
+
+    def __init__(self, charge: int, calc_mz: float, annotation: str = None)\
+            -> None:
+        """
+        Instantiate a new `FragmentAnnotation`.
+
+        Parameters
+        ----------
+        charge : int
+            The fragment ion charge if known, None otherwise.
+        calc_mz : float
+            The theoretical m/z value of the fragment.
+        annotation : str
+            The fragment's annotation string.
+        """
+        self.ion_type = 'unknown'
+        self.charge = charge
+        self.calc_mz = calc_mz
+        self.annotation = annotation
+
+    def _charge_to_str(self):
+        """
+        Convert a numeric charge to a string representation.
+        """
+        if self.charge is None:
+            return 'unknown'
+        elif self.charge > 0:
+            return '+' * self.charge
+        elif self.charge < 0:
+            return '-' * -self.charge
+        else:
+            return 'undefined'
+
+    def __repr__(self) -> str:
+        return f"FragmentAnnotation(annotation='{self.annotation}', " \
+               f"charge={self._charge_to_str()}, mz={self.calc_mz})"
+
+    def __str__(self) -> str:
+        return self.annotation
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, FragmentAnnotation):
+            return False
+        else:
+            return self.annotation == other.annotation
+
+
+class PeptideFragmentAnnotation(FragmentAnnotation):
     """
     Class representing a peptide fragment ion annotation.
     """
 
-    def __init__(self, ion_type: str, ion_index: int, charge: int,
-                 calc_mz: float) -> None:
+    def __init__(self, charge: int, calc_mz: float, ion_type: str,
+                 ion_index: int) -> None:
         """
         Instantiate a new `PeptideFragmentAnnotation`.
 
         Parameters
         ----------
-        ion_type : {'a', 'b', 'c', 'x', 'y', 'z'}
-            The peptide fragment ion type.
-        ion_index : int
-            The peptide fragment ion index.
         charge : int
             The peptide fragment ion charge.
         calc_mz : float
             The theoretical m/z value of the peptide fragment.
+        ion_type : {'a', 'b', 'c', 'x', 'y', 'z'}
+            The peptide fragment ion type.
+        ion_index : int
+            The peptide fragment ion index.
         """
+        super().__init__(charge, calc_mz)
         if ion_type not in 'abcxyz':
             raise ValueError(f'Unknown ion type: {ion_type}')
         self.ion_type = ion_type
         self.ion_index = ion_index
-        if charge <= 0:
-            raise ValueError('Charge should be strictly positive')
-        self.charge = charge
-        self.calc_mz = calc_mz
+        self.annotation = f'{self.ion_type}{self.ion_index}' \
+                          f'{self._charge_to_str()}'
 
     def __repr__(self) -> str:
         return f"PeptideFragmentAnnotation(ion_type='{self.ion_type}', " \
             f"ion_index={self.ion_index}, charge={self.charge}, " \
             f"mz={self.calc_mz})"
-
-    def __str__(self) -> str:
-        return f'{self.ion_type}{self.ion_index}{"+" * self.charge}'
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, PeptideFragmentAnnotation):
@@ -60,36 +108,32 @@ class PeptideFragmentAnnotation:
                     math.isclose(self.calc_mz, other.calc_mz))
 
 
-class MoleculeFragmentAnnotation:
+class MoleculeFragmentAnnotation(FragmentAnnotation):
     """
     Class representing a molecule fragment ion annotation.
     """
 
-    def __init__(self, smiles: str, charge: int,
-                 calc_mz: float) -> None:
+    def __init__(self, charge: int, calc_mz: float, smiles: str) -> None:
         """
         Instantiate a new `MoleculeFragmentAnnotation`.
 
         Parameters
         ----------
-        smiles : str
-            The SMILES representation of the molecule.
         charge : int
             The molecule fragment ion charge.
         calc_mz : float
             The theoretical m/z value of the molecule fragment.
+        smiles : str
+            The SMILES representation of the molecule.
         """
-        self.ion_type = 'mol'
+        super().__init__(charge, calc_mz)
+        self.ion_type = 'molecule'
         self.smiles = smiles
-        self.charge = charge
-        self.calc_mz = calc_mz
+        self.annotation = f'{self.smiles}{self._charge_to_str()}'
 
     def __repr__(self) -> str:
         return f"MoleculeFragmentAnnotation(smiles='{self.smiles}', " \
             f"charge={self.charge}, mz={self.calc_mz})"
-
-    def __str__(self) -> str:
-        return f'{self.smiles}{"+" * self.charge}'
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, MoleculeFragmentAnnotation):
@@ -154,9 +198,10 @@ def _get_theoretical_peptide_fragments(
                 mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
                 ions.append(PeptideFragmentAnnotation(
-                    ion_type, ion_index, charge,
-                    mass.fast_mass(sequence=sequence, ion_type=ion_type,
-                                   charge=charge) + mod_mass / charge))
+                    charge, mass.fast_mass(
+                        sequence=sequence, ion_type=ion_type,
+                        charge=charge) + mod_mass / charge,
+                    ion_type, ion_index))
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 
 
@@ -536,7 +581,7 @@ def _get_mz_peak_index(
     if peak_i_start == peak_i_stop:
         return None
     else:
-        peak_i_stop -= 1
+        print(peak_i_start, peak_i_stop)
         peak_annotation_i = 0
         if peak_assignment == 'nearest_mz':
             peak_annotation_i = np.argmin(np.abs(
@@ -652,7 +697,7 @@ class MsmsSpectrum:
         if np.asarray(mz).ndim > 0:
             self._mz = np.asarray(mz)
         else:
-            raise ValueError('Invalid mz values')
+            raise ValueError('Invalid m/z values')
 
     @property
     def intensity(self):
@@ -926,6 +971,7 @@ class MsmsSpectrum:
         return self
 
     def annotate_molecule_fragment(self, smiles: str, fragment_mz: float,
+                                   fragment_charge: int,
                                    fragment_tol_mass: float,
                                    fragment_tol_mode: str,
                                    peak_assignment: str = 'most_intense')\
@@ -942,6 +988,8 @@ class MsmsSpectrum:
             The fragment molecule that will be annotated in SMILES format.
         fragment_mz : float
             The expected m/z of the molecule.
+        fragment_charge : int
+            The charge of the molecule.
         fragment_tol_mass : float
             Fragment mass tolerance to match spectrum peaks against the
             theoretical molecule mass.
@@ -958,6 +1006,11 @@ class MsmsSpectrum:
         -------
         self : `MsmsSpectrum`
         """
+        # Make sure the SMILES annotation is valid and sanitized.
+        mol = Chem.MolFromSmiles(smiles, sanitize=False)
+        if mol is None or Chem.SanitizeMol(mol, catchErrors=True) != 0:
+            raise ValueError('Invalid SMILES molecule')
+        # Find the matching m/z value.
         peak_index = _get_mz_peak_index(self.mz, self.intensity, fragment_mz,
                                         fragment_tol_mass, fragment_tol_mode,
                                         peak_assignment)
@@ -969,6 +1022,7 @@ class MsmsSpectrum:
                 self.annotation = np.full_like(self.mz, None, object)
             # Set the molecule's annotation.
             self.annotation[peak_index] =\
-                MoleculeFragmentAnnotation(smiles, 1, fragment_mz)
+                MoleculeFragmentAnnotation(fragment_charge, fragment_mz,
+                                           Chem.MolToSmiles(mol))
 
         return self

@@ -1,6 +1,7 @@
+import io
 import itertools
 import math
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -8,7 +9,8 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-from spectrum_utils.spectrum import MsmsSpectrum, MoleculeFragmentAnnotation, PeptideFragmentAnnotation
+from spectrum_utils.spectrum import MsmsSpectrum, MoleculeFragmentAnnotation,\
+    PeptideFragmentAnnotation
 
 
 colors = {'a': '#388E3C', 'b': '#1976D2', 'c': '#00796B',
@@ -18,15 +20,57 @@ zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
            'mol': 5, None: 1}
 
 
-_mol_annotation_size = 200
+# Default molecule size is 300x300 px.
+_mol_dim = 300
+# Default molecule dpi is 300 (default RDKit dpi is 72).
+_mol_annotation_dpi = 300 / 72
+# Combine the molecule annotation dimension and dpi.
+_mol_size = int(_mol_dim * _mol_annotation_dpi)
+# Change the default RDKit line width from -1 to 10 to accommodate the larger
+# figure.
+_mol_line_width = 10
+# Change the default RDKit font size from 0.5 to 2.5 to accommodate the larger
+# figure.
+_mol_font_size = 2.5
 
 
-def _annotate_ion(mz, intensity, annotation, color_ions, annotate_ions,
-                  annotation_kws, ax):
-    # No annotation -> just return peak styling information.
+def _annotate_ion(mz: float, intensity: float,
+                  annotation: Optional[MoleculeFragmentAnnotation,
+                                       PeptideFragmentAnnotation],
+                  color_ions: bool, annotate_ions: bool,
+                  annotation_kws: Dict[str, object], ax: plt.Axes)\
+        -> Tuple[str, int]:
+    """
+    Annotate a specific fragment peak.
+
+    Parameters
+    ----------
+    mz : float
+        The peak's m/z value (position of the annotation on the x axis).
+    intensity : float
+        The peak's intensity (position of the annotation on the y axis).
+    annotation : Optional[MoleculeFragmentAnnotation,
+                          PeptideFragmentAnnotation]
+        The annotation that will be plotted.
+    color_ions : bool
+        Flag whether to color the peak annotation or not.
+    annotate_ions : bool
+        Flag whether to annotation the peak or not.
+    annotation_kws : Dict
+        Keyword arguments for `ax.text` to customize peak annotations.
+    ax : plt.Axes
+        Axes instance on which to plot the annotation.
+
+    Returns
+    -------
+    Tuple[str, int]
+        A tuple of the annotation's color as a hex string and the annotation's
+        zorder.
+    """
+    # No annotation -> Just return peak styling information.
     if annotation is None:
         return colors.get(None), zorders.get(None)
-    # Else: add the textual or figure annotation.
+    # Else: Add the textual or figure annotation.
     else:
         color = (colors.get(annotation.ion_type) if color_ions else
                  colors.get(None))
@@ -36,42 +80,58 @@ def _annotate_ion(mz, intensity, annotation, color_ions, annotate_ions,
             annotation_pos = intensity
             if annotation_pos > 0:
                 annotation_pos += 0.02
+            # Textual peptide fragment annotation.
             if type(annotation) == PeptideFragmentAnnotation:
                 ax.text(mz, annotation_pos, str(annotation), color=color,
-                        **annotation_kws)
+                        zorder=zorder, **annotation_kws)
+            # Graphic molecule fragment annotation.
             elif type(annotation) == MoleculeFragmentAnnotation:
                 im = _smiles_to_im(annotation.smiles)
+                # Rescale the molecule to fill 1/3th of the plot vertically
+                # and horizontally.
                 x_range = ax.get_xlim()[1] - ax.get_xlim()[0]
-                width = (x_range / 3) / _mol_annotation_size * im.shape[1]
-                height = (1/3) / _mol_annotation_size * im.shape[0]
-                ax.imshow(im, aspect='auto', extent=(mz - width // 2,
-                                                     mz + width // 2,
-                                                     annotation_pos,
-                                                     annotation_pos + height),
+                width = (x_range / 3) / _mol_size * im.shape[1]
+                height = (1/3) / _mol_size * im.shape[0]
+                ax.imshow(im, aspect='auto', interpolation='none',
+                          extent=(mz - width // 2, mz + width // 2,
+                                  annotation_pos, annotation_pos + height),
                           zorder=zorder)
 
         return color, zorder
 
 
-def _smiles_to_im(smiles):
-    # Draw the molecule and make the white background transparent.
-    # https://stackoverflow.com/a/54148416
-    options = Draw.DrawingOptions()
-    options.dotsPerAngstrom = 100
-    im = Draw.MolToImage(Chem.MolFromSmiles(smiles),
-                         size=(_mol_annotation_size, _mol_annotation_size),
-                         options=options)
-    im = np.asarray(im).copy()
-    im[:, :, 3] = (255 * (im[:, :, :3] != 255).any(axis=2)).astype(np.uint8)
-    # Crop the image by removing white lines.
+def _smiles_to_im(smiles: str) -> np.array:
+    """
+    Generate a molecule figure from its SMILES representation.
+
+    Parameters
+    ----------
+    smiles : str
+        The SMILES representation of the molecule to be converted to a figure.
+
+    Returns
+    -------
+    np.array
+        The molecule figure as an [N, M, 3] NumPy RGB array. N and M are
+        defined by `_mol_size` with empty lines cropped.
+    """
+    # Draw the molecule.
+    # https://sourceforge.net/p/rdkit/mailman/message/36735785/
+    d2d = Draw.MolDraw2DCairo(_mol_size, _mol_size)
+    d2d.SetFontSize(_mol_font_size)
+    d2d.drawOptions().bondLineWidth = _mol_line_width
+    Draw.PrepareAndDrawMolecule(d2d, Chem.MolFromSmiles(smiles))
+    d2d.FinishDrawing()
+    im = plt.imread(io.BytesIO(d2d.GetDrawingText()))
+    # Crop the image by removing empty (white) lines.
     bottom, top, left, right = 0, im.shape[0] - 1, 0, im.shape[1] - 1
-    while bottom < im.shape[0] and im[bottom:bottom+1, :, :3].min() == 255:
+    while bottom < im.shape[0] and not im[bottom:bottom+1, :, :].min() < 1.:
         bottom += 1
-    while top > 0 and im[top-1:top, :, :3].min() == 255:
+    while top > 0 and not im[top-1:top, :, :].min() < 1.:
         top -= 1
-    while left < im.shape[1] and im[:, left:left+1, :3].min() == 255:
+    while left < im.shape[1] and not im[:, left:left+1, :].min() < 1.:
         left += 1
-    while right > 0 and im[:, right-1:right, :3].min() == 255:
+    while right > 0 and not im[:, right-1:right, :].min() < 1.:
         right -= 1
     return im[bottom:top:, left:right, :]
 

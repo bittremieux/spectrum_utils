@@ -473,14 +473,12 @@ def _get_peptide_fragment_annotation_map(
                < -fragment_tol_mass):
             peak_i_start += 1
         peak_i_stop = peak_i_start
-        annotation_candidates_i = []
         while (peak_i_stop < len(spectrum_mz) and
                utils.mass_diff(spectrum_mz[peak_i_stop], fragment_mz,
                                fragment_tol_mode == 'Da')
                <= fragment_tol_mass):
-            annotation_candidates_i.append(peak_i_stop)
             peak_i_stop += 1
-        if len(annotation_candidates_i) > 0:
+        if peak_i_start != peak_i_stop:
             peak_annotation_i = 0
             if peak_assignment == 'nearest_mz':
                 peak_annotation_i = np.argmin(np.abs(

@@ -507,7 +507,7 @@ class MsmsSpectrum:
                  annotation: Optional[Union[np.ndarray, Iterable]] = None,
                  retention_time: Optional[float] = None,
                  peptide: Optional[str] = None,
-                 modifications: Optional[Dict[Union[float, str], float]] = None,
+                 modifications: Optional[Dict[Union[int, str], float]] = None,
                  is_decoy: bool = False) -> None:
         """
         Instantiate a new `MsmsSpectrum` consisting of fragment peaks.
@@ -537,7 +537,7 @@ class MsmsSpectrum:
             The peptide sequence corresponding to the spectrum (the default is
             None, which means that no peptide-spectrum match is specified). The
             peptide sequence should only exist of the 20 standard amino acids.
-        modifications : Optional[Dict[Union[float, str], float]], optional
+        modifications : Optional[Dict[Union[int, str], float]], optional
             Mapping of modification positions and mass differences. Valid
             positions are any amino acid index in the peptide (0-based),
             'N-term', and 'C-term'.

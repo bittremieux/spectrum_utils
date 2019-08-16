@@ -1059,7 +1059,8 @@ class MsmsSpectrum:
                                    fragment_charge: int,
                                    fragment_tol_mass: float,
                                    fragment_tol_mode: str,
-                                   peak_assignment: str = 'most_intense')\
+                                   peak_assignment: str = 'most_intense',
+                                   text: Optional[str] = None)\
             -> 'MsmsSpectrum':
         """
         Annotate a peak (if present) with its m/z value.
@@ -1083,6 +1084,9 @@ class MsmsSpectrum:
 
             - 'most_intense': The most intense peak will be annotated (default).
             - 'nearest_mz': The peak whose m/z is closest to the given m/z will be annotated.
+        text : Optional[str], optional
+            The text to annotate the peak with. If None, its m/z value will be
+            used.
 
         Returns
         -------
@@ -1100,7 +1104,8 @@ class MsmsSpectrum:
                 self.annotation = np.full_like(self.mz, None, object)
             # Set the peak annotation.
             self.annotation[peak_index] =\
-                FragmentAnnotation(fragment_charge, fragment_mz,
-                                   str(fragment_mz))
+                FragmentAnnotation(
+                    fragment_charge, fragment_mz,
+                    text if text is not None else str(fragment_mz))
 
         return self

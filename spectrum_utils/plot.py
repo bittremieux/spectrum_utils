@@ -206,11 +206,9 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
     if grid in (True, 'both', 'major'):
-        ax.grid(b=True, which='major', color='#9E9E9E',
-                linestyle='--', linewidth=1.)
+        ax.grid(b=True, which='major', color='#9E9E9E', linewidth=0.2)
     if grid in (True, 'both', 'minor'):
-        ax.grid(b=True, which='minor', color='#9E9E9E',
-                linestyle='--', linewidth=0.5)
+        ax.grid(b=True, which='minor', color='#9E9E9E', linewidth=0.2)
     ax.set_axisbelow(True)
 
     ax.tick_params(axis='both', which='both', labelsize='small')

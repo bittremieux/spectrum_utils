@@ -1054,3 +1054,53 @@ class MsmsSpectrum:
                                            Chem.MolToSmiles(mol))
 
         return self
+
+    def annotate_mz_fragment(self, fragment_mz: float,
+                                   fragment_charge: int,
+                                   fragment_tol_mass: float,
+                                   fragment_tol_mode: str,
+                                   peak_assignment: str = 'most_intense')\
+            -> 'MsmsSpectrum':
+        """
+        Annotate a peak (if present) with its m/z value.
+
+        The matching position in `self.annotation` will be overwritten.
+
+        Parameters
+        ----------
+        fragment_mz : float
+            The expected m/z to annotate.
+        fragment_charge : int
+            The peak charge.
+        fragment_tol_mass : float
+            Fragment mass tolerance to match spectrum peaks against the given
+            m/z.
+        fragment_tol_mode : {'Da', 'ppm'}
+            Fragment mass tolerance unit. Either 'Da' or 'ppm'.
+        peak_assignment : {'most_intense', 'nearest_mz'}, optional
+            In case multiple peaks occur within the given mass window around
+            the given m/z, only a single peak will be annotated:
+
+            - 'most_intense': The most intense peak will be annotated (default).
+            - 'nearest_mz': The peak whose m/z is closest to the given m/z will be annotated.
+
+        Returns
+        -------
+        self : `MsmsSpectrum`
+        """
+        # Find the matching m/z value.
+        peak_index = _get_mz_peak_index(self.mz, self.intensity, fragment_mz,
+                                        fragment_tol_mass, fragment_tol_mode,
+                                        peak_assignment)
+        if peak_index is None:
+            raise ValueError(f'No matching peak found for {fragment_mz} m/z')
+        else:
+            # Initialize the annotations if they don't exist yet.
+            if self.annotation is None:
+                self.annotation = np.full_like(self.mz, None, object)
+            # Set the peak annotation.
+            self.annotation[peak_index] =\
+                FragmentAnnotation(fragment_charge, fragment_mz,
+                                   str(fragment_mz))
+
+        return self

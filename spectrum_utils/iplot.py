@@ -87,6 +87,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
                  .mark_rule(size=2).encode(x=x_axis, y=y_axis, color=color,
                                            tooltip=tooltip_not_annotated))
     # Annotated peaks.
+    # FIXME: Find a way to add custom image marks in Altair to add molecule
+    #        graphics (https://github.com/altair-viz/altair/issues/848).
     annotation_kws = {
         'align': 'left' if not mirror_intensity else 'right',
         'angle': 270, 'baseline': 'middle'}

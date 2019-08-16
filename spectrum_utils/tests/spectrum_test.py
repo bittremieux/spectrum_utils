@@ -751,7 +751,7 @@ def test_annotate_molecule_fragments_invalid_mz():
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     with pytest.raises(ValueError):
-        spec.annotate_molecule_fragment('blablablabla', 1600, 1,
+        spec.annotate_molecule_fragment('CCCCCCCC', 1600, 1,
                                         fragment_tol_mass, fragment_tol_mode)
 
 
@@ -766,7 +766,6 @@ def test_annotate_molecule_fragments_nearest_mz():
     spec.annotate_molecule_fragment('CCCCCCCC', fragment_mz, charge,
                                     fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='nearest_mz')
-    charge = 1
     assert spec.annotation[0] == spectrum.MoleculeFragmentAnnotation(
         charge, fragment_mz, 'CCCCCCCC')
     assert spec.annotation[1] is None
@@ -784,8 +783,83 @@ def test_annotate_molecule_fragments_most_intense():
     spec.annotate_molecule_fragment('CCCCCCCC', fragment_mz, charge,
                                     fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='most_intense')
-    charge = 1
     assert spec.annotation[0] is None
     assert spec.annotation[1] == spectrum.MoleculeFragmentAnnotation(
         charge, fragment_mz, 'CCCCCCCC')
+    assert spec.annotation[2] is None
+
+
+def test_annotate_mz_fragments():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum(
+        'test_spectrum', 500, 1, mz, intensity)
+    fragment_tol_mass = 0.02
+    fragment_tol_mode = 'Da'
+    num_annotation = 4
+    for fragment_mz in np.random.choice(spec.mz, num_annotation, False):
+        spec.annotate_mz_fragment(fragment_mz, 1, fragment_tol_mass,
+                                  fragment_tol_mode)
+    assert np.count_nonzero(spec.annotation) == num_annotation
+
+
+def test_annotate_mz_fragments_text():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum(
+        'test_spectrum', 500, 1, mz, intensity)
+    fragment_tol_mass = 0.02
+    fragment_tol_mode = 'Da'
+    annotation = ['one', 'two', 'three', 'four']
+    for a, fragment_mz in zip(annotation, np.random.choice(
+            spec.mz, len(annotation), False)):
+        spec.annotate_mz_fragment(fragment_mz, 1, fragment_tol_mass,
+                                  fragment_tol_mode, a)
+    assert np.count_nonzero(spec.annotation) == len(annotation)
+
+
+def test_annotate_mz_fragments_invalid_mz():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum(
+        'test_spectrum', 500, 1, mz, intensity)
+    fragment_tol_mass = 0.02
+    fragment_tol_mode = 'Da'
+    with pytest.raises(ValueError):
+        spec.annotate_mz_fragment(1600, 1, fragment_tol_mass,
+                                  fragment_tol_mode)
+
+
+def test_annotate_mz_fragments_nearest_mz():
+    fragment_tol_mass = 1
+    fragment_tol_mode = 'Da'
+    mz, intensity = np.asarray([200, 200.5, 201]), np.asarray([10, 20, 30])
+    spec = spectrum.MsmsSpectrum(
+        'test_spectrum', 100, 1, mz, intensity)
+    fragment_mz = 200.15
+    charge = 1
+    spec.annotate_mz_fragment(fragment_mz, charge, fragment_tol_mass,
+                              fragment_tol_mode, 'nearest_mz', 'hello')
+    assert spec.annotation[0] == spectrum.FragmentAnnotation(
+        charge, fragment_mz, 'hello')
+    assert spec.annotation[1] is None
+    assert spec.annotation[2] is None
+
+
+def test_annotate_mz_fragments_most_intense():
+    fragment_tol_mass = 1
+    fragment_tol_mode = 'Da'
+    mz, intensity = np.asarray([200, 200.5, 201.5]), np.asarray([10, 20, 30])
+    spec = spectrum.MsmsSpectrum(
+        'test_spectrum', 100, 1, mz, intensity)
+    fragment_mz = 200.15
+    charge = 1
+    spec.annotate_mz_fragment(fragment_mz, charge, fragment_tol_mass,
+                              fragment_tol_mode, 'most_intense', 'hello')
+    assert spec.annotation[0] is None
+    assert spec.annotation[1] == spectrum.FragmentAnnotation(
+        charge, fragment_mz, 'hello')
     assert spec.annotation[2] is None

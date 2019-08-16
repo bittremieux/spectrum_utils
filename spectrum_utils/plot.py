@@ -125,17 +125,19 @@ def _smiles_to_im(smiles: str) -> np.array:
     Draw.PrepareAndDrawMolecule(d2d, Chem.MolFromSmiles(smiles))
     d2d.FinishDrawing()
     im = plt.imread(io.BytesIO(d2d.GetDrawingText()))
+    # Make white pixels transparent.
+    im = np.dstack((im, (~im.all(2)).astype(np.float32)))
     # Crop the image by removing empty (white) lines.
     bottom, top, left, right = 0, im.shape[0] - 1, 0, im.shape[1] - 1
-    while bottom < im.shape[0] and not im[bottom:bottom+1, :, :].min() < 1.:
+    while bottom < im.shape[0] and np.isclose(im[bottom, :, 3].sum(), 0):
         bottom += 1
-    while top > 0 and not im[top-1:top, :, :].min() < 1.:
+    while top > 0 and np.isclose(im[top, :, 3].sum(), 0):
         top -= 1
-    while left < im.shape[1] and not im[:, left:left+1, :].min() < 1.:
+    while left < im.shape[1] and np.isclose(im[:, left, 3].sum(), 0):
         left += 1
-    while right > 0 and not im[:, right-1:right, :].min() < 1.:
+    while right > 0 and np.isclose(im[:, right, 3].sum(), 0):
         right -= 1
-    return im[bottom:top:, left:right, :]
+    return im[bottom:top+1:, left:right+1, :]
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,

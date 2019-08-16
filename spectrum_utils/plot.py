@@ -83,15 +83,13 @@ def _annotate_ion(mz: float, intensity: float,
             # Graphic molecule fragment annotation.
             if type(annotation) == MoleculeFragmentAnnotation:
                 im = _smiles_to_im(annotation.smiles)
-                # Rescale the molecule to fill 1/3th of the plot horizontally,
-                # keep the aspect ratio vertically.
-                ratio = 1 / (3 * _mol_size)
-                x_range = ax.get_xlim()[1] - ax.get_xlim()[0]
-                y_range = ax.get_ylim()[1] - ax.get_ylim()[0]
-                width = x_range * im.shape[1] * ratio
-                height = y_range * im.shape[0] * ratio
+                # Rescale the molecule to fill 1/5th of the plot horizontally
+                # and vertically.
+                scale_factor = 0.2
+                width = (ax.get_xlim()[1] - ax.get_xlim()[0]) * scale_factor
+                height = (ax.get_ylim()[1] - ax.get_ylim()[0]) * scale_factor
                 ax.imshow(im, aspect='auto', interpolation='none',
-                          extent=(mz - width // 2, mz + width // 2,
+                          extent=(mz - width / 2, mz + width / 2,
                                   annotation_pos, annotation_pos + height),
                           zorder=zorder)
             # Textual fragment annotation.

@@ -22,9 +22,7 @@ install:
   - conda create -q -n test python=$TRAVIS_PYTHON_VERSION
   - source activate test
   # Install the dependencies using conda.
-  - conda install altair matplotlib numba numpy pandas pyteomics rdkit -c defaults -c bioconda -c conda-forge
-  - conda list
+  - conda install altair matplotlib numba numpy pandas pyteomics pytest rdkit -c defaults -c bioconda -c conda-forge
   - python setup.py install
-  - conda list
 script:
   - pytest

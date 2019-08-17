@@ -23,6 +23,8 @@ install:
   - source activate test
   # Install the dependencies using conda.
   - conda install altair matplotlib numba numpy pandas pyteomics rdkit -c defaults -c bioconda -c conda-forge
+  - conda list
   - python setup.py install
+  - conda list
 script:
   - pytest

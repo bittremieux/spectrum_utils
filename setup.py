@@ -40,7 +40,8 @@ setuptools.setup(
         'matplotlib',
         'numba>=0.41',
         'numpy',
-        'pyteomics'],
+        'pyteomics',
+        'rdkit'],
     extras_require={
         'iplot': ['altair', 'pandas']
     }

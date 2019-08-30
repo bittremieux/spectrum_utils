@@ -4,62 +4,26 @@
 ![Python 3.6](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![Python 3.7](https://img.shields.io/badge/python-3.7-brightgreen.svg)
 
-Simple MS/MS spectrum preprocessing and visualization in Python.
+Efficient MS/MS spectrum processing and visualization in Python.
 
 ## Features
 
-- Spectrum (pre)processing
-	- Precursor & noise peak removal
-	- Intensity filtering
-	- Intensity scaling
-	- Modification-aware fragment ion annotating (powered by [Pyteomics](https://pyteomics.readthedocs.io/))
+- Spectrum processing
+    - Precursor & noise peak removal
+    - Intensity filtering
+    - Intensity scaling
+    - Peak annotations
+        - Modification-aware (static & variable) peptide fragments
+        - SMILES-based molecules
+        - Custom strings
 - Spectrum plotting
-	- Single spectrum with annotated ions
-	- Mirror plot of matching spectra
-	- Interactive spectrum plots
-
-## Example
-
-```
-import matplotlib.pyplot as plt
-
-from spectrum_utils import plot
-from spectrum_utils import spectrum
-
-
-# Initialize spectrum information first...
-
-spec = spectrum.MsmsSpectrum(identifier, precursor_mz, precursor_charge,
-                             mz, intensity, retention_time=retention_time,
-                             peptide=peptide)
-
-# Preprocess the MS/MS spectrum.
-fragment_tol_mass = 10
-fragment_tol_mode = 'ppm'
-spec = (spec.set_mz_range(min_mz=100, max_mz=1400)
-            .remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
-            .filter_intensity(min_intensity=0.05, max_num_peaks=150)
-            .scale_intensity(scaling='root')
-            .annotate_peaks(fragment_tol_mass, fragment_tol_mode,
-                            ion_types='aby'))
-
-# Plot the MS/MS spectrum.
-plot.spectrum(spec)
-
-plt.show()
-plt.close()
-```
-(Condensed example. See [here](https://github.com/bittremieux/spectrum_utils/blob/master/notebooks/quickstart.ipynb) for the full code to generate the figure below.)
-
-![spectrum_utils](spectrum_utils.png)
+    - Fully customizable individual spectrum plots
+    - Mirror plot of matching spectra
+    - Interactive spectrum plots
 
 ## Installation
 
-`spectrum_utils` can be installed easily via pip:
-
-```pip install spectrum_utils```
-
-Or via conda:
+`spectrum_utils` can easily be installed using conda:
 
 ```conda install -c bioconda spectrum_utils```
 
@@ -73,8 +37,37 @@ Or via conda:
 - [NumPy](https://www.numpy.org/)
 - [Pandas](https://pandas.pydata.org/)
 - [Pyteomics](https://pyteomics.readthedocs.io/)
+- [RDKit](https://www.rdkit.org/)
 
 Missing dependencies will be automatically installed when you install `spectrum_utils`.
+
+## Example
+
+```
+import spectrum_utils.plot as sup
+import spectrum_utils.spectrum as sus
+
+
+# Initialize spectrum information first...
+
+spectrum = sus.MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+                            mz, intensity, retention_time=retention_time,
+                            peptide=peptide)
+
+# Preprocess the MS/MS spectrum.
+fragment_tol_mass = 10
+fragment_tol_mode = 'ppm'
+spectrum = (spectrum.set_mz_range(min_mz=100, max_mz=1400)
+            .remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
+            .filter_intensity(min_intensity=0.05, max_num_peaks=50)
+            .annotate_peptide_fragments(fragment_tol_mass, fragment_tol_mode,
+                                        ion_types='aby'))
+
+# Plot the MS/MS spectrum.
+sup.spectrum(spectrum, grid=False)
+```
+
+![spectrum_utils](spectrum_utils.png)
 
 ## API documentation
 

@@ -51,6 +51,7 @@ autodoc_default_options = {
     'special-members': '__init__',
     'undoc-members': True
 }
+autodoc_mock_imports = ['altair', 'matplotlib', 'pandas', 'pyteomics', 'rdkit']
 autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.

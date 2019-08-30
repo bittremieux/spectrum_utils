@@ -717,33 +717,72 @@ class MsmsSpectrum:
         self.is_decoy = is_decoy
 
     @property
-    def mz(self):
+    def mz(self) -> np.ndarray:
+        """
+        Get or set the mass-to-charge ratios of the fragment peaks.
+
+        When setting new m/z values it should be possible to convert the given
+        values to a NumPy array and the number of m/z values should be equal to
+        the number of intensity (and annotation) values.
+
+        Returns
+        -------
+        np.ndarray
+            The mass-to-charge ratios of the fragment peaks.
+        """
         return self._mz
 
     @mz.setter
-    def mz(self, mz):
+    def mz(self, mz: Union[np.ndarray, Iterable]) -> None:
         if np.asarray(mz).ndim > 0:
             self._mz = np.asarray(mz)
         else:
             raise ValueError('Invalid m/z values')
 
     @property
-    def intensity(self):
+    def intensity(self) -> np.ndarray:
+        """
+        Get or set the intensities of the fragment peaks.
+
+        When setting new intensity values it should be possible to convert the
+        given values to a NumPy array and the number of intensity values should
+        be equal to the number of m/z (and annotation) values.
+
+        Returns
+        -------
+        np.ndarray
+            The intensity values of the fragment peaks.
+        """
         return self._intensity
 
     @intensity.setter
-    def intensity(self, intensity):
+    def intensity(self, intensity: Union[np.ndarray, Iterable]) -> None:
         if np.asarray(intensity).ndim > 0:
             self._intensity = np.asarray(intensity)
         else:
             raise ValueError('Invalid intensity values')
 
     @property
-    def annotation(self):
+    def annotation(self) -> Optional[np.ndarray]:
+        """
+        Get or set the annotations of the fragment peaks.
+
+        When setting new annotations it should be possible to convert the given
+        values to a NumPy array (or None) and the number of annotations should
+        be equal to the number of m/z and intensity values.
+
+        Returns
+        -------
+        Optional[np.ndarray]
+            The annotations of the fragment peaks or None if no annotations
+            have been specified.
+        """
         return self._annotation
 
     @annotation.setter
-    def annotation(self, annotation):
+    def annotation(
+            self, annotation: Optional[Union[np.ndarray, Iterable]] = None)\
+            -> None:
         if annotation is None:
             self._annotation = None
         elif np.asarray(annotation).ndim > 0:

@@ -47,7 +47,11 @@ extensions = [
     'sphinx.ext.autosummary',
 ]
 
-autodoc_default_flags = ['special-members']
+autodoc_default_options = {
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True
+}
 autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.

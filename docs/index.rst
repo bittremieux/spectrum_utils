@@ -13,14 +13,14 @@ Features
 --------
 
 - Spectrum (pre)processing
-	- Precursor & noise peak removal
-	- Intensity filtering
-	- Intensity scaling
-	- Modification-aware fragment ion annotating (powered by `Pyteomics <https://pyteomics.readthedocs.io/>`_)
+    - Precursor & noise peak removal
+    - Intensity filtering
+    - Intensity scaling
+    - Modification-aware fragment ion annotating (powered by `Pyteomics <https://pyteomics.readthedocs.io/>`_)
 - Spectrum plotting
-	- Single spectrum with annotated ions
-	- Mirror plot of matching spectra
-	- Interactive spectrum plots
+    - Single spectrum with annotated ions
+    - Mirror plot of matching spectra
+    - Interactive spectrum plots
 
 Example
 -------
@@ -89,9 +89,8 @@ API documentation
 -----------------
 
 .. toctree::
-   :glob:
 
-   api/*
+    spectrum_utils
 
 Contact
 -------

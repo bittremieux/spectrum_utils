@@ -26,7 +26,7 @@ def static_modification(amino_acid: str, mass_diff: float) -> None:
     amino_acid : str
         The amino acid whose monoisotopic mass is modified.
     mass_diff : float
-        The _mass difference_ to be added to the amino acid's original
+        The *mass difference* to be added to the amino acid's original
         monoisotopic mass.
     """
     global _aa_mass
@@ -235,7 +235,7 @@ def _get_theoretical_peptide_fragments(
 
 
 @nb.njit(nb.types.Tuple((nb.float32[:], nb.float32[:], nb.int64[:]))
-             (nb.float32[::1], nb.float32[::1]))
+         (nb.float32[::1], nb.float32[::1]))
 def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
         -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     mz, intensity = mz.reshape(-1), intensity.reshape(-1)
@@ -904,9 +904,18 @@ class MsmsSpectrum:
             means that no transformation will be performed).
             Potential transformation options are:
 
-            - 'root': Root-transform the peak intensities. The default is a square root transformation (`degree` is 2). The degree of the root can be specified using the `degree` kwarg.
-            - 'log':  Log-transform the peak intensities. The default is a log2 transformation (`base` is 2) after summing the intensities with 1 to avoid negative values after the transformation. The base of the logarithm can be specified using the `base` kwarg.
-            - 'rank': Rank-transform the peak intensities. The maximum rank of the most intense peak can be specified using the `max_rank` kwarg, by default the number of peaks in the spectrum is used as the maximum rank. Note that `max_rank` should be greater than or equal to the number of peaks in the spectrum.
+            - 'root': Root-transform the peak intensities. The default is a
+              square root transformation (`degree` is 2). The degree of the
+              root can be specified using the `degree` kwarg.
+            - 'log':  Log-transform the peak intensities. The default is a log2
+              transformation (`base` is 2) after summing the intensities with 1
+              to avoid negative values after the transformation. The base of
+              the logarithm can be specified using the `base` kwarg.
+            - 'rank': Rank-transform the peak intensities. The maximum rank of
+              the most intense peak can be specified using the `max_rank`
+              kwarg, by default the number of peaks in the spectrum is used as
+              the maximum rank. Note that `max_rank` should be greater than or
+              equal to the number of peaks in the spectrum.
 
         max_intensity : Optional[float], optional
             Intensity of the most intense peak relative to which the peaks will
@@ -975,8 +984,10 @@ class MsmsSpectrum:
             theoretical peak, only a single peak will be annotated with the
             fragment type:
 
-            - 'most_intense': The most intense peak will be annotated (default).
-            - 'nearest_mz': The peak whose m/z is closest to the theoretical m/z will be annotated.
+            - 'most_intense': The most intense peak will be annotated
+              (default).
+            - 'nearest_mz': The peak whose m/z is closest to the theoretical
+              m/z will be annotated.
 
         Returns
         -------
@@ -1027,8 +1038,10 @@ class MsmsSpectrum:
             In case multiple peaks occur within the given mass window around
             the molecule's given mass, only a single peak will be annotated:
 
-            - 'most_intense': The most intense peak will be annotated (default).
-            - 'nearest_mz': The peak whose m/z is closest to the theoretical m/z will be annotated.
+            - 'most_intense': The most intense peak will be annotated
+              (default).
+            - 'nearest_mz': The peak whose m/z is closest to the theoretical
+              m/z will be annotated.
 
         Returns
         -------
@@ -1055,13 +1068,10 @@ class MsmsSpectrum:
 
         return self
 
-    def annotate_mz_fragment(self, fragment_mz: float,
-                                   fragment_charge: int,
-                                   fragment_tol_mass: float,
-                                   fragment_tol_mode: str,
-                                   peak_assignment: str = 'most_intense',
-                                   text: Optional[str] = None)\
-            -> 'MsmsSpectrum':
+    def annotate_mz_fragment(self, fragment_mz: float, fragment_charge: int,
+                             fragment_tol_mass: float, fragment_tol_mode: str,
+                             peak_assignment: str = 'most_intense',
+                             text: Optional[str] = None) -> 'MsmsSpectrum':
         """
         Annotate a peak (if present) with its m/z value.
 
@@ -1082,8 +1092,10 @@ class MsmsSpectrum:
             In case multiple peaks occur within the given mass window around
             the given m/z, only a single peak will be annotated:
 
-            - 'most_intense': The most intense peak will be annotated (default).
-            - 'nearest_mz': The peak whose m/z is closest to the given m/z will be annotated.
+            - 'most_intense': The most intense peak will be annotated
+              (default).
+            - 'nearest_mz': The peak whose m/z is closest to the given m/z will
+              be annotated.
         text : Optional[str], optional
             The text to annotate the peak with. If None, its m/z value will be
             used.

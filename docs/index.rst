@@ -54,13 +54,13 @@ The recommended way to install ``spectrum_utils`` is using conda. Alternatively 
 
     pip install spectrum_utils
 
-To install the basic `spectrum_utils` version. Or::
+To install the basic ``spectrum_utils`` version. Or::
 
     pip install spectrum_utils[iplot]
 
 To include the interactive plotting functionality (requires Pandas and Altair).
 
-When installing using pip it is recommended to explicitly install any dependencies (listed above) in advance. Any missing dependencies will be automatically installed from PyPI when you install ``spectrum_utils``, _except_ RDKit. Please refer to the `RDKit installation notes <https://www.rdkit.org/docs/Install.html>`_ for information on how to install RDKit.
+When installing using pip it is recommended to explicitly install any dependencies (listed above) in advance. Any missing dependencies will be automatically installed from PyPI when you install ``spectrum_utils``, *except* RDKit. Please refer to the `RDKit installation notes <https://www.rdkit.org/docs/Install.html>`_ for information on how to install RDKit.
 
 In contrast, when installing ``spectrum_utils`` using conda all dependencies will be automatically installed, including RDKit.
 

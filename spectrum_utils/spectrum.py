@@ -1,5 +1,6 @@
 import math
 import operator
+import warnings
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
@@ -1040,11 +1041,19 @@ class MsmsSpectrum:
         theoretical_fragments = _get_theoretical_peptide_fragments(
             self.peptide, self.modifications, ion_types, max_ion_charge)
         self.annotation = np.full_like(self.mz, None, object)
-        for annotation_i, fragment_i in _get_peptide_fragment_annotation_map(
-                self.mz, self.intensity,
-                [fragment.calc_mz for fragment in theoretical_fragments],
-                fragment_tol_mass, fragment_tol_mode, peak_assignment):
-            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
+        with warnings.catch_warnings():
+            # FIXME: Deprecated reflected list in Numba should be resolved from
+            #        version 0.46.0 onwards.
+            #  https://numba.pydata.org/numba-doc/latest/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
+            warnings.simplefilter('ignore', nb.NumbaPendingDeprecationWarning)
+            for annotation_i, fragment_i in\
+                    _get_peptide_fragment_annotation_map(
+                        self.mz, self.intensity,
+                        [fragment.calc_mz for fragment
+                         in theoretical_fragments],
+                        fragment_tol_mass, fragment_tol_mode, peak_assignment):
+                self.annotation[annotation_i] =\
+                    theoretical_fragments[fragment_i]
 
         return self
 

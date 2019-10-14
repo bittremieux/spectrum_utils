@@ -267,6 +267,8 @@ def mirror(spec_top: MsmsSpectrum, spec_bottom: MsmsSpectrum,
     max_mz = max([math.ceil(spec_top.mz[-1] / 100 + 1) * 100,
                   math.ceil(spec_bottom.mz[-1] / 100 + 1) * 100])
     ax.set_xlim(min_mz, max_mz)
+    ax.yaxis.set_major_locator(mticker.AutoLocator())
+    ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(
         lambda x, pos: f'{abs(x):.0%}'))
 

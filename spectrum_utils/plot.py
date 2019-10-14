@@ -199,8 +199,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
             peak_intensity *= -1
 
         color, zorder = _annotate_ion(
-            mz, peak_intensity if not mirror_intensity else -peak_intensity,
-            annotation, color_ions, annotate_ions, annotation_kws, ax)
+            mz, peak_intensity, annotation, color_ions, annotate_ions,
+            annotation_kws, ax)
         ax.plot([mz, mz], [0, peak_intensity], color=color, zorder=zorder)
 
     ax.xaxis.set_minor_locator(mticker.AutoLocator())

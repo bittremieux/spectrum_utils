@@ -15,6 +15,8 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
+from recommonmark.transform import AutoStructify
+
 import spectrum_utils
 
 
@@ -179,3 +181,9 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+
+# Recommonmark AutoStructify.
+def setup(app):
+    app.add_config_value('recommonmark_config', {
+        'auto_toc_tree_section': 'Contents'}, True)
+    app.add_transform(AutoStructify)

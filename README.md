@@ -4,9 +4,10 @@
 ![Python 3.6](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![Python 3.7](https://img.shields.io/badge/python-3.7-brightgreen.svg)
 
-Efficient MS/MS spectrum processing and visualization in Python.
+spectrum_utils is a Python package for efficient MS/MS spectrum processing and
+visualization.
 
-## Features
+spectrum_utils contains the following features:
 
 - Spectrum processing
     - Precursor & noise peak removal
@@ -21,74 +22,29 @@ Efficient MS/MS spectrum processing and visualization in Python.
     - Mirror plot of matching spectra
     - Interactive spectrum plots
 
-## Installation
-
-`spectrum_utils` can easily be installed using conda:
-
-```conda install -c bioconda spectrum_utils```
-
-### Dependencies
-
-`spectrum_utils` has the following dependencies:
-
-- [Altair](https://altair-viz.github.io/)
-- [Matplotlib](https://matplotlib.org/)
-- [Numba](http://numba.pydata.org/)
-- [NumPy](https://www.numpy.org/)
-- [Pandas](https://pandas.pydata.org/)
-- [Pyteomics](https://pyteomics.readthedocs.io/)
-- [RDKit](https://www.rdkit.org/)
-
-Missing dependencies will be automatically installed when you install `spectrum_utils`.
-
-### Alternative installation options
-
-The recommended way to install `spectrum_utils` is using conda. Alternatively `spectrum_utils` can also be installed using pip:
-
-```pip install spectrum_utils```
-
-To install the basic `spectrum_utils` version. Or:
-
-```pip install spectrum_utils[iplot]```
-
-To include the interactive plotting functionality (requires Pandas and Altair).
-
-When installing using pip it is recommended to explicitly install any dependencies (listed above or in the [environment file](environment.yml)) in advance. Any missing dependencies will be automatically installed from PyPI when you install `spectrum_utils`, _except_ RDKit. Please refer to the [RDKit installation notes](https://www.rdkit.org/docs/Install.html) for information on how to install RDKit.
-
-In contrast, when installing `spectrum_utils` using conda all dependencies will be automatically installed, including RDKit.
-
-## Example
-
-```
-import spectrum_utils.plot as sup
-import spectrum_utils.spectrum as sus
-
-
-# Initialize spectrum information first...
-
-spectrum = sus.MsmsSpectrum(identifier, precursor_mz, precursor_charge,
-                            mz, intensity, retention_time=retention_time,
-                            peptide=peptide)
-
-# Preprocess the MS/MS spectrum.
-fragment_tol_mass = 10
-fragment_tol_mode = 'ppm'
-spectrum = (spectrum.set_mz_range(min_mz=100, max_mz=1400)
-            .remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
-            .filter_intensity(min_intensity=0.05, max_num_peaks=50)
-            .annotate_peptide_fragments(fragment_tol_mass, fragment_tol_mode,
-                                        ion_types='aby'))
-
-# Plot the MS/MS spectrum.
-sup.spectrum(spectrum, grid=False)
-```
-
 ![spectrum_utils](spectrum_utils.png)
 
-## API documentation
+## Installation
 
-You can find the API documentation [here](https://spectrum-utils.readthedocs.io/).
+spectrum_utils, including all its required dependencies, can be easily
+[installed using conda](https://anaconda.org/bioconda/spectrum_utils) from the
+Bioconda channel:
 
-## Contact
+    conda install -c bioconda spectrum_utils
 
-For more information you can visit the [official code website](https://github.com/bittremieux/spectrum_utils/) or send an email to <wout.bittremieux@uantwerpen.be>.
+## Documentation
+
+Please see the [documentation](https://spectrum-utils.readthedocs.io/) for
+detailed installation instructions, usage examples, the API reference, and more
+information.
+
+## Citation
+ 
+spectrum_utils is freely available as open source under the
+[Apache 2.0 license](http://opensource.org/licenses/Apache-2.0).
+
+When using spectrum_utils please cite the following manuscript:
+ 
+Wout Bittremieux. "spectrum_utils: A Python package for mass spectrometry data
+processing and visualization." _bioRxiv_ (2019)
+doi:[10.1101/725036](https://doi.org/10.1101/725036).

@@ -1121,7 +1121,8 @@ class MsmsSpectrum:
                              peak_assignment: str = 'most_intense',
                              text: Optional[str] = None) -> 'MsmsSpectrum':
         """
-        Annotate a peak (if present) with its m/z value.
+        Annotate a peak (if present) with its m/z value or a custom provided
+        string.
 
         The matching position in `self.annotation` will be overwritten.
 

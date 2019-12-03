@@ -3,6 +3,7 @@
 [![Build status](https://travis-ci.org/bittremieux/spectrum_utils.svg?master)](https://travis-ci.org/bittremieux/spectrum_utils)
 ![Python 3.6](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![Python 3.7](https://img.shields.io/badge/python-3.7-brightgreen.svg)
+![Python 3.8](https://img.shields.io/badge/python-3.8-brightgreen.svg)
 
 spectrum_utils is a Python package for efficient MS/MS spectrum processing and
 visualization.

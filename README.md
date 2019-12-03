@@ -31,7 +31,7 @@ spectrum_utils, including all its required dependencies, can be easily
 [installed using conda](https://anaconda.org/bioconda/spectrum_utils) from the
 Bioconda channel:
 
-    conda install -c conda-forge -c bioconda spectrum_utils
+    conda install -c conda-forge -c bioconda -c defaults spectrum_utils
 
 ## Documentation
 

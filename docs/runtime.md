@@ -167,4 +167,4 @@ If the user knows in advance that only a single method call needs to be made,
 Numba's JIT compilation can be disabled to avoid this overhead by setting the' \
 `NUMBA_DISABLE_JIT` environment variable to `1`. See the 
 [Numba documentation](https://numba.pydata.org/numba-doc/dev/user/troubleshoot.html#disabling-jit-compilation) 
-# for more information.
+for more information.

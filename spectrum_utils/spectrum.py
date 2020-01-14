@@ -683,7 +683,7 @@ class MsmsSpectrum:
                              'have equal length')
 
         self._mz, self._intensity, order = _init_spectrum(
-            np.asarray(mz, np.float32), np.asarray(intensity, np.float32))
+            np.array(mz, np.float32), np.array(intensity, np.float32))
 
         if annotation is not None:
             self._annotation = np.asarray(annotation).reshape(-1)

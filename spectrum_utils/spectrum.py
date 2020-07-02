@@ -1019,7 +1019,7 @@ class MsmsSpectrum:
         max_ion_charge : Optional[int], optional
             All fragments up to and including the given charge will be
             annotated (by default all fragments with a charge up to the
-            precursor minus one will be annotated).
+            precursor minus, or minimum charge one, one will be annotated).
         peak_assignment : {'most_intense', 'nearest_mz'}, optional
             In case multiple peaks occur within the given mass window around a
             theoretical peak, only a single peak will be annotated with the

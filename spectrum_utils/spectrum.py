@@ -1037,7 +1037,7 @@ class MsmsSpectrum:
         if self.peptide is None:
             raise ValueError('No peptide sequence available for the spectrum')
         if max_ion_charge is None:
-            max_ion_charge = self.precursor_charge - 1
+            max_ion_charge = max(1, self.precursor_charge - 1)
 
         theoretical_fragments = _get_theoretical_peptide_fragments(
             self.peptide, self.modifications, ion_types, max_ion_charge)

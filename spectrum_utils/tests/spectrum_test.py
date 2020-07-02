@@ -646,10 +646,10 @@ def test_annotate_peptide_fragments():
     fragment_tol_mode = 'Da'
     peptides = ['SYELPDGQVITIGNER', 'MFLSFPTTK', 'DLYANTVLSGGTTMYPGIADR',
                 'YLYEIAR', 'VAPEEHPVLLTEAPLNPK']
-    for peptide in peptides:
+    for charge, peptide in enumerate(peptides, 1):
         fragment_mz = np.asarray([fragment.calc_mz for fragment in
                                   spectrum._get_theoretical_peptide_fragments(
-                                      peptide)])
+                                      peptide, max_charge=charge - 1)])
         fragment_mz += np.random.uniform(
             -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass,
             len(fragment_mz))
@@ -657,7 +657,6 @@ def test_annotate_peptide_fragments():
         mz = np.random.uniform(100, 1400, num_peaks)
         mz[: len(fragment_mz)] = fragment_mz
         intensity = np.random.lognormal(0, 1, num_peaks)
-        charge = 2
         spec = spectrum.MsmsSpectrum(
             'test_spectrum', mass.calculate_mass(sequence=peptide,
                                                  charge=charge),

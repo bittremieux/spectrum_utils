@@ -725,22 +725,6 @@ def test_annotate_molecule_fragments():
     assert np.count_nonzero(spec.annotation) == len(smiles)
 
 
-def test_annotate_molecule_fragments_invalid_smiles():
-    num_peaks = 150
-    mz = np.random.uniform(100, 1400, num_peaks)
-    intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 500, 1, mz, intensity)
-    fragment_tol_mass = 0.02
-    fragment_tol_mode = 'Da'
-    with pytest.raises(ValueError):
-        spec.annotate_molecule_fragment('blablablabla', spec.mz[0], 1,
-                                        fragment_tol_mass, fragment_tol_mode)
-    with pytest.raises(ValueError):
-        spec.annotate_molecule_fragment('O=C1NCNc2nc(C)nc12', spec.mz[0], 1,
-                                        fragment_tol_mass, fragment_tol_mode)
-
-
 def test_annotate_molecule_fragments_invalid_mz():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)

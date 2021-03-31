@@ -22,7 +22,6 @@ spectrum_utils has the following dependencies:
 - [NumPy](https://www.numpy.org/)
 - [Pandas](https://pandas.pydata.org/)
 - [Pyteomics](https://pyteomics.readthedocs.io/)
-- [RDKit](https://www.rdkit.org/)
 
 Missing dependencies will be automatically installed when you install
 spectrum_utils using conda.
@@ -44,9 +43,4 @@ When installing using pip it is recommended to explicitly install any
 dependencies (listed above or in the
 [environment file](https://github.com/bittremieux/spectrum_utils/blob/master/environment.yml))
 in advance. Any missing dependencies will be automatically installed from PyPI
-when you install spectrum_utils, _except_ RDKit. Please refer to the
-[RDKit installation notes](https://www.rdkit.org/docs/Install.html) for
-information on how to install RDKit.
-
-In contrast, when installing spectrum_utils using conda all dependencies will
-be automatically installed, including RDKit.
+when you install spectrum_utils.

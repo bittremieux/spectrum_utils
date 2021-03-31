@@ -5,7 +5,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
 import numpy as np
-from rdkit import Chem
 try:
     from pyteomics import cmass as mass
 except ImportError:
@@ -1073,7 +1072,8 @@ class MsmsSpectrum:
         Parameters
         ----------
         smiles : str
-            The fragment molecule that will be annotated in SMILES format.
+            The fragment molecule that will be annotated in SMILES format. Note
+            that the SMILES string is not tested for validity.
         fragment_mz : float
             The expected m/z of the molecule.
         fragment_charge : int
@@ -1096,10 +1096,6 @@ class MsmsSpectrum:
         -------
         self : `MsmsSpectrum`
         """
-        # Make sure the SMILES annotation is valid and sanitized.
-        mol = Chem.MolFromSmiles(smiles, sanitize=False)
-        if mol is None or Chem.SanitizeMol(mol, catchErrors=True) != 0:
-            raise ValueError('Invalid SMILES molecule')
         # Find the matching m/z value.
         peak_index = _get_mz_peak_index(self.mz, self.intensity, fragment_mz,
                                         fragment_tol_mass, fragment_tol_mode,
@@ -1113,7 +1109,7 @@ class MsmsSpectrum:
             # Set the molecule's annotation.
             self.annotation[peak_index] =\
                 MoleculeFragmentAnnotation(fragment_charge, fragment_mz,
-                                           Chem.MolToSmiles(mol))
+                                           smiles)
 
         return self
 

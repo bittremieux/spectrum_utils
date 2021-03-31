@@ -1,13 +1,9 @@
-import io
 import itertools
 import math
 from typing import Dict, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-import numpy as np
-from rdkit import Chem
-from rdkit.Chem import Draw
 
 from spectrum_utils.spectrum import MsmsSpectrum, MoleculeFragmentAnnotation,\
     PeptideFragmentAnnotation
@@ -18,20 +14,6 @@ colors = {'a': '#388E3C', 'b': '#1976D2', 'c': '#00796B',
           'unknown': '#212121', 'molecule': '#212121', None: '#212121'}
 zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
            'molecule': 5, None: 1}
-
-
-# Default molecule size is 300x300 px.
-_mol_dim = 300
-# Default molecule dpi is 300 (default RDKit dpi is 72).
-_mol_annotation_dpi = 300 / 72
-# Combine the molecule annotation dimension and dpi.
-_mol_size = int(_mol_dim * _mol_annotation_dpi)
-# Change the default RDKit line width from -1 to 10 to accommodate the larger
-# figure.
-_mol_line_width = 10
-# Change the default RDKit font size from 0.5 to 2.5 to accommodate the larger
-# figure.
-_mol_font_size = 2.5
 
 
 def _annotate_ion(mz: float, intensity: float,
@@ -70,7 +52,7 @@ def _annotate_ion(mz: float, intensity: float,
     # No annotation -> Just return peak styling information.
     if annotation is None:
         return colors.get(None), zorders.get(None)
-    # Else: Add the textual or figure annotation.
+    # Else: Add the textual annotation.
     else:
         color = (colors.get(annotation.ion_type) if color_ions else
                  colors.get(None))
@@ -80,64 +62,12 @@ def _annotate_ion(mz: float, intensity: float,
             annotation_pos = intensity
             if annotation_pos > 0:
                 annotation_pos += 0.02
-            # Graphic molecule fragment annotation.
-            if type(annotation) == MoleculeFragmentAnnotation:
-                im = _smiles_to_im(annotation.smiles)
-                # Rescale the molecule to fill 1/5th of the plot horizontally
-                # and vertically.
-                scale_factor = 0.2
-                width = (ax.get_xlim()[1] - ax.get_xlim()[0]) * scale_factor
-                height = (ax.get_ylim()[1] - ax.get_ylim()[0]) * scale_factor
-                ax.imshow(im, aspect='auto', interpolation='none',
-                          extent=(mz - width / 2, mz + width / 2,
-                                  annotation_pos, annotation_pos + height),
-                          zorder=zorder)
-            # Textual fragment annotation.
-            else:
-                kws = annotation_kws.copy()
-                del kws['zorder']
-                ax.text(mz, annotation_pos, str(annotation), color=color,
-                        zorder=zorder, **kws)
+            kws = annotation_kws.copy()
+            del kws['zorder']
+            ax.text(mz, annotation_pos, str(annotation), color=color,
+                    zorder=zorder, **kws)
 
         return color, zorder
-
-
-def _smiles_to_im(smiles: str) -> np.array:
-    """
-    Generate a molecule figure from its SMILES representation.
-
-    Parameters
-    ----------
-    smiles : str
-        The SMILES representation of the molecule to be converted to a figure.
-
-    Returns
-    -------
-    np.array
-        The molecule figure as an [N, M, 3] NumPy RGB array. N and M are
-        defined by `_mol_size` with empty lines cropped.
-    """
-    # Draw the molecule.
-    # https://sourceforge.net/p/rdkit/mailman/message/36735785/
-    d2d = Draw.MolDraw2DCairo(_mol_size, _mol_size)
-    d2d.SetFontSize(_mol_font_size)
-    d2d.drawOptions().bondLineWidth = _mol_line_width
-    Draw.PrepareAndDrawMolecule(d2d, Chem.MolFromSmiles(smiles))
-    d2d.FinishDrawing()
-    im = plt.imread(io.BytesIO(d2d.GetDrawingText()))
-    # Make white pixels transparent.
-    im = np.dstack((im, (~im.all(2)).astype(np.float32)))
-    # Crop the image by removing empty (white) lines.
-    bottom, top, left, right = 0, im.shape[0] - 1, 0, im.shape[1] - 1
-    while bottom < im.shape[0] and np.isclose(im[bottom, :, 3].sum(), 0):
-        bottom += 1
-    while top > 0 and np.isclose(im[top, :, 3].sum(), 0):
-        top -= 1
-    while left < im.shape[1] and np.isclose(im[:, left, 3].sum(), 0):
-        left += 1
-    while right > 0 and np.isclose(im[:, right, 3].sum(), 0):
-        right -= 1
-    return im[bottom:top+1:, left:right+1, :]
 
 
 def spectrum(spec: MsmsSpectrum, color_ions: bool = True,

@@ -55,7 +55,7 @@ autodoc_default_options = {
     'undoc-members': True           # Include methods without a docstring.
 }
 # Prevent import errors from these modules.
-autodoc_mock_imports = ['altair', 'matplotlib', 'pandas', 'pyteomics', 'rdkit']
+autodoc_mock_imports = ['altair', 'matplotlib', 'pandas', 'pyteomics']
 # Scan all found documents for autosummary directives and generate stub pages
 # for each.
 autosummary_generate = True

@@ -19,4 +19,4 @@ def mass_diff(mz1, mz2, mode_is_da):
     -------
         The mass difference(s) between the given m/z values.
     """
-    return mz1 - mz2 if mode_is_da else (mz1 - mz2) / mz2 * 10**6
+    return mz1 - mz2 if mode_is_da else (mz1 - mz2) / mz2 * 10 ** 6

@@ -711,8 +711,7 @@ def test_annotate_molecule_fragments():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 500, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 1, mz, intensity)
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     smiles = ['[Cu+2].[O-]S(=O)(=O)[O-] ', 'O=Cc1ccc(O)c(OC)c1',
@@ -729,8 +728,7 @@ def test_annotate_molecule_fragments_invalid_mz():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 500, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 1, mz, intensity)
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     with pytest.raises(ValueError):
@@ -742,8 +740,7 @@ def test_annotate_molecule_fragments_nearest_mz():
     fragment_tol_mass = 1
     fragment_tol_mode = 'Da'
     mz, intensity = np.asarray([200, 200.5, 201]), np.asarray([10, 20, 30])
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 100, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
     charge = 1
     spec.annotate_molecule_fragment('CCCCCCCC', fragment_mz, charge,
@@ -759,8 +756,7 @@ def test_annotate_molecule_fragments_most_intense():
     fragment_tol_mass = 1
     fragment_tol_mode = 'Da'
     mz, intensity = np.asarray([200, 200.5, 201.5]), np.asarray([10, 20, 30])
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 100, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
     charge = 1
     spec.annotate_molecule_fragment('CCCCCCCC', fragment_mz, charge,
@@ -776,8 +772,7 @@ def test_annotate_mz_fragments():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 500, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 1, mz, intensity)
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     num_annotation = 4
@@ -791,8 +786,7 @@ def test_annotate_mz_fragments_text():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 500, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 1, mz, intensity)
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     annotation = ['one', 'two', 'three', 'four']
@@ -807,8 +801,7 @@ def test_annotate_mz_fragments_invalid_mz():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 500, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 1, mz, intensity)
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     with pytest.raises(ValueError):
@@ -820,8 +813,7 @@ def test_annotate_mz_fragments_nearest_mz():
     fragment_tol_mass = 1
     fragment_tol_mode = 'Da'
     mz, intensity = np.asarray([200, 200.5, 201]), np.asarray([10, 20, 30])
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 100, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
     charge = 1
     spec.annotate_mz_fragment(fragment_mz, charge, fragment_tol_mass,
@@ -836,8 +828,7 @@ def test_annotate_mz_fragments_most_intense():
     fragment_tol_mass = 1
     fragment_tol_mode = 'Da'
     mz, intensity = np.asarray([200, 200.5, 201.5]), np.asarray([10, 20, 30])
-    spec = spectrum.MsmsSpectrum(
-        'test_spectrum', 100, 1, mz, intensity)
+    spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
     charge = 1
     spec.annotate_mz_fragment(fragment_mz, charge, fragment_tol_mass,

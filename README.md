@@ -1,9 +1,9 @@
 # spectrum_utils
 
-[![Build status](https://travis-ci.org/bittremieux/spectrum_utils.svg?master)](https://travis-ci.org/bittremieux/spectrum_utils)
-![Python 3.6](https://img.shields.io/badge/python-3.6-brightgreen.svg)
-![Python 3.7](https://img.shields.io/badge/python-3.7-brightgreen.svg)
-![Python 3.8](https://img.shields.io/badge/python-3.8-brightgreen.svg)
+[![conda](https://img.shields.io/conda/vn/bioconda/spectrum_utils?color=green)](http://bioconda.github.io/recipes/spectrum_utils/README.html)
+[![PyPI](https://img.shields.io/pypi/v/spectrum_utils?color=green)](https://pypi.org/project/spectrum_utils/)
+[![Build status](https://github.com/bittremieux/spectrum_utils/workflows/tests/badge.svg)](https://github.com/bittremieux/spectrum_utils/actions?query=workflow:tests)
+[![docs](https://readthedocs.org/projects/spectrum_utils/badge/?version=latest)](https://spectrum_utils.readthedocs.io/en/latest/?badge=latest)
 
 spectrum_utils is a Python package for efficient MS/MS spectrum processing and
 visualization.
@@ -27,11 +27,16 @@ spectrum_utils contains the following features:
 
 ## Installation
 
-spectrum_utils, including all its required dependencies, can be easily
-[installed using conda](https://anaconda.org/bioconda/spectrum_utils) from the
-Bioconda channel:
+spectrum_utils requires Python version 3.6+ and can be installed with pip or
+conda.
 
-    conda install -c conda-forge -c bioconda -c defaults spectrum_utils
+Using conda:
+
+    conda install -c bioconda spectrum_utils
+
+Using pip:
+
+    pip install spectrum_utils
 
 ## Documentation
 

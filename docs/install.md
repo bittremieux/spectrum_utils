@@ -1,10 +1,20 @@
 # Install
 
-spectrum_utils, including all its required dependencies, can be easily
-[installed using conda](https://anaconda.org/bioconda/spectrum_utils) from the
-Bioconda channel:
+spectrum_utils requires Python version 3.6+ and can be installed with pip or
+conda.
 
-    conda install -c conda-forge -c bioconda -c defaults spectrum_utils
+Using conda:
+
+    conda install -c bioconda spectrum_utils
+
+Using pip (default; only static plotting using Matplotlib):
+
+    pip install spectrum_utils
+
+To include interactive plotting functionality (requires Pandas and Altair) when
+installing using pip:
+
+    pip install spectrum_utils[iplot]
 
 ## Detailed installation information
 
@@ -24,23 +34,4 @@ spectrum_utils has the following dependencies:
 - [Pyteomics](https://pyteomics.readthedocs.io/)
 
 Missing dependencies will be automatically installed when you install
-spectrum_utils using conda.
-
-## Alternative installation options
-
-The recommended way to install spectrum_utils is using conda. Alternatively,
-spectrum_utils can also be installed using pip:
-
-    pip install spectrum_utils
-
-To install the basic spectrum_utils version. Or:
-
-    pip install spectrum_utils[iplot]
-
-To include the interactive plotting functionality (requires Pandas and Altair).
-
-When installing using pip it is recommended to explicitly install any
-dependencies (listed above or in the
-[environment file](https://github.com/bittremieux/spectrum_utils/blob/master/environment.yml))
-in advance. Any missing dependencies will be automatically installed from PyPI
-when you install spectrum_utils.
+spectrum_utils using conda or pip.

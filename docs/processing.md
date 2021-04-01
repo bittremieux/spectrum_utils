@@ -22,7 +22,7 @@ The example in the [quickstart](quickstart.md) shows how spectrum peaks can be
 annotated with peptide fragments.
 
 The following example shows how spectrum peaks can be annotated with their
-_m_/_z_ values and a SMILES-based substructure:
+_m_/_z_ values:
 
 ```python
 import matplotlib.pyplot as plt
@@ -48,11 +48,6 @@ annotate_fragment_mz = [133.102, 147.080, 195.117, 237.164, 267.174, 295.170,
                         573.245, 633.269]
 for fragment_mz in annotate_fragment_mz:
     spectrum.annotate_mz_fragment(fragment_mz, charge, tol_mass, tol_mode)
-fragment_smiles = '[H][C@@]1([C@](C2=O)(OC3)C)[C@]4([H])[C@@]([H])(C4(C)C)'\
-                  'C=C[C@@]13C=C5C2=C[C+](C5)C'
-fragment_mz = 295.170
-spectrum.annotate_molecule_fragment(fragment_smiles, fragment_mz, charge,
-                                    tol_mass, tol_mode)
 
 fig, ax = plt.subplots(figsize=(12, 6))
 sup.spectrum(spectrum, ax=ax)

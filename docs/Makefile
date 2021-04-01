@@ -4,16 +4,16 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
-SOURCEDIR     = .
-BUILDDIR      = _build
+SOURCEDIR     = src
+BUILDDIR      = build
 
 # Put it first so that "make" without argument is like "make help".
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 buildapi:
-	sphinx-apidoc -feT ../spectrum_utils -o api
-	@echo "Auto-generation of API documentation finished. The generated files are in 'api/'"
+	sphinx-apidoc -feT ../spectrum_utils -o $(SOURCEDIR)/api
+	@echo "Auto-generation of API documentation finished. The generated files are in '$(SOURCEDIR)/api/'"
 
 .PHONY: help Makefile
 

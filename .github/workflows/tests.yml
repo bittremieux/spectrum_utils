@@ -1,0 +1,46 @@
+# This workflow will install Python dependencies, run tests, and lint with a
+# single version of Python. For more information see:
+# https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+  - cron: "0 0 1 1/1 *" # Run monthly.
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v2
+      with:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pytest-cov wheel
+        pip install -e .
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names.
+        flake8 . --count --extend-exclude ./docs/conf.py --show-source --statistics
+        # exit-zero treats all errors as warnings.
+        flake8 . --count --extend-exclude ./docs/conf.py --exit-zero --max-complexity=10 --statistics
+    - name: Run unit and system tests
+      run: |
+        pytest --cov=spectrum_utils ./tests/
+    - name: Upload coverage to codecov
+      uses: codecov/codecov-action@v1
+      with:
+        fail_ci_if_error: true

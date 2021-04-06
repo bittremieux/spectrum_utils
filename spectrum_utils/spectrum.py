@@ -1,6 +1,4 @@
-import math
 import operator
-import warnings
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
@@ -121,8 +119,9 @@ class FragmentAnnotation:
 def _get_theoretical_peptide_fragments(
         peptide: str,
         modifications: Optional[Dict[Union[float, str], float]] = None,
-        types: str = 'by', max_charge: int = 1)\
-        -> List[PeptideFragmentAnnotation]:
+        types: str = 'by', max_charge: int = 1,
+        neutral_losses: Optional[Dict[str, float]] = None) \
+        -> List[FragmentAnnotation]:
     """
     Get theoretical peptide fragments for the given peptide.
 
@@ -142,6 +141,9 @@ def _get_theoretical_peptide_fragments(
     max_charge : int, optional
         All fragments up to and including the given charge will be generated
         (the default is 1 to only generate singly-charged fragments).
+    neutral_losses : Optional[Dict[str, float]]
+        A dictionary with neutral loss names and (negative) mass differences to
+        be considered.
 
     Returns
     -------
@@ -171,11 +173,17 @@ def _get_theoretical_peptide_fragments(
                 sequence = peptide[i:]
                 mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
-                ions.append(PeptideFragmentAnnotation(
-                    charge, mass.fast_mass(
-                        sequence=sequence, ion_type=ion_type,
-                        charge=charge, aa_mass=_aa_mass) + mod_mass / charge,
-                    ion_type, ion_index))
+                for nl_name, nl_mass in neutral_losses.items():
+                    ions.append(FragmentAnnotation(
+                        ion_type=f'{ion_type}{ion_index}',
+                        neutral_loss=nl_name,
+                        isotope=0,
+                        charge=charge,
+                        calc_mz=mass.fast_mass(sequence=sequence,
+                                               ion_type=ion_type,
+                                               charge=charge,
+                                               aa_mass=_aa_mass)
+                                + (mod_mass + nl_mass) / charge))
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 
 
@@ -452,7 +460,7 @@ def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
 @nb.njit
 def _get_peptide_fragment_annotation_map(
         spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
-        annotation_mz: List[float], fragment_tol_mass: float,
+        annotation_mz: nb.typed.List, fragment_tol_mass: float,
         fragment_tol_mode: str, peak_assignment: str = 'most_intense')\
         -> List[Tuple[int, int]]:
     """
@@ -464,7 +472,7 @@ def _get_peptide_fragment_annotation_map(
         The mass-to-charge varlues of the spectrum fragment peaks.
     spectrum_intensity : np.ndarray
         The intensities of the spectrum fragment peaks.
-    annotation_mz : List[float]
+    annotation_mz : nb.typed.List[float]
         A list of mass-to-charge values of the peptide fragment annotations.
     fragment_tol_mass : float
         Fragment mass tolerance to match spectrum peaks against theoretical
@@ -940,7 +948,8 @@ class MsmsSpectrum:
                                    fragment_tol_mode: str,
                                    ion_types: str = 'by',
                                    max_ion_charge: Optional[int] = None,
-                                   peak_assignment: str = 'most_intense')\
+                                   peak_assignment: str = 'most_intense',
+                                   neutral_losses: Optional[List] = None) \
             -> 'MsmsSpectrum':
         """
         Annotate peaks with their corresponding peptide fragment ion
@@ -973,6 +982,9 @@ class MsmsSpectrum:
               (default).
             - 'nearest_mz': The peak whose m/z is closest to the theoretical
               m/z will be annotated.
+        neutral_losses : List, optional
+            List of neutral losses to consider, specified by their molecular
+            formula. By default no neutral losses are considered.
 
         Returns
         -------
@@ -982,23 +994,25 @@ class MsmsSpectrum:
             raise ValueError('No peptide sequence available for the spectrum')
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
-
+        if neutral_losses is None:
+            neutral_losses = {None: 0}
+        else:
+            neutral_losses = {name: -mass.calculate_mass(formula=name)
+                              for name in neutral_losses}
+            # Make sure the standard peaks (without a neutral loss) are always
+            # considered.
+            neutral_losses[None] = 0
         theoretical_fragments = _get_theoretical_peptide_fragments(
-            self.peptide, self.modifications, ion_types, max_ion_charge)
+            self.peptide, self.modifications, ion_types, max_ion_charge,
+            neutral_losses)
         self.annotation = np.full_like(self.mz, None, object)
-        with warnings.catch_warnings():
-            # FIXME: Deprecated reflected list in Numba should be resolved from
-            #        version 0.46.0 onwards.
-            #  https://numba.pydata.org/numba-doc/latest/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
-            warnings.simplefilter('ignore', nb.NumbaPendingDeprecationWarning)
-            for annotation_i, fragment_i in\
-                    _get_peptide_fragment_annotation_map(
-                        self.mz, self.intensity,
-                        [fragment.calc_mz for fragment
-                         in theoretical_fragments],
-                        fragment_tol_mass, fragment_tol_mode, peak_assignment):
-                self.annotation[annotation_i] =\
-                    theoretical_fragments[fragment_i]
+        for annotation_i, fragment_i in \
+                _get_peptide_fragment_annotation_map(
+                    self.mz, self.intensity,
+                    nb.typed.List([fragment.calc_mz
+                                   for fragment in theoretical_fragments]),
+                    fragment_tol_mass, fragment_tol_mode, peak_assignment):
+            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
 
         return self
 

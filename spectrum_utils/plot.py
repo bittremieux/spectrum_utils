@@ -5,20 +5,18 @@ from typing import Dict, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
-from spectrum_utils.spectrum import MsmsSpectrum, MoleculeFragmentAnnotation,\
-    PeptideFragmentAnnotation
+from spectrum_utils.spectrum import MsmsSpectrum, FragmentAnnotation
 
 
 colors = {'a': '#388E3C', 'b': '#1976D2', 'c': '#00796B',
           'x': '#7B1FA2', 'y': '#D32F2F', 'z': '#F57C00',
-          'unknown': '#212121', 'molecule': '#212121', None: '#212121'}
-zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, 'unknown': 2,
-           'molecule': 5, None: 1}
+          '?': '#212121', 'f': '#212121', None: '#212121'}
+zorders = {'a': 3, 'b': 4, 'c': 3, 'x': 3, 'y': 4, 'z': 3, '?': 2, 'f': 5,
+           None: 1}
 
 
 def _annotate_ion(mz: float, intensity: float,
-                  annotation: Optional[Union[MoleculeFragmentAnnotation,
-                                             PeptideFragmentAnnotation]],
+                  annotation: Optional[FragmentAnnotation],
                   color_ions: bool, annotate_ions: bool,
                   annotation_kws: Dict[str, object], ax: plt.Axes)\
         -> Tuple[str, int]:
@@ -54,9 +52,9 @@ def _annotate_ion(mz: float, intensity: float,
         return colors.get(None), zorders.get(None)
     # Else: Add the textual annotation.
     else:
-        color = (colors.get(annotation.ion_type) if color_ions else
+        color = (colors.get(annotation.ion_type[0]) if color_ions else
                  colors.get(None))
-        zorder = zorders.get(annotation.ion_type)
+        zorder = zorders.get(annotation.ion_type[0])
 
         if annotate_ions:
             annotation_pos = intensity

@@ -97,16 +97,19 @@ class FragmentAnnotation:
         return f'FragmentAnnotation({self}, mz={self.calc_mz})'
 
     def __str__(self) -> str:
-        annotation = self.ion_type
-        if self.neutral_loss is not None:
-            annotation += f'-{self.neutral_loss}'
-        if self.isotope != 0:
-            annotation += f'{self.isotope:+}i'
-        if self.charge > 1:
-            annotation += f'^{self.charge}'
-        if self.adduct is not None:
-            annotation += self.adduct
-        return annotation
+        if self.ion_type == '?':
+            return str(self.calc_mz)
+        else:
+            annotation = self.ion_type
+            if self.neutral_loss is not None:
+                annotation += f'-{self.neutral_loss}'
+            if self.isotope != 0:
+                annotation += f'{self.isotope:+}i'
+            if self.charge > 1:
+                annotation += f'^{self.charge}'
+            if self.adduct is not None:
+                annotation += self.adduct
+            return annotation
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FragmentAnnotation):

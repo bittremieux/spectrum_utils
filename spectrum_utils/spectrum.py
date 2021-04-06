@@ -80,8 +80,7 @@ class FragmentAnnotation:
         if ion_type == '?' and (neutral_loss is not None or
                                 isotope != 0 or
                                 charge != 1 or
-                                adduct is not None or
-                                calc_mz is not None):
+                                adduct is not None):
             raise ValueError('Information specified for an unknown ion')
         self.ion_type = ion_type
         self.neutral_loss = neutral_loss
@@ -1066,19 +1065,17 @@ class MsmsSpectrum:
             if self.annotation is None:
                 self.annotation = np.full_like(self.mz, None, object)
             # Set the molecule's annotation.
-            self.annotation[peak_index] =\
-                MoleculeFragmentAnnotation(fragment_charge, fragment_mz,
-                                           smiles)
+            self.annotation[peak_index] = FragmentAnnotation(
+                f'f{{{smiles}}}', charge=fragment_charge, calc_mz=fragment_mz)
 
         return self
 
-    def annotate_mz_fragment(self, fragment_mz: float, fragment_charge: int,
+    def annotate_mz_fragment(self, fragment_mz: float,
                              fragment_tol_mass: float, fragment_tol_mode: str,
-                             peak_assignment: str = 'most_intense',
-                             text: Optional[str] = None) -> 'MsmsSpectrum':
+                             peak_assignment: str = 'most_intense') \
+            -> 'MsmsSpectrum':
         """
-        Annotate a peak (if present) with its m/z value or a custom provided
-        string.
+        Annotate a peak (if present) with its m/z value.
 
         The matching position in `self.annotation` will be overwritten.
 
@@ -1086,8 +1083,6 @@ class MsmsSpectrum:
         ----------
         fragment_mz : float
             The expected m/z to annotate.
-        fragment_charge : int
-            The peak charge.
         fragment_tol_mass : float
             Fragment mass tolerance to match spectrum peaks against the given
             m/z.
@@ -1101,9 +1096,6 @@ class MsmsSpectrum:
               (default).
             - 'nearest_mz': The peak whose m/z is closest to the given m/z will
               be annotated.
-        text : Optional[str], optional
-            The text to annotate the peak with. If None, its m/z value will be
-            used.
 
         Returns
         -------
@@ -1120,9 +1112,7 @@ class MsmsSpectrum:
             if self.annotation is None:
                 self.annotation = np.full_like(self.mz, None, object)
             # Set the peak annotation.
-            self.annotation[peak_index] =\
-                FragmentAnnotation(
-                    fragment_charge, fragment_mz,
-                    text if text is not None else str(fragment_mz))
+            self.annotation[peak_index] = FragmentAnnotation(
+                '?', calc_mz=fragment_mz)
 
         return self

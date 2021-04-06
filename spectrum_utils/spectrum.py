@@ -47,130 +47,75 @@ class FragmentAnnotation:
     Class representing a general fragment ion annotation.
     """
 
-    def __init__(self, charge: int, calc_mz: float, annotation: str = None)\
+    def __init__(self, ion_type: str, neutral_loss: Optional[str] = None,
+                 isotope: int = 0, charge: int = 1,
+                 adduct: Optional[str] = None, calc_mz: float = None) \
             -> None:
         """
-        Instantiate a new `FragmentAnnotation`.
+        Interpretation of a single fragment peak.
+
+        This fragment annotation format is derived from the PSI peak
+        interpretation specification:
+        https://docs.google.com/document/d/1yEUNG4Ump6vnbMDs4iV4s3XISflmOkRAyqUuutcCG2w/edit?usp=sharing
 
         Parameters
         ----------
-        charge : int
-            The fragment ion charge if known, None otherwise.
+        ion_type : str
+            Specifies the basic type of ion being described. Examples are
+            b ions, y ions, immonium ions, unfragmented precursor ions,
+            internal fragmentation ions, isobaric tag ions, etc.
+        neutral_loss : str, optional
+            A string of 0 to n loss components, described by their molecular
+            formula. The default is no neutral loss.
+        isotope : int, optional
+            The isotope number above or below the monoisotope. The default is
+            the monoisotopic peak.
+        charge : int, optional
+            The charge of the fragment. The default is charge 1.
+        adduct : str, optional
+            The adduct that ionized the fragment.
         calc_mz : float
             The theoretical m/z value of the fragment.
-        annotation : str
-            The fragment's annotation string.
         """
-        self.ion_type = 'unknown'
+        if ion_type[0] not in '?abcxyzIm_prf':
+            raise ValueError('Unsupported ion type')
+        if ion_type == '?' and (neutral_loss is not None or
+                                isotope != 0 or
+                                charge != 1 or
+                                adduct is not None or
+                                calc_mz is not None):
+            raise ValueError('Information specified for an unknown ion')
+        self.ion_type = ion_type
+        self.neutral_loss = neutral_loss
+        self.isotope = isotope
+        if charge == 0:
+            raise ValueError('Invalid charge 0 for annotated fragment')
+        elif charge < 0:
+            raise ValueError('Invalid negative charge')
         self.charge = charge
+        self.adduct = adduct
         self.calc_mz = calc_mz
-        self.annotation = annotation
-
-    def _charge_to_str(self):
-        """
-        Convert a numeric charge to a string representation.
-        """
-        if self.charge is None:
-            return 'unknown'
-        elif self.charge > 0:
-            return '+' * self.charge
-        elif self.charge < 0:
-            return '-' * -self.charge
-        else:
-            return 'undefined'
 
     def __repr__(self) -> str:
-        return f"FragmentAnnotation(annotation='{self.annotation}', " \
-               f"charge={self._charge_to_str()}, mz={self.calc_mz})"
+        return f'FragmentAnnotation({self}, mz={self.calc_mz})'
 
     def __str__(self) -> str:
-        return self.annotation
+        annotation = self.ion_type
+        if self.neutral_loss is not None:
+            annotation += f'-{self.neutral_loss}'
+        if self.isotope != 0:
+            annotation += f'{self.isotope:+}i'
+        if self.charge > 1:
+            annotation += f'^{self.charge}'
+        if self.adduct is not None:
+            annotation += self.adduct
+        return annotation
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FragmentAnnotation):
             return False
         else:
-            return self.annotation == other.annotation
-
-
-class PeptideFragmentAnnotation(FragmentAnnotation):
-    """
-    Class representing a peptide fragment ion annotation.
-    """
-
-    def __init__(self, charge: int, calc_mz: float, ion_type: str,
-                 ion_index: int) -> None:
-        """
-        Instantiate a new `PeptideFragmentAnnotation`.
-
-        Parameters
-        ----------
-        charge : int
-            The peptide fragment ion charge.
-        calc_mz : float
-            The theoretical m/z value of the peptide fragment.
-        ion_type : {'a', 'b', 'c', 'x', 'y', 'z'}
-            The peptide fragment ion type.
-        ion_index : int
-            The peptide fragment ion index.
-        """
-        super().__init__(charge, calc_mz)
-        if ion_type not in 'abcxyz':
-            raise ValueError(f'Unknown ion type: {ion_type}')
-        self.ion_type = ion_type
-        self.ion_index = ion_index
-        self.annotation = f'{self.ion_type}{self.ion_index}' \
-                          f'{self._charge_to_str()}'
-
-    def __repr__(self) -> str:
-        return f"PeptideFragmentAnnotation(ion_type='{self.ion_type}', " \
-            f"ion_index={self.ion_index}, charge={self.charge}, " \
-            f"mz={self.calc_mz})"
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, PeptideFragmentAnnotation):
-            return False
-        else:
-            return (self.ion_type == other.ion_type and
-                    self.ion_index == other.ion_index and
-                    self.charge == other.charge and
-                    math.isclose(self.calc_mz, other.calc_mz))
-
-
-class MoleculeFragmentAnnotation(FragmentAnnotation):
-    """
-    Class representing a molecule fragment ion annotation.
-    """
-
-    def __init__(self, charge: int, calc_mz: float, smiles: str) -> None:
-        """
-        Instantiate a new `MoleculeFragmentAnnotation`.
-
-        Parameters
-        ----------
-        charge : int
-            The molecule fragment ion charge.
-        calc_mz : float
-            The theoretical m/z value of the molecule fragment.
-        smiles : str
-            The SMILES representation of the molecule.
-        """
-        super().__init__(charge, calc_mz)
-        self.ion_type = 'molecule'
-        self.smiles = smiles
-        self.annotation = self.smiles
-
-    def __repr__(self) -> str:
-        return f"MoleculeFragmentAnnotation(smiles='{self.smiles}', " \
-            f"charge={self.charge}, mz={self.calc_mz})"
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, MoleculeFragmentAnnotation):
-            return False
-        else:
-            return (self.smiles == other.smiles and
-                    self.charge == other.charge and
-                    math.isclose(self.calc_mz, other.calc_mz))
+            return str(self) == str(other)
 
 
 def _get_theoretical_peptide_fragments(

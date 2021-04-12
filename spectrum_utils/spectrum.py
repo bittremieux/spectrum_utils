@@ -163,6 +163,8 @@ def _get_theoretical_peptide_fragments(
             del mods['C-term']
     else:
         mods = {}
+    if neutral_losses is None:
+        neutral_losses = {None: 0}
     ions = []
     for i in range(1, len(peptide)):
         for ion_type in types:
@@ -996,9 +998,7 @@ class MsmsSpectrum:
             raise ValueError('No peptide sequence available for the spectrum')
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
-        if neutral_losses is None:
-            neutral_losses = {None: 0}
-        else:
+        if neutral_losses is not None:
             neutral_losses = {name: -mass.calculate_mass(formula=name)
                               for name in neutral_losses}
             # Make sure the standard peaks (without a neutral loss) are always

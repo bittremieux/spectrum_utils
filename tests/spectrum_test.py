@@ -101,6 +101,73 @@ def test_get_theoretical_fragments_mod_multiple():
         assert fragment.calc_mz == pytest.approx(fragment_mz)
 
 
+def test_get_theoretical_fragments_neutral_loss():
+    peptide = 'HPYLEDR'
+    fragments = {'b1': 138.066147, 'b2': 235.118912, 'b3': 398.182220,
+                 'b4': 511.266266, 'b5': 640.308899, 'b6': 755.335815,
+                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
+                 'y4': 532.272522, 'y5': 695.335815, 'y6': 792.388550,
+                 'b1^2': 69.536731,  'b2^2': 118.063111, 'b3^2': 199.594776,
+                 'b4^2': 256.136806, 'b5^2': 320.658101, 'b6^2': 378.171571,
+                 'y1^2': 88.063114,  'y2^2': 145.576584, 'y3^2': 210.097879,
+                 'y4^2': 266.639909, 'y5^2': 348.171574, 'y6^2': 396.697954,
+                 'b1^3': 46.693580,  'b2^3': 79.044500,  'b3^3': 133.398943,
+                 'b4^3': 171.093630, 'b5^3': 214.107826, 'b6^3': 252.450140,
+                 'y1^3': 59.044501,  'y2^3': 97.386815,  'y3^3': 140.401011,
+                 'y4^3': 178.095698, 'y5^3': 232.450141, 'y6^3': 264.801061}
+    neutral_loss = 'H2O', 18.010565    # water
+    neutral_loss_fragments = {}
+    for fragment, mz in fragments.items():
+        fragment = fragment.split('^')
+        if len(fragment) == 1:
+            charge = 1
+            fragment = f'{fragment[0]}-{neutral_loss[0]}'
+        else:
+            charge = int(fragment[1])
+            fragment = f'{fragment[0]}-{neutral_loss[0]}^{fragment[1]}'
+        neutral_loss_fragments[fragment] = mz - (neutral_loss[1] / charge)
+    fragments = {**fragments, **neutral_loss_fragments}
+    for fragment in spectrum._get_theoretical_peptide_fragments(
+            peptide, max_charge=3,
+            neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]}):
+        fragment_mz = fragments[str(fragment)]
+        assert fragment_mz == pytest.approx(fragment.calc_mz), str(fragment)
+
+
+def test_get_theoretical_fragments_mod_neutral_loss():
+    peptide = 'HPYLEDR'
+    modifications = {2: 79.96633}
+    fragments = {'b1': 138.066147, 'b2': 235.118912, 'b3': 478.148590,
+                 'b4': 591.232666, 'b5': 720.275269, 'b6': 835.302185,
+                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
+                 'y4': 532.272522, 'y5': 775.302185, 'y6': 872.354980,
+                 'b1^2': 69.536731,  'b2^2': 118.063111, 'b3^2': 239.577941,
+                 'b4^2': 296.119971, 'b5^2': 360.641266, 'b6^2': 418.154736,
+                 'y1^2': 88.063114,  'y2^2': 145.576584, 'y3^2': 210.097879,
+                 'y4^2': 266.639909, 'y5^2': 388.154739, 'y6^2': 436.681119,
+                 'b1^3': 46.693580,  'b2^3': 79.044500,  'b3^3': 160.054386,
+                 'b4^3': 197.749073, 'b5^3': 240.763270, 'b6^3': 279.105583,
+                 'y1^3': 59.044501,  'y2^3': 97.386815,  'y3^3': 140.401011,
+                 'y4^3': 178.095698, 'y5^3': 259.105585, 'y6^3': 291.456505}
+    neutral_loss = 'H2O', 18.010565    # water
+    neutral_loss_fragments = {}
+    for fragment, mz in fragments.items():
+        fragment = fragment.split('^')
+        if len(fragment) == 1:
+            charge = 1
+            fragment = f'{fragment[0]}-{neutral_loss[0]}'
+        else:
+            charge = int(fragment[1])
+            fragment = f'{fragment[0]}-{neutral_loss[0]}^{fragment[1]}'
+        neutral_loss_fragments[fragment] = mz - (neutral_loss[1] / charge)
+    fragments = {**fragments, **neutral_loss_fragments}
+    for fragment in spectrum._get_theoretical_peptide_fragments(
+            peptide, modifications, max_charge=3,
+            neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]}):
+        fragment_mz = fragments[str(fragment)]
+        assert fragment_mz == pytest.approx(fragment.calc_mz), str(fragment)
+
+
 def test_mz_intensity_len():
     mz = np.random.uniform(100, 1400, 150)
     intensity = np.random.exponential(1, 100)
@@ -681,7 +748,7 @@ def test_annotate_peptide_fragments():
                                                  charge=charge),
             charge, mz, intensity, peptide=peptide)
         spec.annotate_peptide_fragments(fragment_tol_mass, fragment_tol_mode)
-        assert np.count_nonzero(spec.annotation) == len(fragment_mz)
+        assert np.count_nonzero(spec.annotation) >= len(fragment_mz)
 
 
 def test_annotate_peptide_fragments_nearest_mz():
@@ -724,6 +791,39 @@ def test_annotate_peptide_fragments_most_intense():
     assert spec.annotation[0] is None
     assert spec.annotation[1] == spectrum.FragmentAnnotation(
         'b1', charge=1, calc_mz=fragment_mz[0])
+
+
+def test_annotate_peptide_fragments_neutral_loss():
+    fragment_tol_mass, fragment_tol_mode = 0.02, 'Da'
+    neutral_loss = 'H2O', 18.010565    # water
+    n_peaks = 150
+    peptides = ['SYELPDGQVITIGNER', 'MFLSFPTTK', 'DLYANTVLSGGTTMYPGIADR',
+                'YLYEIAR', 'VAPEEHPVLLTEAPLNPK']
+    for charge, peptide in enumerate(peptides, 2):
+        fragment_mz = np.asarray([
+            fragment.calc_mz for fragment in
+            spectrum._get_theoretical_peptide_fragments(
+                peptide,
+                neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]})])
+        fragment_mz += np.random.uniform(
+            -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass,
+            len(fragment_mz))
+        mz = np.random.uniform(100, 1400, n_peaks)
+        mz[: len(fragment_mz)] = fragment_mz
+        intensity = np.random.lognormal(0, 1, n_peaks)
+        spec = spectrum.MsmsSpectrum(
+            'test_spectrum', mass.calculate_mass(sequence=peptide,
+                                                 charge=charge),
+            charge, mz, intensity, peptide=peptide)
+        spec.annotate_peptide_fragments(
+            fragment_tol_mass, fragment_tol_mode,
+            neutral_losses={neutral_loss[0]: -neutral_loss[1]})
+        n_fragments = len(fragment_mz) - (
+                len(fragment_mz) - (np.partition(
+                    np.abs(fragment_mz.reshape(-1, 1) -
+                           fragment_mz.reshape(1, -1)), 1, axis=1)[:, 1]
+                                >= fragment_tol_mass).sum()) // 2
+        assert np.count_nonzero(spec.annotation) >= n_fragments
 
 
 def test_annotate_molecule_fragments():

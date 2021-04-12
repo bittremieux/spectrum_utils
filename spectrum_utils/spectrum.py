@@ -94,7 +94,20 @@ class FragmentAnnotation:
         self.calc_mz = calc_mz
 
     def __repr__(self) -> str:
-        return f'FragmentAnnotation({self}, mz={self.calc_mz})'
+        if self.ion_type == '?':
+            ion = '?'
+        else:
+            ion = self.ion_type
+            if self.neutral_loss is not None:
+                ion += f'{self.neutral_loss}'
+            if self.isotope != 0:
+                ion += f'{self.isotope:+}i'
+            if self.charge > 1:
+                ion += f'^{self.charge}'
+            if self.adduct is not None:
+                ion += self.adduct
+            return ion
+        return f'FragmentAnnotation({ion}, mz={self.calc_mz})'
 
     def __str__(self) -> str:
         if self.ion_type == '?':
@@ -102,11 +115,10 @@ class FragmentAnnotation:
         else:
             annotation = self.ion_type
             if self.neutral_loss is not None:
-                annotation += f'-{self.neutral_loss}'
+                annotation += f'{self.neutral_loss}'
             if self.isotope != 0:
                 annotation += f'{self.isotope:+}i'
-            if self.charge > 1:
-                annotation += f'^{self.charge}'
+            annotation += '+' * self.charge
             if self.adduct is not None:
                 annotation += self.adduct
             return annotation
@@ -178,6 +190,8 @@ def _get_theoretical_peptide_fragments(
                 mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
                 for nl_name, nl_mass in neutral_losses.items():
+                    nl_name = (None if nl_name is None else
+                               f'{"-" if nl_mass < 0 else "+"}{nl_name}')
                     ions.append(FragmentAnnotation(
                         ion_type=f'{ion_type}{ion_index}',
                         neutral_loss=nl_name,

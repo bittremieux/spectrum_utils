@@ -46,7 +46,7 @@ class FragmentAnnotation:
     """
 
     def __init__(self, ion_type: str, neutral_loss: Optional[str] = None,
-                 isotope: int = 0, charge: int = 1,
+                 isotope: int = 0, charge: int = 0,
                  adduct: Optional[str] = None, calc_mz: float = None) \
             -> None:
         """

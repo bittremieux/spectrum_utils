@@ -10,6 +10,29 @@ from spectrum_utils import spectrum
 np.random.seed(13)
 
 
+def test_fragmentannotation_unknown():
+    spectrum.FragmentAnnotation('?')
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('?', neutral_loss='H2O')
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('?', isotope=1)
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('?', charge=1)
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('?', adduct='[M+H]')
+
+
+def test_fragment_annotation_primary():
+    spectrum.FragmentAnnotation('b5', neutral_loss='H2O', isotope=1, charge=1,
+                                adduct='[M+H]')
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('b5')
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('b5', charge=0)
+    with pytest.raises(ValueError):
+        spectrum.FragmentAnnotation('b5', charge=-2)
+
+
 def test_get_theoretical_fragments():
     peptide = 'HPYLEDR'
     fragments = {'b1_1': 138.066147, 'b2_1': 235.118912, 'b3_1': 398.182220,
@@ -103,10 +126,10 @@ def test_get_theoretical_fragments_mod_multiple():
 
 def test_get_theoretical_fragments_neutral_loss():
     peptide = 'HPYLEDR'
-    fragments = {'b1': 138.066147, 'b2': 235.118912, 'b3': 398.182220,
-                 'b4': 511.266266, 'b5': 640.308899, 'b6': 755.335815,
-                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
-                 'y4': 532.272522, 'y5': 695.335815, 'y6': 792.388550,
+    fragments = {'b1^1': 138.066147, 'b2^1': 235.118912, 'b3^1': 398.182220,
+                 'b4^1': 511.266266, 'b5^1': 640.308899, 'b6^1': 755.335815,
+                 'y1^1': 175.118912, 'y2^1': 290.145844, 'y3^1': 419.188446,
+                 'y4^1': 532.272522, 'y5^1': 695.335815, 'y6^1': 792.388550,
                  'b1^2': 69.536731,  'b2^2': 118.063111, 'b3^2': 199.594776,
                  'b4^2': 256.136806, 'b5^2': 320.658101, 'b6^2': 378.171571,
                  'y1^2': 88.063114,  'y2^2': 145.576584, 'y3^2': 210.097879,
@@ -118,29 +141,26 @@ def test_get_theoretical_fragments_neutral_loss():
     neutral_loss = 'H2O', 18.010565    # water
     neutral_loss_fragments = {}
     for fragment, mz in fragments.items():
-        fragment = fragment.split('^')
-        if len(fragment) == 1:
-            charge = 1
-            fragment = f'{fragment[0]}-{neutral_loss[0]}'
-        else:
-            charge = int(fragment[1])
-            fragment = f'{fragment[0]}-{neutral_loss[0]}^{fragment[1]}'
+        charge = int(fragment.split('^')[1])
+        fragment = f'{fragment}-{neutral_loss[0]}'
         neutral_loss_fragments[fragment] = mz - (neutral_loss[1] / charge)
     fragments = {**fragments, **neutral_loss_fragments}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, max_charge=3,
             neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]}):
-        fragment_mz = fragments[str(fragment)]
-        assert fragment_mz == pytest.approx(fragment.calc_mz), str(fragment)
+        fragment_mz = fragments[
+            f"""{fragment.ion_type}^{fragment.charge}{fragment.neutral_loss
+            if fragment.neutral_loss is not None else ''}"""]
+        assert fragment_mz == pytest.approx(fragment.calc_mz), repr(fragment)
 
 
 def test_get_theoretical_fragments_mod_neutral_loss():
     peptide = 'HPYLEDR'
     modifications = {2: 79.96633}
-    fragments = {'b1': 138.066147, 'b2': 235.118912, 'b3': 478.148590,
-                 'b4': 591.232666, 'b5': 720.275269, 'b6': 835.302185,
-                 'y1': 175.118912, 'y2': 290.145844, 'y3': 419.188446,
-                 'y4': 532.272522, 'y5': 775.302185, 'y6': 872.354980,
+    fragments = {'b1^1': 138.066147, 'b2^1': 235.118912, 'b3^1': 478.148590,
+                 'b4^1': 591.232666, 'b5^1': 720.275269, 'b6^1': 835.302185,
+                 'y1^1': 175.118912, 'y2^1': 290.145844, 'y3^1': 419.188446,
+                 'y4^1': 532.272522, 'y5^1': 775.302185, 'y6^1': 872.354980,
                  'b1^2': 69.536731,  'b2^2': 118.063111, 'b3^2': 239.577941,
                  'b4^2': 296.119971, 'b5^2': 360.641266, 'b6^2': 418.154736,
                  'y1^2': 88.063114,  'y2^2': 145.576584, 'y3^2': 210.097879,
@@ -152,20 +172,17 @@ def test_get_theoretical_fragments_mod_neutral_loss():
     neutral_loss = 'H2O', 18.010565    # water
     neutral_loss_fragments = {}
     for fragment, mz in fragments.items():
-        fragment = fragment.split('^')
-        if len(fragment) == 1:
-            charge = 1
-            fragment = f'{fragment[0]}-{neutral_loss[0]}'
-        else:
-            charge = int(fragment[1])
-            fragment = f'{fragment[0]}-{neutral_loss[0]}^{fragment[1]}'
+        charge = int(fragment.split('^')[1])
+        fragment = f'{fragment}-{neutral_loss[0]}'
         neutral_loss_fragments[fragment] = mz - (neutral_loss[1] / charge)
     fragments = {**fragments, **neutral_loss_fragments}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, modifications, max_charge=3,
             neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]}):
-        fragment_mz = fragments[str(fragment)]
-        assert fragment_mz == pytest.approx(fragment.calc_mz), str(fragment)
+        fragment_mz = fragments[
+            f"""{fragment.ion_type}^{fragment.charge}{fragment.neutral_loss
+            if fragment.neutral_loss is not None else ''}"""]
+        assert fragment_mz == pytest.approx(fragment.calc_mz), repr(fragment)
 
 
 def test_mz_intensity_len():
@@ -918,11 +935,10 @@ def test_annotate_mz_fragments_nearest_mz():
     mz, intensity = np.asarray([200, 200.5, 201]), np.asarray([10, 20, 30])
     spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
-    charge = 1
     spec.annotate_mz_fragment(fragment_mz, fragment_tol_mass,
                               fragment_tol_mode, 'nearest_mz')
     assert spec.annotation[0] == spectrum.FragmentAnnotation(
-        '?', charge=charge, calc_mz=fragment_mz)
+        '?', calc_mz=fragment_mz)
     assert spec.annotation[1] is None
     assert spec.annotation[2] is None
 
@@ -933,10 +949,9 @@ def test_annotate_mz_fragments_most_intense():
     mz, intensity = np.asarray([200, 200.5, 201.5]), np.asarray([10, 20, 30])
     spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
-    charge = 1
     spec.annotate_mz_fragment(fragment_mz, fragment_tol_mass,
                               fragment_tol_mode, 'most_intense')
     assert spec.annotation[0] is None
     assert spec.annotation[1] == spectrum.FragmentAnnotation(
-        '?', charge=charge, calc_mz=fragment_mz)
+        '?', calc_mz=fragment_mz)
     assert spec.annotation[2] is None

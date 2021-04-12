@@ -79,13 +79,13 @@ class FragmentAnnotation:
             raise ValueError('Unsupported ion type')
         if ion_type == '?' and (neutral_loss is not None or
                                 isotope != 0 or
-                                charge != 1 or
+                                charge != 0 or
                                 adduct is not None):
             raise ValueError('Information specified for an unknown ion')
         self.ion_type = ion_type
         self.neutral_loss = neutral_loss
         self.isotope = isotope
-        if charge == 0:
+        if charge == 0 and ion_type != '?':
             raise ValueError('Invalid charge 0 for annotated fragment')
         elif charge < 0:
             raise ValueError('Invalid negative charge')

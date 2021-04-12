@@ -26,8 +26,7 @@ def test_get_theoretical_fragments():
                  'y4_3': 178.095698, 'y5_3': 232.450141, 'y6_3': 264.801061}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, max_charge=3):
-        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}'
-                                f'_{fragment.charge}']
+        fragment_mz = fragments[f'{fragment.ion_type}_{fragment.charge}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
 
 
@@ -48,8 +47,7 @@ def test_get_theoretical_fragments_static_mod():
                  'y4_3': 178.095698, 'y5_3': 259.105585, 'y6_3': 291.456505}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, None, max_charge=3):
-        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}'
-                                f'_{fragment.charge}']
+        fragment_mz = fragments[f'{fragment.ion_type}_{fragment.charge}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
     assert spectrum._aa_mass['Y'] == pytest.approx(163.06333 + 79.96633)
     spectrum.reset_modifications()
@@ -73,8 +71,7 @@ def test_get_theoretical_fragments_mod():
                  'y4_3': 178.095698, 'y5_3': 259.105585, 'y6_3': 291.456505}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, modifications, max_charge=3):
-        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}'
-                                f'_{fragment.charge}']
+        fragment_mz = fragments[f'{fragment.ion_type}_{fragment.charge}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
 
 
@@ -87,7 +84,7 @@ def test_get_theoretical_fragments_mod_term():
                  'y4': 532.272522, 'y5': 695.335815, 'y6': 792.388550}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, modifications):
-        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}']
+        fragment_mz = fragments[f'{fragment.ion_type}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
 
 
@@ -100,7 +97,7 @@ def test_get_theoretical_fragments_mod_multiple():
                  'y4': 532.272522, 'y5': 775.302185, 'y6': 872.354980}
     for fragment in spectrum._get_theoretical_peptide_fragments(
             peptide, modifications):
-        fragment_mz = fragments[f'{fragment.ion_type}{fragment.ion_index}']
+        fragment_mz = fragments[f'{fragment.ion_type}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
 
 
@@ -115,7 +112,7 @@ def test_mz_annotation_len():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.FragmentAnnotation(None, this_mz, str(this_mz))
+    annotation = [spectrum.FragmentAnnotation('?', calc_mz=this_mz)
                   for this_mz in mz[:100]]
     with pytest.raises(ValueError):
         spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
@@ -147,8 +144,9 @@ def test_init_annotation_order():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     for this_mz, this_annotation in zip(spec.mz, spec.annotation):
@@ -159,8 +157,9 @@ def test_mz_array():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks).tolist()
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     assert type(spec.mz) == np.ndarray
@@ -174,8 +173,9 @@ def test_intensity_array():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks).tolist()
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     assert type(spec.intensity) == np.ndarray
@@ -189,8 +189,9 @@ def test_annotation_array():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     assert type(spec.annotation) == np.ndarray
@@ -206,8 +207,9 @@ def test_annotation_none():
     intensity = np.random.lognormal(0, 1, num_peaks)
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity)
     assert spec.annotation is None
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec.annotation = annotation
     assert type(spec.annotation) == np.ndarray
     spec.annotation = None
@@ -267,8 +269,9 @@ def test_round_no_merge():
     num_peaks = 150
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.49, 0.5, num_peaks)
     intensity = np.random.exponential(1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz.copy(),
                                  intensity.copy(), annotation.copy())
     decimals = 0
@@ -287,8 +290,9 @@ def test_round_merge_len():
     mz[5] = mz[3] + 0.0005
     mz[7] = mz[8] - 0.00037
     intensity = np.random.exponential(1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     spec.round(1)
@@ -328,26 +332,29 @@ def test_round_merge_annotation():
     mz[5] = mz[3] + 0.0005
     mz[7] = mz[8] - 0.00037
     intensity = np.arange(1, 11)
-    annotation = [None, None, None,
-                  spectrum.PeptideFragmentAnnotation(1, mz[3], 'b', 4), None,
-                  spectrum.PeptideFragmentAnnotation(1, mz[5], 'b', 6),
-                  spectrum.PeptideFragmentAnnotation(1, mz[6], 'b', 7), None,
-                  None, spectrum.PeptideFragmentAnnotation(1, mz[9], 'b', 10)]
+    annotation = [
+        None, None, None,
+        spectrum.FragmentAnnotation('b4', charge=1, calc_mz=mz[3]), None,
+        spectrum.FragmentAnnotation('b6', charge=1, calc_mz=mz[5]),
+        spectrum.FragmentAnnotation('b7', charge=1, calc_mz=mz[6]), None,
+        None, spectrum.FragmentAnnotation('b10', charge=1, calc_mz=mz[9])]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz.copy(), intensity,
                                  annotation.copy())
     spec.round(1, 'max')
     np.testing.assert_array_equal(spec.annotation, [
-        None, None, None, spectrum.PeptideFragmentAnnotation(1, mz[5], 'b', 6),
-        spectrum.PeptideFragmentAnnotation(1, mz[6], 'b', 7), None,
-        spectrum.PeptideFragmentAnnotation(1, mz[9], 'b', 10)])
+        None, None, None,
+        spectrum.FragmentAnnotation('b6', charge=1, calc_mz=mz[5]),
+        spectrum.FragmentAnnotation('b7', charge=1, calc_mz=mz[6]), None,
+        spectrum.FragmentAnnotation('b10', charge=1, calc_mz=mz[9])])
 
 
 def test_set_mz_range_keep_all():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     min_mz, max_mz = 0, 1500
@@ -361,8 +368,9 @@ def test_set_mz_range_truncate():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     min_mz, max_mz = 400, 1200
@@ -380,8 +388,9 @@ def test_set_mz_range_truncate_left():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     min_mz, max_mz = 400, 1500
@@ -397,8 +406,9 @@ def test_set_mz_range_truncate_right():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     min_mz, max_mz = 0, 1200
@@ -414,8 +424,9 @@ def test_set_mz_range_none():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     spec.set_mz_range(None, None)
@@ -431,8 +442,9 @@ def test_remove_precursor_peak():
     fragment_tol_mode = 'Da'
     precursor_mz = mz[np.random.randint(0, num_peaks)] + fragment_tol_mass / 2
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz, 2, mz,
                                  intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
@@ -449,8 +461,9 @@ def test_remove_precursor_peak_none():
     fragment_tol_mode = 'Da'
     precursor_mz = mz[np.random.randint(0, num_peaks)] + fragment_tol_mass * 2
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz, 2, mz,
                                  intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
@@ -470,8 +483,9 @@ def test_remove_precursor_peak_charge():
     mz[-1] = ((precursor_mz - 1.0072766) * precursor_charge) / 2 + 1.0072766
     mz[-2] = ((precursor_mz - 1.0072766) * precursor_charge) + 1.0072766
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz,
                                  precursor_charge, mz, intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
@@ -491,8 +505,9 @@ def test_remove_precursor_peak_isotope():
     mz[-1] = precursor_mz + 1 / precursor_charge
     mz[-2] = precursor_mz + 2 / precursor_charge
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', precursor_mz,
                                  precursor_charge, mz, intensity, annotation)
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode, 2)
@@ -506,8 +521,9 @@ def test_filter_intensity_keep_all():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     spec.filter_intensity()
@@ -521,8 +537,9 @@ def test_filter_intensity_remove_low_intensity():
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
     max_intensity = intensity.max()
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     min_intensity = 0.05
@@ -540,8 +557,9 @@ def test_filter_intensity_max_num_peaks():
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
     max_intensity = intensity.max()
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     max_num_peaks = 50
@@ -557,8 +575,9 @@ def test_filter_intensity_remove_low_intensity_max_num_peaks():
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
     max_intensity = intensity.max()
-    annotation = [spectrum.PeptideFragmentAnnotation(1, this_mz, 'y', i)
-                  for i, this_mz in enumerate(mz)]
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
     spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
                                  annotation)
     min_intensity = 0.05
@@ -681,8 +700,8 @@ def test_annotate_peptide_fragments_nearest_mz():
         charge, mz, intensity, peptide=peptide)
     spec.annotate_peptide_fragments(fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='nearest_mz')
-    assert spec.annotation[0] == spectrum.PeptideFragmentAnnotation(
-        1, fragment_mz[0], 'b', 1)
+    assert spec.annotation[0] == spectrum.FragmentAnnotation(
+        'b1', charge=1, calc_mz=fragment_mz[0])
     assert spec.annotation[1] is None
 
 
@@ -703,8 +722,8 @@ def test_annotate_peptide_fragments_most_intense():
     spec.annotate_peptide_fragments(fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='most_intense')
     assert spec.annotation[0] is None
-    assert spec.annotation[1] == spectrum.PeptideFragmentAnnotation(
-        1, fragment_mz[0], 'b', 1)
+    assert spec.annotation[1] == spectrum.FragmentAnnotation(
+        'b1', charge=1, calc_mz=fragment_mz[0])
 
 
 def test_annotate_molecule_fragments():
@@ -746,8 +765,8 @@ def test_annotate_molecule_fragments_nearest_mz():
     spec.annotate_molecule_fragment('CCCCCCCC', fragment_mz, charge,
                                     fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='nearest_mz')
-    assert spec.annotation[0] == spectrum.MoleculeFragmentAnnotation(
-        charge, fragment_mz, 'CCCCCCCC')
+    assert spec.annotation[0] == spectrum.FragmentAnnotation(
+        f'f{{CCCCCCCC}}', charge=charge, calc_mz=fragment_mz)
     assert spec.annotation[1] is None
     assert spec.annotation[2] is None
 
@@ -763,8 +782,8 @@ def test_annotate_molecule_fragments_most_intense():
                                     fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='most_intense')
     assert spec.annotation[0] is None
-    assert spec.annotation[1] == spectrum.MoleculeFragmentAnnotation(
-        charge, fragment_mz, 'CCCCCCCC')
+    assert spec.annotation[1] == spectrum.FragmentAnnotation(
+        f'f{{CCCCCCCC}}', charge=charge, calc_mz=fragment_mz)
     assert spec.annotation[2] is None
 
 
@@ -777,24 +796,9 @@ def test_annotate_mz_fragments():
     fragment_tol_mode = 'Da'
     num_annotation = 4
     for fragment_mz in np.random.choice(spec.mz, num_annotation, False):
-        spec.annotate_mz_fragment(fragment_mz, 1, fragment_tol_mass,
+        spec.annotate_mz_fragment(fragment_mz, fragment_tol_mass,
                                   fragment_tol_mode)
     assert np.count_nonzero(spec.annotation) == num_annotation
-
-
-def test_annotate_mz_fragments_text():
-    num_peaks = 150
-    mz = np.random.uniform(100, 1400, num_peaks)
-    intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 1, mz, intensity)
-    fragment_tol_mass = 0.02
-    fragment_tol_mode = 'Da'
-    annotation = ['one', 'two', 'three', 'four']
-    for a, fragment_mz in zip(annotation, np.random.choice(
-            spec.mz, len(annotation), False)):
-        spec.annotate_mz_fragment(fragment_mz, 1, fragment_tol_mass,
-                                  fragment_tol_mode, a)
-    assert np.count_nonzero(spec.annotation) == len(annotation)
 
 
 def test_annotate_mz_fragments_invalid_mz():
@@ -805,8 +809,7 @@ def test_annotate_mz_fragments_invalid_mz():
     fragment_tol_mass = 0.02
     fragment_tol_mode = 'Da'
     with pytest.raises(ValueError):
-        spec.annotate_mz_fragment(1600, 1, fragment_tol_mass,
-                                  fragment_tol_mode)
+        spec.annotate_mz_fragment(1600, fragment_tol_mass, fragment_tol_mode)
 
 
 def test_annotate_mz_fragments_nearest_mz():
@@ -816,10 +819,10 @@ def test_annotate_mz_fragments_nearest_mz():
     spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
     charge = 1
-    spec.annotate_mz_fragment(fragment_mz, charge, fragment_tol_mass,
-                              fragment_tol_mode, 'nearest_mz', 'hello')
+    spec.annotate_mz_fragment(fragment_mz, fragment_tol_mass,
+                              fragment_tol_mode, 'nearest_mz')
     assert spec.annotation[0] == spectrum.FragmentAnnotation(
-        charge, fragment_mz, 'hello')
+        '?', charge=charge, calc_mz=fragment_mz)
     assert spec.annotation[1] is None
     assert spec.annotation[2] is None
 
@@ -831,9 +834,9 @@ def test_annotate_mz_fragments_most_intense():
     spec = spectrum.MsmsSpectrum('test_spectrum', 100, 1, mz, intensity)
     fragment_mz = 200.15
     charge = 1
-    spec.annotate_mz_fragment(fragment_mz, charge, fragment_tol_mass,
-                              fragment_tol_mode, 'most_intense', 'hello')
+    spec.annotate_mz_fragment(fragment_mz, fragment_tol_mass,
+                              fragment_tol_mode, 'most_intense')
     assert spec.annotation[0] is None
     assert spec.annotation[1] == spectrum.FragmentAnnotation(
-        charge, fragment_mz, 'hello')
+        '?', charge=charge, calc_mz=fragment_mz)
     assert spec.annotation[2] is None

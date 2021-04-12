@@ -948,12 +948,11 @@ class MsmsSpectrum:
     def annotate_peaks(self, *args, **kwargs):
         raise DeprecationWarning('Renamed to annotate_peptide_fragments')
 
-    def annotate_peptide_fragments(self, fragment_tol_mass: float,
-                                   fragment_tol_mode: str,
-                                   ion_types: str = 'by',
-                                   max_ion_charge: Optional[int] = None,
-                                   peak_assignment: str = 'most_intense',
-                                   neutral_losses: Optional[List] = None) \
+    def annotate_peptide_fragments(
+            self, fragment_tol_mass: float, fragment_tol_mode: str,
+            ion_types: str = 'by', max_ion_charge: Optional[int] = None,
+            peak_assignment: str = 'most_intense',
+            neutral_losses: Optional[Dict[str, float]] = None) \
             -> 'MsmsSpectrum':
         """
         Annotate peaks with their corresponding peptide fragment ion
@@ -986,9 +985,10 @@ class MsmsSpectrum:
               (default).
             - 'nearest_mz': The peak whose m/z is closest to the theoretical
               m/z will be annotated.
-        neutral_losses : List, optional
-            List of neutral losses to consider, specified by their molecular
-            formula. By default no neutral losses are considered.
+        neutral_losses : Dict[str, float], optional
+            Neutral losses to consider, specified as a dictionary with as keys
+            the description (molecular formula) and as value the neutral loss.
+            Note that the value should typically be negative.
 
         Returns
         -------
@@ -998,11 +998,9 @@ class MsmsSpectrum:
             raise ValueError('No peptide sequence available for the spectrum')
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
-        if neutral_losses is not None:
-            neutral_losses = {name: -mass.calculate_mass(formula=name)
-                              for name in neutral_losses}
-            # Make sure the standard peaks (without a neutral loss) are always
-            # considered.
+        # Make sure the standard peaks (without a neutral loss) are always
+        # considered.
+        if neutral_losses is not None and None not in neutral_losses:
             neutral_losses[None] = 0
         theoretical_fragments = _get_theoretical_peptide_fragments(
             self.peptide, self.modifications, ion_types, max_ion_charge,

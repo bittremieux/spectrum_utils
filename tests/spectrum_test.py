@@ -883,7 +883,7 @@ def test_annotate_molecule_fragments_nearest_mz():
                                     fragment_tol_mass, fragment_tol_mode,
                                     peak_assignment='nearest_mz')
     assert spec.annotation[0] == spectrum.FragmentAnnotation(
-        f'f{{CCCCCCCC}}', charge=charge, calc_mz=fragment_mz)
+        'f{{CCCCCCCC}}', charge=charge, calc_mz=fragment_mz)
     assert spec.annotation[1] is None
     assert spec.annotation[2] is None
 
@@ -900,7 +900,7 @@ def test_annotate_molecule_fragments_most_intense():
                                     peak_assignment='most_intense')
     assert spec.annotation[0] is None
     assert spec.annotation[1] == spectrum.FragmentAnnotation(
-        f'f{{CCCCCCCC}}', charge=charge, calc_mz=fragment_mz)
+        'f{{CCCCCCCC}}', charge=charge, calc_mz=fragment_mz)
     assert spec.annotation[2] is None
 
 

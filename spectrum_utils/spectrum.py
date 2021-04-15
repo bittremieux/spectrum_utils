@@ -1,6 +1,4 @@
-import math
 import operator
-import warnings
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
@@ -47,137 +45,97 @@ class FragmentAnnotation:
     Class representing a general fragment ion annotation.
     """
 
-    def __init__(self, charge: int, calc_mz: float, annotation: str = None)\
+    def __init__(self, ion_type: str, neutral_loss: Optional[str] = None,
+                 isotope: int = 0, charge: int = 0,
+                 adduct: Optional[str] = None, calc_mz: float = None) \
             -> None:
         """
-        Instantiate a new `FragmentAnnotation`.
+        Interpretation of a single fragment peak.
+
+        This fragment annotation format is derived from the PSI peak
+        interpretation specification:
+        https://docs.google.com/document/d/1yEUNG4Ump6vnbMDs4iV4s3XISflmOkRAyqUuutcCG2w/edit?usp=sharing
 
         Parameters
         ----------
-        charge : int
-            The fragment ion charge if known, None otherwise.
+        ion_type : str
+            Specifies the basic type of ion being described. Examples are
+            b ions, y ions, immonium ions, unfragmented precursor ions,
+            internal fragmentation ions, isobaric tag ions, etc.
+        neutral_loss : str, optional
+            A string of 0 to n loss components, described by their molecular
+            formula. The default is no neutral loss.
+        isotope : int, optional
+            The isotope number above or below the monoisotope. The default is
+            the monoisotopic peak.
+        charge : int, optional
+            The charge of the fragment. The default is charge 1.
+        adduct : str, optional
+            The adduct that ionized the fragment.
         calc_mz : float
             The theoretical m/z value of the fragment.
-        annotation : str
-            The fragment's annotation string.
         """
-        self.ion_type = 'unknown'
+        if ion_type[0] not in '?abcxyzIm_prf':
+            raise ValueError('Unsupported ion type')
+        if ion_type == '?' and (neutral_loss is not None or
+                                isotope != 0 or
+                                charge != 0 or
+                                adduct is not None):
+            raise ValueError('Information specified for an unknown ion')
+        self.ion_type = ion_type
+        self.neutral_loss = neutral_loss
+        self.isotope = isotope
+        if charge == 0 and ion_type != '?':
+            raise ValueError('Invalid charge 0 for annotated fragment')
+        elif charge < 0:
+            raise ValueError('Invalid negative charge')
         self.charge = charge
+        self.adduct = adduct
         self.calc_mz = calc_mz
-        self.annotation = annotation
-
-    def _charge_to_str(self):
-        """
-        Convert a numeric charge to a string representation.
-        """
-        if self.charge is None:
-            return 'unknown'
-        elif self.charge > 0:
-            return '+' * self.charge
-        elif self.charge < 0:
-            return '-' * -self.charge
-        else:
-            return 'undefined'
 
     def __repr__(self) -> str:
-        return f"FragmentAnnotation(annotation='{self.annotation}', " \
-               f"charge={self._charge_to_str()}, mz={self.calc_mz})"
+        if self.ion_type == '?':
+            ion = '?'
+        else:
+            ion = self.ion_type
+            if self.neutral_loss is not None:
+                ion += f'{self.neutral_loss}'
+            if self.isotope != 0:
+                ion += f'{self.isotope:+}i'
+            if self.charge > 1:
+                ion += f'^{self.charge}'
+            if self.adduct is not None:
+                ion += self.adduct
+            return ion
+        return f'FragmentAnnotation({ion}, mz={self.calc_mz})'
 
     def __str__(self) -> str:
-        return self.annotation
+        if self.ion_type == '?':
+            return str(self.calc_mz)
+        else:
+            annotation = self.ion_type
+            if self.neutral_loss is not None:
+                annotation += f'{self.neutral_loss}'
+            if self.isotope != 0:
+                annotation += f'{self.isotope:+}i'
+            annotation += '+' * self.charge
+            if self.adduct is not None:
+                annotation += self.adduct
+            return annotation
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FragmentAnnotation):
             return False
         else:
-            return self.annotation == other.annotation
-
-
-class PeptideFragmentAnnotation(FragmentAnnotation):
-    """
-    Class representing a peptide fragment ion annotation.
-    """
-
-    def __init__(self, charge: int, calc_mz: float, ion_type: str,
-                 ion_index: int) -> None:
-        """
-        Instantiate a new `PeptideFragmentAnnotation`.
-
-        Parameters
-        ----------
-        charge : int
-            The peptide fragment ion charge.
-        calc_mz : float
-            The theoretical m/z value of the peptide fragment.
-        ion_type : {'a', 'b', 'c', 'x', 'y', 'z'}
-            The peptide fragment ion type.
-        ion_index : int
-            The peptide fragment ion index.
-        """
-        super().__init__(charge, calc_mz)
-        if ion_type not in 'abcxyz':
-            raise ValueError(f'Unknown ion type: {ion_type}')
-        self.ion_type = ion_type
-        self.ion_index = ion_index
-        self.annotation = f'{self.ion_type}{self.ion_index}' \
-                          f'{self._charge_to_str()}'
-
-    def __repr__(self) -> str:
-        return f"PeptideFragmentAnnotation(ion_type='{self.ion_type}', " \
-            f"ion_index={self.ion_index}, charge={self.charge}, " \
-            f"mz={self.calc_mz})"
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, PeptideFragmentAnnotation):
-            return False
-        else:
-            return (self.ion_type == other.ion_type and
-                    self.ion_index == other.ion_index and
-                    self.charge == other.charge and
-                    math.isclose(self.calc_mz, other.calc_mz))
-
-
-class MoleculeFragmentAnnotation(FragmentAnnotation):
-    """
-    Class representing a molecule fragment ion annotation.
-    """
-
-    def __init__(self, charge: int, calc_mz: float, smiles: str) -> None:
-        """
-        Instantiate a new `MoleculeFragmentAnnotation`.
-
-        Parameters
-        ----------
-        charge : int
-            The molecule fragment ion charge.
-        calc_mz : float
-            The theoretical m/z value of the molecule fragment.
-        smiles : str
-            The SMILES representation of the molecule.
-        """
-        super().__init__(charge, calc_mz)
-        self.ion_type = 'molecule'
-        self.smiles = smiles
-        self.annotation = self.smiles
-
-    def __repr__(self) -> str:
-        return f"MoleculeFragmentAnnotation(smiles='{self.smiles}', " \
-            f"charge={self.charge}, mz={self.calc_mz})"
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, MoleculeFragmentAnnotation):
-            return False
-        else:
-            return (self.smiles == other.smiles and
-                    self.charge == other.charge and
-                    math.isclose(self.calc_mz, other.calc_mz))
+            return str(self) == str(other)
 
 
 def _get_theoretical_peptide_fragments(
         peptide: str,
         modifications: Optional[Dict[Union[float, str], float]] = None,
-        types: str = 'by', max_charge: int = 1)\
-        -> List[PeptideFragmentAnnotation]:
+        types: str = 'by', max_charge: int = 1,
+        neutral_losses: Optional[Dict[str, float]] = None) \
+        -> List[FragmentAnnotation]:
     """
     Get theoretical peptide fragments for the given peptide.
 
@@ -197,6 +155,9 @@ def _get_theoretical_peptide_fragments(
     max_charge : int, optional
         All fragments up to and including the given charge will be generated
         (the default is 1 to only generate singly-charged fragments).
+    neutral_losses : Optional[Dict[str, float]]
+        A dictionary with neutral loss names and (negative) mass differences to
+        be considered.
 
     Returns
     -------
@@ -214,6 +175,8 @@ def _get_theoretical_peptide_fragments(
             del mods['C-term']
     else:
         mods = {}
+    if neutral_losses is None:
+        neutral_losses = {None: 0}
     ions = []
     for i in range(1, len(peptide)):
         for ion_type in types:
@@ -226,11 +189,19 @@ def _get_theoretical_peptide_fragments(
                 sequence = peptide[i:]
                 mod_mass = sum([md for pos, md in mods.items() if pos >= i])
             for charge in range(1, max_charge + 1):
-                ions.append(PeptideFragmentAnnotation(
-                    charge, mass.fast_mass(
-                        sequence=sequence, ion_type=ion_type,
-                        charge=charge, aa_mass=_aa_mass) + mod_mass / charge,
-                    ion_type, ion_index))
+                for nl_name, nl_mass in neutral_losses.items():
+                    nl_name = (None if nl_name is None else
+                               f'{"-" if nl_mass < 0 else "+"}{nl_name}')
+                    ions.append(FragmentAnnotation(
+                        ion_type=f'{ion_type}{ion_index}',
+                        neutral_loss=nl_name,
+                        isotope=0,
+                        charge=charge,
+                        calc_mz=mass.fast_mass(sequence=sequence,
+                                               ion_type=ion_type,
+                                               charge=charge,
+                                               aa_mass=_aa_mass)
+                                + (mod_mass + nl_mass) / charge))
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 
 
@@ -507,7 +478,7 @@ def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
 @nb.njit
 def _get_peptide_fragment_annotation_map(
         spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
-        annotation_mz: List[float], fragment_tol_mass: float,
+        annotation_mz: nb.typed.List, fragment_tol_mass: float,
         fragment_tol_mode: str, peak_assignment: str = 'most_intense')\
         -> List[Tuple[int, int]]:
     """
@@ -519,7 +490,7 @@ def _get_peptide_fragment_annotation_map(
         The mass-to-charge varlues of the spectrum fragment peaks.
     spectrum_intensity : np.ndarray
         The intensities of the spectrum fragment peaks.
-    annotation_mz : List[float]
+    annotation_mz : nb.typed.List[float]
         A list of mass-to-charge values of the peptide fragment annotations.
     fragment_tol_mass : float
         Fragment mass tolerance to match spectrum peaks against theoretical
@@ -991,11 +962,11 @@ class MsmsSpectrum:
     def annotate_peaks(self, *args, **kwargs):
         raise DeprecationWarning('Renamed to annotate_peptide_fragments')
 
-    def annotate_peptide_fragments(self, fragment_tol_mass: float,
-                                   fragment_tol_mode: str,
-                                   ion_types: str = 'by',
-                                   max_ion_charge: Optional[int] = None,
-                                   peak_assignment: str = 'most_intense')\
+    def annotate_peptide_fragments(
+            self, fragment_tol_mass: float, fragment_tol_mode: str,
+            ion_types: str = 'by', max_ion_charge: Optional[int] = None,
+            peak_assignment: str = 'most_intense',
+            neutral_losses: Optional[Dict[str, float]] = None) \
             -> 'MsmsSpectrum':
         """
         Annotate peaks with their corresponding peptide fragment ion
@@ -1028,6 +999,10 @@ class MsmsSpectrum:
               (default).
             - 'nearest_mz': The peak whose m/z is closest to the theoretical
               m/z will be annotated.
+        neutral_losses : Dict[str, float], optional
+            Neutral losses to consider, specified as a dictionary with as keys
+            the description (molecular formula) and as value the neutral loss.
+            Note that the value should typically be negative.
 
         Returns
         -------
@@ -1037,23 +1012,21 @@ class MsmsSpectrum:
             raise ValueError('No peptide sequence available for the spectrum')
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
-
+        # Make sure the standard peaks (without a neutral loss) are always
+        # considered.
+        if neutral_losses is not None and None not in neutral_losses:
+            neutral_losses[None] = 0
         theoretical_fragments = _get_theoretical_peptide_fragments(
-            self.peptide, self.modifications, ion_types, max_ion_charge)
+            self.peptide, self.modifications, ion_types, max_ion_charge,
+            neutral_losses)
         self.annotation = np.full_like(self.mz, None, object)
-        with warnings.catch_warnings():
-            # FIXME: Deprecated reflected list in Numba should be resolved from
-            #        version 0.46.0 onwards.
-            #  https://numba.pydata.org/numba-doc/latest/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
-            warnings.simplefilter('ignore', nb.NumbaPendingDeprecationWarning)
-            for annotation_i, fragment_i in\
-                    _get_peptide_fragment_annotation_map(
-                        self.mz, self.intensity,
-                        [fragment.calc_mz for fragment
-                         in theoretical_fragments],
-                        fragment_tol_mass, fragment_tol_mode, peak_assignment):
-                self.annotation[annotation_i] =\
-                    theoretical_fragments[fragment_i]
+        for annotation_i, fragment_i in \
+                _get_peptide_fragment_annotation_map(
+                    self.mz, self.intensity,
+                    nb.typed.List([fragment.calc_mz
+                                   for fragment in theoretical_fragments]),
+                    fragment_tol_mass, fragment_tol_mode, peak_assignment):
+            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
 
         return self
 
@@ -1107,19 +1080,17 @@ class MsmsSpectrum:
             if self.annotation is None:
                 self.annotation = np.full_like(self.mz, None, object)
             # Set the molecule's annotation.
-            self.annotation[peak_index] =\
-                MoleculeFragmentAnnotation(fragment_charge, fragment_mz,
-                                           smiles)
+            self.annotation[peak_index] = FragmentAnnotation(
+                f'f{{{smiles}}}', charge=fragment_charge, calc_mz=fragment_mz)
 
         return self
 
-    def annotate_mz_fragment(self, fragment_mz: float, fragment_charge: int,
+    def annotate_mz_fragment(self, fragment_mz: float,
                              fragment_tol_mass: float, fragment_tol_mode: str,
-                             peak_assignment: str = 'most_intense',
-                             text: Optional[str] = None) -> 'MsmsSpectrum':
+                             peak_assignment: str = 'most_intense') \
+            -> 'MsmsSpectrum':
         """
-        Annotate a peak (if present) with its m/z value or a custom provided
-        string.
+        Annotate a peak (if present) with its m/z value.
 
         The matching position in `self.annotation` will be overwritten.
 
@@ -1127,8 +1098,6 @@ class MsmsSpectrum:
         ----------
         fragment_mz : float
             The expected m/z to annotate.
-        fragment_charge : int
-            The peak charge.
         fragment_tol_mass : float
             Fragment mass tolerance to match spectrum peaks against the given
             m/z.
@@ -1142,9 +1111,6 @@ class MsmsSpectrum:
               (default).
             - 'nearest_mz': The peak whose m/z is closest to the given m/z will
               be annotated.
-        text : Optional[str], optional
-            The text to annotate the peak with. If None, its m/z value will be
-            used.
 
         Returns
         -------
@@ -1161,9 +1127,7 @@ class MsmsSpectrum:
             if self.annotation is None:
                 self.annotation = np.full_like(self.mz, None, object)
             # Set the peak annotation.
-            self.annotation[peak_index] =\
-                FragmentAnnotation(
-                    fragment_charge, fragment_mz,
-                    text if text is not None else str(fragment_mz))
+            self.annotation[peak_index] = FragmentAnnotation(
+                '?', calc_mz=fragment_mz)
 
         return self

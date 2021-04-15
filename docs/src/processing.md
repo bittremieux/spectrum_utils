@@ -13,7 +13,7 @@ y, or z ions for peptide spectra.
 - Using `MsmsSpectrum.annotate_molecule_fragment(...)` using SMILES strings to
 annotate peaks with molecule (sub)structures.
 - Using `MsmsSpectrum.annotate_mz_fragment(...)` to annotate peaks with their
-_m_/_z_ value or user-provided custom strings.
+_m_/_z_ value.
 
 Peak annotations can be visualized using the spectrum_utils plotting
 functionality.
@@ -26,28 +26,26 @@ _m_/_z_ values:
 
 ```python
 import matplotlib.pyplot as plt
+import pandas as pd
 import spectrum_utils.spectrum as sus
 import spectrum_utils.plot as sup
-from pyteomics import mgf
+import urllib.parse
 
-
-spectrum_dict = mgf.get_spectrum('spectra.mgf', 'CCMSLIB00000840351')
-identifier = spectrum_dict['params']['title']
-precursor_mz = spectrum_dict['params']['pepmass'][0]
-precursor_charge = spectrum_dict['params']['charge'][0]
-mz = spectrum_dict['m/z array']
-intensity = spectrum_dict['intensity array']
-
-spectrum = sus.MsmsSpectrum(
-    identifier, precursor_mz, precursor_charge, mz, intensity)
+usi = 'mzspec:GNPS:GNPS-LIBRARY:accession:CCMSLIB00000840351'
+peaks = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi)}')
+precursor_mz = 633.2680
+precursor_charge = 1
+spectrum = sus.MsmsSpectrum(usi, precursor_mz, precursor_charge,
+                            peaks['mz'].values, peaks['intensity'].values)
 spectrum.filter_intensity(0.05)
 
-charge, tol_mass, tol_mode = 1, 0.5, 'Da'
+tol_mass, tol_mode = 0.5, 'Da'
 annotate_fragment_mz = [133.102, 147.080, 195.117, 237.164, 267.174, 295.170,
                         313.181, 355.192, 377.172, 391.187, 451.209, 511.231,
                         573.245, 633.269]
 for fragment_mz in annotate_fragment_mz:
-    spectrum.annotate_mz_fragment(fragment_mz, charge, tol_mass, tol_mode)
+    spectrum.annotate_mz_fragment(fragment_mz, tol_mass, tol_mode)
 
 fig, ax = plt.subplots(figsize=(12, 6))
 sup.spectrum(spectrum, ax=ax)
@@ -104,7 +102,43 @@ oxidated methionine:
 peptide = 'DLTDYLMK'
 modifications = {6: 15.994915}
 
-spectrum = sus.spectrum.MsmsSpectrum(
+spectrum = sus.MsmsSpectrum(
     identifier, precursor_mz, precursor_charge, mz, intensity,
     peptide=peptide, modifications=modifications)
 ```
+
+
+## Neutral losses
+
+Besides the canonical a, b, c, x, y, and z ions, each of these ions can also be
+automatically annotated with a neutral loss (or gain). Neutral losses need to
+be specified by their identifier (molecular formula) and their mass difference:
+
+```python
+spectrum.annotate_peptide_fragments(0.05, 'Da', ion_types='aby',
+                                    neutral_losses={'NH3': -17.026549,
+                                                    'H2O': -18.010565})
+```
+
+The above example will consider all peaks with an optional ammonia (NH3) or
+water (H2O) neutral loss.
+
+Common neutral losses to consider are:
+
+| Neutral loss/gain | Molecular formula | Mass difference |
+| --- | --- | --- |
+| Hydrogen | H | 1.007825 |
+| Ammonia | NH3 | 17.026549 |
+| Water | H2O | 18.010565 |
+| Carbon monoxide | CO | 27.994915 |
+| Carbon dioxide | CO2 | 43.989829 |
+| Formamide | HCONH2 | 45.021464 |
+| Formic acid | HCOOH | 46.005479 |
+| Methanesulfenic acid | CH4OS | 63.998301 |
+| Sulfur trioxide | SO3 | 79.956818 |
+| Metaphosphoric acid | HPO3 | 79.966331 |
+| Mercaptoacetamide | C2H5NOS | 91.009195 |
+| Mercaptoacetic acid | C2H4O2S | 91.993211 |
+| Phosphoric acid | H3PO4 | 97.976896 |
+
+Note that typically the neutral _loss_ mass difference should be negative.

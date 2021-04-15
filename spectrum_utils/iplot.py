@@ -51,7 +51,8 @@ def spectrum(spec: MsmsSpectrum, color_ions: bool = True,
     if spec.annotation is not None:
         annotation = (spec.annotation if annotate_ions else
                       [None] * len(spec.mz))
-        color = [colors[a.ion_type if a is not None and color_ions else None]
+        color = [colors[a.ion_type[0] if a is not None and color_ions else
+                        None]
                  for a in spec.annotation]
     else:
         annotation = [None] * len(spec.mz)

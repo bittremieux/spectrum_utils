@@ -150,8 +150,8 @@ spectrum_bottom = sus.MsmsSpectrum(usi_bottom, 507.7484, 2,
 <div id="mirror"></div>
 
 <script type="text/javascript">
-  var mirror = "https://raw.githubusercontent.com/bittremieux/spectrum_utils/master/docs/mirror_iplot.json";
-  var spectrum = "https://raw.githubusercontent.com/bittremieux/spectrum_utils/master/docs/spectrum_iplot.json";
+  var mirror = "https://raw.githubusercontent.com/bittremieux/spectrum_utils/master/docs/src/mirror_iplot.json";
+  var spectrum = "https://raw.githubusercontent.com/bittremieux/spectrum_utils/master/docs/src/spectrum_iplot.json";
   vegaEmbed('#mirror', mirror).then(function(result) {
   }).catch(console.error);
   vegaEmbed('#spectrum', spectrum).then(function(result) {

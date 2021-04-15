@@ -19,7 +19,7 @@ spectrum_utils contains the following features:
     - Peak annotations
         - Modification-aware (static & variable) peptide fragments
         - SMILES-based molecules
-        - Custom strings
+        - Mass-over-charge values
 - Spectrum plotting
     - Fully customizable individual spectrum plots
     - Mirror plot of matching spectra

@@ -15,32 +15,28 @@ intense peaks.
 IO functionality is not included in spectrum_utils. Instead you can use
 excellent libraries to read a variety of mass spectrometry data formats such as
 [Pyteomics](https://pyteomics.readthedocs.io/) or
-[pymzML](https://pymzml.readthedocs.io/).
+[pymzML](https://pymzml.readthedocs.io/), or from retrieve spectra from
+external resources, for example, using their
+[Universal Spectrum Identifier](https://www.psidev.info/usi).
 
 ```python
 import matplotlib.pyplot as plt
+import pandas as pd
 import spectrum_utils.plot as sup
 import spectrum_utils.spectrum as sus
-from pyteomics import mgf
+import urllib.parse
 
 
-# Read the spectrum from an MGF file using Pyteomics.
-spectrum_dict = mgf.get_spectrum(
-    'spectra.mgf',
-    'mzspec:PXD004732:01650b_BC2-TUM_first_pool_53_01_01-3xHCD-1h-R2:scan:'
-    '41840:WNQLQAFWGTGK/2')
-identifier = spectrum_dict['params']['title']
-precursor_mz = spectrum_dict['params']['pepmass'][0]
-precursor_charge = spectrum_dict['params']['charge'][0]
-mz = spectrum_dict['m/z array']
-intensity = spectrum_dict['intensity array']
-retention_time = float(spectrum_dict['params']['rtinseconds'])
-peptide = 'WNQLQAFWGTGK'
-
+# Get the spectrum peaks using its USI.
+usi = 'mzspec:PXD004732:01650b_BC2-TUM_first_pool_53_01_01-3xHCD-1h-R2:scan:41840'
+peaks = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi)}')
 # Create the MS/MS spectrum.
-spectrum = sus.MsmsSpectrum(
-    identifier, precursor_mz, precursor_charge, mz, intensity,
-    retention_time=retention_time, peptide=peptide)
+precursor_mz = 718.3600
+precursor_charge = 2
+spectrum = sus.MsmsSpectrum(usi, precursor_mz, precursor_charge,
+                            peaks['mz'].values, peaks['intensity'].values,
+                            peptide='WNQLQAFWGTGK')
 
 # Process the MS/MS spectrum.
 fragment_tol_mass = 10
@@ -63,10 +59,12 @@ As demonstrated, each of the processing steps can be achieved using a single,
 high-level function call. These calls can be chained together to easily
 perform multiple processing steps.
 
-Note that several processing steps modify the peak _m_/_z_ and intensity values
-and are thus not idempotent.
-
 Spectrum plotting can similarly be achieved using a high-level function call,
 resulting in the following figure:
 
 ![](quickstart.png)
+
+Note that several processing steps modify the peak _m_/_z_ and intensity values
+and are thus not idempotent. It is recommended to make a copy of the
+`MsmsSpectrum` object prior to any processing if the raw peak values need to
+remain available as well.

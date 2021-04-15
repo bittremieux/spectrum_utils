@@ -31,36 +31,34 @@ of code is required to do the actual plotting:
 
 ```python
 import matplotlib.pyplot as plt
+import pandas as pd
 import spectrum_utils.plot as sup
 import spectrum_utils.spectrum as sus
-from pyteomics import mgf
+import urllib.parse
 
 
-spectra = []
-for spectrum_dict in mgf.read('spectra.mgf'):
-    if 'DLTDYLMK' in spectrum_dict['params']['title']:
-        identifier = spectrum_dict['params']['title']
-        precursor_mz = spectrum_dict['params']['pepmass'][0]
-        precursor_charge = spectrum_dict['params']['charge'][0]
-        mz = spectrum_dict['m/z array']
-        intensity = spectrum_dict['intensity array']
-        retention_time = float(spectrum_dict['params']['rtinseconds'])
-        peptide = 'DLTDYLMK'
-        modifications = {6: 15.994915}
-
-        # Create the MS/MS spectrum.
-        spectra.append(sus.MsmsSpectrum(identifier, precursor_mz,
-                                        precursor_charge, mz, intensity,
-                                        retention_time=retention_time,
-                                        peptide=peptide,
-                                        modifications=modifications)
-                       .filter_intensity(0.01, 50)
-                       .scale_intensity('root')
-                       .annotate_peptide_fragments(0.5, 'Da', ion_types='aby'))
+peptide, modifications = 'DLTDYLMK', {6: 15.994915}
+usi_top = 'mzspec:MSV000079960:DY_HS_Exp7-Ad1:scan:30372'
+peaks_top = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi_top)}')
+spectrum_top = sus.MsmsSpectrum(usi_top, 507.7484, 2,
+                                peaks_top['mz'].values,
+                                peaks_top['intensity'].values,
+                                peptide=peptide,
+                                modifications=modifications)
+usi_bottom = 'mzspec:MSV000080679:j11962_C1orf144:scan:10671'
+peaks_bottom = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi_bottom)}')
+spectrum_bottom = sus.MsmsSpectrum(usi_bottom, 507.7484, 2,
+                                   peaks_bottom['mz'].values,
+                                   peaks_bottom['intensity'].values,
+                                   peptide=peptide,
+                                   modifications=modifications)
 
 fig, ax = plt.subplots(figsize=(12, 6))
-spectrum_top, spectrum_bottom = spectra
-sup.mirror(spectrum_top, spectrum_bottom, ax=ax)
+sup.mirror(spectrum_top.annotate_peptide_fragments(0.5, 'Da', ion_types='aby'),
+           spectrum_bottom.annotate_peptide_fragments(0.5, 'Da', ion_types='aby'),
+           ax=ax)
 plt.show()
 plt.close()
 ```
@@ -84,28 +82,22 @@ See below for example interactive plots of a single spectrum and a mirror plot.
 <script src="https://cdn.jsdelivr.net/npm/vega-embed@4"></script>
 
 ```python
+import pandas as pd
 import spectrum_utils.iplot as sup
 import spectrum_utils.spectrum as sus
-from pyteomics import mgf
+import urllib.parse
 
 
-# Read the spectrum from an MGF file using Pyteomics.
-spectrum_dict = mgf.get_spectrum(
-    'spectra.mgf',
-    'mzspec:PXD004732:01650b_BC2-TUM_first_pool_53_01_01-3xHCD-1h-R2:scan:'
-    '41840:WNQLQAFWGTGK/2')
-identifier = spectrum_dict['params']['title']
-precursor_mz = spectrum_dict['params']['pepmass'][0]
-precursor_charge = spectrum_dict['params']['charge'][0]
-mz = spectrum_dict['m/z array']
-intensity = spectrum_dict['intensity array']
-retention_time = float(spectrum_dict['params']['rtinseconds'])
-peptide = 'WNQLQAFWGTGK'
-
+# Get the spectrum peaks using its USI.
+usi = 'mzspec:PXD004732:01650b_BC2-TUM_first_pool_53_01_01-3xHCD-1h-R2:scan:41840'
+peaks = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi)}')
 # Create the MS/MS spectrum.
-spectrum = sus.MsmsSpectrum(
-    identifier, precursor_mz, precursor_charge, mz, intensity,
-    retention_time=retention_time, peptide=peptide)
+precursor_mz = 718.3600
+precursor_charge = 2
+spectrum = sus.MsmsSpectrum(usi, precursor_mz, precursor_charge,
+                            peaks['mz'].values, peaks['intensity'].values,
+                            peptide='WNQLQAFWGTGK')
 
 # Process the MS/MS spectrum.
 fragment_tol_mass = 10
@@ -125,36 +117,34 @@ spectrum = (spectrum.set_mz_range(min_mz=100, max_mz=1400)
 <div id="spectrum"></div>
 
 ```python
+import pandas as pd
 import spectrum_utils.iplot as sup
 import spectrum_utils.spectrum as sus
-from pyteomics import mgf
+import urllib.parse
 
 
-spectra = []
-for spectrum_dict in mgf.read('../docs/spectra.mgf'):
-    if 'DLTDYLMK' in spectrum_dict['params']['title']:
-        identifier = spectrum_dict['params']['title']
-        precursor_mz = spectrum_dict['params']['pepmass'][0]
-        precursor_charge = spectrum_dict['params']['charge'][0]
-        mz = spectrum_dict['m/z array']
-        intensity = spectrum_dict['intensity array']
-        retention_time = float(spectrum_dict['params']['rtinseconds'])
-        peptide = 'DLTDYLMK'
-        modifications = {6: 15.994915}
+peptide, modifications = 'DLTDYLMK', {6: 15.994915}
+usi_top = 'mzspec:MSV000079960:DY_HS_Exp7-Ad1:scan:30372'
+peaks_top = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi_top)}')
+spectrum_top = sus.MsmsSpectrum(usi_top, 507.7484, 2,
+                                peaks_top['mz'].values,
+                                peaks_top['intensity'].values,
+                                peptide=peptide,
+                                modifications=modifications)
+usi_bottom = 'mzspec:MSV000080679:j11962_C1orf144:scan:10671'
+peaks_bottom = pd.read_csv(
+    f'https://metabolomics-usi.ucsd.edu/csv/?usi={urllib.parse.quote(usi_bottom)}')
+spectrum_bottom = sus.MsmsSpectrum(usi_bottom, 507.7484, 2,
+                                   peaks_bottom['mz'].values,
+                                   peaks_bottom['intensity'].values,
+                                   peptide=peptide,
+                                   modifications=modifications)
 
-        # Create the MS/MS spectrum.
-        spectra.append(sus.MsmsSpectrum(identifier, precursor_mz,
-                                        precursor_charge, mz, intensity,
-                                        retention_time=retention_time,
-                                        peptide=peptide,
-                                        modifications=modifications)
-                       .filter_intensity(0.01, 50)
-                       .scale_intensity('root')
-                       .annotate_peptide_fragments(0.5, 'Da', ion_types='aby'))
-
-spectrum_top, spectrum_bottom = spectra
-(sup.mirror(spectrum_top, spectrum_bottom).properties(width=800, height=600)
-                                          .save('mirror_iplot.json'))
+(sup.mirror(spectrum_top.annotate_peptide_fragments(0.5, 'Da', ion_types='aby'),
+            spectrum_bottom.annotate_peptide_fragments(0.5, 'Da', ion_types='aby'))
+ .properties(width=800, height=600)
+ .save('mirror_iplot.json'))
 ```
 
 <div id="mirror"></div>

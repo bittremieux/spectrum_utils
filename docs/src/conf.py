@@ -42,6 +42,7 @@ release = spectrum_utils.__version__
 # ones.
 extensions = [
     'recommonmark',             # Use Markdown instead of reStructuredText.
+    'sphinx_markdown_tables',   # Support tables in Markdown.
     'sphinx.ext.autosummary',   # Generate documentation summary one-liners.
     'sphinx.ext.napoleon',      # Support NumPy and Google style docstrings.
     'sphinx.ext.viewcode',      # Add links to the source code.

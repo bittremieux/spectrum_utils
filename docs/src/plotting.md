@@ -143,7 +143,7 @@ spectrum_bottom = sus.MsmsSpectrum(usi_bottom, 507.7484, 2,
 
 (sup.mirror(spectrum_top.annotate_peptide_fragments(0.5, 'Da', ion_types='aby'),
             spectrum_bottom.annotate_peptide_fragments(0.5, 'Da', ion_types='aby'))
- .properties(width=800, height=600)
+ .properties(width=640, height=400)
  .save('mirror_iplot.json'))
 ```
 

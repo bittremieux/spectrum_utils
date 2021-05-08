@@ -822,6 +822,8 @@ class MsmsSpectrum:
                 min_mz = self.mz[0]
             if max_mz is None:
                 max_mz = self.mz[-1]
+            if max_mz < min_mz:
+                min_mz, max_mz = max_mz, min_mz
 
         mz_range_mask = _get_mz_range_mask(self.mz, min_mz, max_mz)
         self.mz = self.mz[mz_range_mask]

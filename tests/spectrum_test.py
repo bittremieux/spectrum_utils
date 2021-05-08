@@ -519,6 +519,26 @@ def test_set_mz_range_none():
     assert len(spec.annotation) == num_peaks
 
 
+def test_set_mz_range_reversed():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    annotation = [
+        spectrum.FragmentAnnotation(f'y{i}', charge=1, calc_mz=this_mz)
+        for i, this_mz in enumerate(mz)]
+    spec = spectrum.MsmsSpectrum('test_spectrum', 500, 2, mz, intensity,
+                                 annotation)
+    min_mz, max_mz = 400, 1200
+    assert spec.mz.min() < min_mz
+    assert spec.mz.max() > max_mz
+    spec.set_mz_range(max_mz, min_mz)
+    assert len(spec.mz) < num_peaks
+    assert len(spec.intensity) < num_peaks
+    assert len(spec.annotation) < num_peaks
+    assert spec.mz.min() >= min_mz
+    assert spec.mz.max() <= max_mz
+
+
 def test_remove_precursor_peak():
     num_peaks = 150
     mz = np.random.uniform(100, 1400, num_peaks)

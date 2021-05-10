@@ -7,7 +7,9 @@ from pyteomics import mass
 from spectrum_utils import spectrum
 
 
-np.random.seed(13)
+@pytest.fixture(autouse=True)
+def set_random_seed():
+    np.random.seed(13)
 
 
 def test_fragmentannotation_unknown():

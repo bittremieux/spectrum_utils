@@ -74,9 +74,9 @@ def test_get_theoretical_fragments_static_mod():
             peptide, None, max_charge=3):
         fragment_mz = fragments[f'{fragment.ion_type}_{fragment.charge}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
-    assert spectrum._aa_mass['Y'] == pytest.approx(163.06333 + 79.96633)
+    assert spectrum.aa_mass['Y'] == pytest.approx(163.06333 + 79.96633)
     spectrum.reset_modifications()
-    assert spectrum._aa_mass['Y'] == pytest.approx(163.06333)
+    assert spectrum.aa_mass['Y'] == pytest.approx(163.06333)
 
 
 def test_get_theoretical_fragments_mod():

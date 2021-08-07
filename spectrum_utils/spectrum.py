@@ -1,9 +1,6 @@
-import functools
 import operator
-import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-import fastobo
 import numba as nb
 import numpy as np
 try:
@@ -14,7 +11,13 @@ except ImportError:
 from spectrum_utils import utils
 
 
-_aa_mass = {**mass.std_aa_mass, 'U': 150.953633405, 'O': 237.147726925, 'X': 0}
+_aa_mass = {**mass.std_aa_mass,
+            # 'B': 0,             # aspartic acid / asparagine (ambiguous mass)
+            # 'Z': 0,             # glutamic acid / glutamine (ambiguous mass)
+            'J': 113.084064015,   # leucine / isoleucine
+            'U': 150.953633405,   # selenocysteine
+            'O': 237.147726925,   # pyrrolysine
+            'X': 0}               # any amino acid, gaps (zero mass)
 aa_mass = _aa_mass.copy()
 
 
@@ -146,8 +149,7 @@ def _get_theoretical_peptide_fragments(
     Parameters
     ----------
     peptide : str
-        The peptide sequence for which the fragments will be generated. The
-        peptide sequence should only exist of the 20 standard amino acids.
+        The peptide sequence for which the fragments will be generated.
     modifications : Optional[Dict[Union[float, str], float]], optional
         Mapping of modification positions and mass differences. Valid positions
         are any amino acid index in the peptide (0-based), 'N-term', and
@@ -169,6 +171,12 @@ def _get_theoretical_peptide_fragments(
         A list of all fragments as (`PeptideFragmentAnnotation`, m/z) tuples
         sorted in ascending m/z order.
     """
+    if 'B' in peptide:
+        raise ValueError('Explicitly specify aspartic acid (D) or asparagine '
+                         '(N) to compute the peptide fragments')
+    if 'Z' in peptide:
+        raise ValueError('Explicitly specify glutamic acid (E) or glutamine '
+                         '(Q) to compute the peptide fragments')
     if modifications is not None:
         mods = modifications.copy()
         if 'N-term' in modifications:
@@ -216,165 +224,6 @@ def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
     mz, intensity = mz.reshape(-1), intensity.reshape(-1)
     order = np.argsort(mz)
     return mz[order], intensity[order], order
-
-
-def _parse_proforma(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
-    """
-    Parse a ProForma-encoded peptide string.
-
-    Parameters
-    ----------
-    peptide : str
-        The ProForma peptide string.
-
-    Returns
-    -------
-    Tuple[str, Dict[Union[int, str], float]]
-        (1) The base peptide string without modifications, and (2) a mapping of
-        modification positions and mass differences. Modification positions are
-        specified as their amino acid index in the peptide (0-based), 'N-term',
-        or 'C-term'.
-    """
-    peptide_base, modifications = [], {}
-    i = 0
-    while i < len(peptide):
-        # Parse localized modification.
-        if peptide[i] == '[':
-            j, left_bracket_count, right_bracket_count = i + 1, 1, 0
-            while right_bracket_count < left_bracket_count:
-                j += 1
-                left_bracket_count += peptide[j] == '['
-                right_bracket_count += peptide[j] == ']'
-            modifications[len(peptide_base) - 1] = \
-                _parse_proforma_modification(peptide[i + 1:j])
-            i = j + 1
-        # Standard amino acid.
-        else:
-            peptide_base.append(peptide[i])
-            i += 1
-
-    return ''.join(peptide_base).upper(), modifications
-
-
-def _parse_proforma_modification(modification: str) -> float:
-    """
-    Convert a ProForma modification string to the corresponding mass
-    difference.
-
-    Parameters
-    ----------
-    modification : str
-        The ProForma modification string.
-
-    Returns
-    -------
-    float
-        The modification mass difference.
-    """
-    # Modification specified by name or mass only (no prefix).
-    if ':' not in modification:
-        # Numerical mass difference.
-        if modification[0] in '+-':
-            return float(modification)
-        # Retrieve from Unimod or PSI-MOD by name.
-        else:
-            mod_mass = _cv_lookup('u', modification)
-            return (mod_mass if mod_mass is not None else
-                    _cv_lookup('m', modification))
-    else:
-        prefix, modification = modification.split(':', 1)
-        prefix = prefix.lower()
-        # Numerical mass difference (controlled vocabulary or "Obs" prefix).
-        if (prefix in 'umrxg' or prefix == 'obs') and modification[0] in '+-':
-            return float(modification)
-        # Retrieve from controlled vocabulary by name or accession.
-        elif prefix in ('u', 'm', 'r', 'x', 'g', 'unimod', 'mod', 'resid',
-                        'xlmod', 'gno'):
-            return _cv_lookup(prefix, modification)
-        # Calculate mass from elemental formula.
-        elif prefix == 'formula':
-            return mass.calculate_mass(formula=modification)
-        # Calculate mass from glycan composition.
-        elif prefix == 'glycan':
-            raise NotImplementedError(
-                'Glycan composition is not supported yet')
-    raise ValueError('Unknown ProForma modification')
-
-
-def _cv_lookup(cv_id: str, term: str) -> Optional[float]:
-    """
-    Retrieve a term from a controlled vocabulary by identifier or name.
-
-    Parameters
-    ----------
-    cv_id : str
-        The identifier of the controlled vocabulary supported by ProForma.
-        Single character identifiers indicate a lookup by name, multi-character
-        identifiers indicate a lookup by ID.
-    term : str
-        The name or identifier of the term to look up in the controlled
-        vocabulary.
-
-    Returns
-    -------
-    Optional[float]
-        The mass difference of the modification as specified in the controlled
-        vocabulary, or None if not found.
-    """
-    return _import_obo(cv_id)[len(cv_id) == 1].get(term)
-
-
-@functools.lru_cache
-def _import_obo(obo_id: str) -> Tuple[Dict, Dict]:
-    """
-    Import a ProForma controlled vocabulary and extract modifications by their
-    identifier and name.
-
-    Parameters
-    ----------
-    obo_id : str
-        The controlled vocabulary identifier.
-
-    Returns
-    -------
-    Tuple[Dict, Dict]
-        Terms in the controlled vocabulary indexed by their (i) identifiers, or
-        (ii) names.
-    """
-    obo_id, obo = obo_id.lower(), ({}, {})
-    if obo_id in ('u', 'unimod'):
-        obo_url = 'http://www.unimod.org/obo/unimod.obo'
-        return obo   # FIXME: Unimod parsing issue.
-    elif obo_id in ('m', 'mod'):
-        obo_url = ('https://raw.githubusercontent.com/HUPO-PSI/psi-mod-CV/'
-                   'master/PSI-MOD.obo')
-    elif obo_id in ('r', 'resid'):
-        # FIXME: Unknown RESID obo location.
-        raise NotImplementedError('RESID support is not implemented. Please '
-                                  'specify your modification using alternative'
-                                  ' ProForma encoding.')
-    elif obo_id in ('x', 'xlmod'):
-        obo_url = ('https://raw.githubusercontent.com/HUPO-PSI/mzIdentML/'
-                   'master/cv/XLMOD.obo')
-    elif obo_id in ('g', 'gno'):
-        obo_url = 'http://purl.obolibrary.org/obo/gno.owl'
-    else:
-        raise ValueError(f'Unknown controlled vocabulary: {obo_id.upper()}')
-    with urllib.request.urlopen(obo_url) as response:
-        for frame in fastobo.load(response):
-            if isinstance(frame, fastobo.term.TermFrame):
-                term_name, term_mass = None, 0
-                for clause in frame:
-                    if isinstance(clause, fastobo.term.NameClause):
-                        term_name = clause.name.strip()
-                    elif isinstance(clause, fastobo.term.XrefClause):
-                        term_xref = clause.raw_value()
-                        if ('DiffMono' in term_xref and
-                                not term_xref.endswith('"none"')):
-                            term_mass = float(
-                                term_xref[term_xref.find('"') + 1:-1])
-                obo[0][str(frame.id)] = obo[1][term_name] = term_mass
-    return obo
 
 
 @nb.njit

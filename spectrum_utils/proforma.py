@@ -1,9 +1,11 @@
 import functools
+import os
 import re
+import tempfile
 from typing import Dict, Optional, Tuple, Union
 
 import pronto
-import requests
+import requests_cache
 from pyteomics.auxiliary.structures import PyteomicsError
 try:
     from pyteomics import cmass as mass
@@ -11,6 +13,10 @@ except ImportError:
     from pyteomics import mass
 
 import spectrum_utils.spectrum as sus
+
+
+_cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
+_session = requests_cache.CachedSession(_cache_dir, backend='filesystem')
 
 
 def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
@@ -32,6 +38,9 @@ def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
 
     Raises
     ------
+    HTTPError
+        If a controlled vocabulary could not be retrieved from its online
+        resource.
     KeyError
         If a specified modification could not be found in the corresponding
         controlled vocabulary.
@@ -164,6 +173,9 @@ def _parse_modification(modification: str) -> Optional[float]:
 
     Raises
     ------
+    HTTPError
+        If the controlled vocabulary could not be retrieved from its online
+        resource.
     KeyError
         If the modification could not be found in the corresponding controlled
         vocabulary.
@@ -215,10 +227,9 @@ def _parse_modification(modification: str) -> Optional[float]:
                                           'not supported')
         # Calculate mass from glycan composition.
         elif modification.title().startswith('Glycan:'):
-            # FIXME: Cache web resource.
             monosaccharides = {
                 term['name']: float(term['has_monoisotopic_mass'])
-                for term in (requests.get(
+                for term in (_session.get(
                                 'https://raw.githubusercontent.com/HUPO-PSI/'
                                 'ProForma/master/monosaccharides/'
                                 'mono.obo.json')
@@ -247,6 +258,9 @@ def _cv_lookup(lookup: str) -> Optional[float]:
 
     Raises
     ------
+    HTTPError
+        If the controlled vocabulary could not be retrieved from its online
+        resource.
     KeyError
         If the term was not found in its controlled vocabulary.
     ValueError
@@ -328,20 +342,32 @@ def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
 
     Raises
     ------
+    HTTPError
+        If the controlled vocabulary could not be retrieved from its online
+        resource.
     ValueError
         If an unknown controlled vocabulary identifier is given.
     """
-    # FIXME: Cache web resource.
     if cv_id == 'UNIMOD':
-        cv = pronto.Ontology('http://www.unimod.org/obo/unimod.obo')
-    elif cv_id in ('MOD', 'XLMOD', 'GNO'):
-        cv = pronto.Ontology.from_obo_library(f'{cv_id.lower()}.obo')
-    elif cv_id == 'RESID':
+        url = 'http://www.unimod.org/obo/unimod.obo'
+    elif cv_id in ('MOD', 'RESID'):
         # RESID is not available as a separate entity anymore but is part of
         # PSI-MOD.
-        cv = pronto.Ontology.from_obo_library('mod.obo')
+        url = ('https://raw.githubusercontent.com/HUPO-PSI/psi-mod-CV/master/'
+               'PSI-MOD.obo')
+    elif cv_id == 'XLMOD':
+        url = ('https://raw.githubusercontent.com/HUPO-PSI/mzIdentML/master/'
+               'cv/XLMOD.obo')
+    elif cv_id == 'GNO':
+        url = ('https://github.com/glygen-glycan-data/GNOme/releases/latest/'
+               'download/GNOme.obo')
     else:
         raise ValueError(f'Unknown controlled vocabulary: {cv_id}')
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        req = _session.get(url)
+        req.raise_for_status()
+        tmp.write(req.content)
+    cv = pronto.Ontology(tmp.name)
     name_to_id = {term.name.strip(): term.id for term in cv.terms()}
     # Translate from RESID identifiers to PSI-MOD identifiers.
     if cv_id == 'RESID':

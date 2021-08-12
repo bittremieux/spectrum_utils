@@ -12,7 +12,7 @@ try:
 except ImportError:
     from pyteomics import mass
 
-import spectrum_utils.spectrum as sus
+from spectrum_utils.spectrum import aa_mass
 
 
 _cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
@@ -141,7 +141,7 @@ def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
             raise NotImplementedError('Modification position ranges are not '
                                       'supported')
         # Standard amino acid.
-        elif peptide[i] in sus.aa_mass.keys():
+        elif peptide[i] in aa_mass.keys():
             peptide_base.append(peptide[i])
             i += 1
         # Give an error for amino acids whose mass can't be computed.

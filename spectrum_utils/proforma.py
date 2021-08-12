@@ -241,15 +241,13 @@ def _parse_modification(modification: str) -> Optional[float]:
                 if 400 <= response.getcode() < 600:
                     raise URLError('Failed to retrieve the monosaccharide '
                                    'definitions from its online resource')
-                monosaccharides_def = json.loads(response.read().decode(
+                mono = json.loads(response.read().decode(
                     response.info().get_param('charset') or 'utf-8'))
-                monosaccharides = {
-                    term['name']: float(term['has_monoisotopic_mass'])
-                    for term in monosaccharides_def['terms'].values()}
-                return sum([monosaccharides[gly[1]] * int(gly[2])
-                            for gly in re.finditer(
-                                r'([a-zA-Z]+)(\d+)',
-                                modification[modification.index(':') + 1:])])
+                mono = {term['name']: float(term['has_monoisotopic_mass'])
+                        for term in mono['terms'].values()}
+                return sum([mono[m[1]] * int(m[2]) for m in re.finditer(
+                    fr'({"|".join([re.escape(m) for m in mono.keys()])})(\d+)',
+                    modification[modification.index(':') + 1:])])
     raise ValueError(f'Unknown ProForma modification: {modification}')
 
 

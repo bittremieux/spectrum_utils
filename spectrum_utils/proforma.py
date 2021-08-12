@@ -1,11 +1,13 @@
 import functools
+import json
 import os
 import re
 import tempfile
+import urllib.request
 from typing import Dict, Optional, Tuple, Union
+from urllib.error import URLError
 
 import pronto
-import requests_cache
 from pyteomics.auxiliary.structures import PyteomicsError
 try:
     from pyteomics import cmass as mass
@@ -16,7 +18,6 @@ from spectrum_utils.spectrum import aa_mass
 
 
 _cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
-_session = requests_cache.CachedSession(_cache_dir, backend='filesystem')
 
 
 def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
@@ -38,7 +39,7 @@ def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
 
     Raises
     ------
-    HTTPError
+    URLError
         If a controlled vocabulary could not be retrieved from its online
         resource.
     KeyError
@@ -173,7 +174,7 @@ def _parse_modification(modification: str) -> Optional[float]:
 
     Raises
     ------
-    HTTPError
+    URLError
         If the controlled vocabulary could not be retrieved from its online
         resource.
     KeyError
@@ -227,17 +228,21 @@ def _parse_modification(modification: str) -> Optional[float]:
                                           'not supported')
         # Calculate mass from glycan composition.
         elif modification.title().startswith('Glycan:'):
-            monosaccharides = {
-                term['name']: float(term['has_monoisotopic_mass'])
-                for term in (_session.get(
-                                'https://raw.githubusercontent.com/HUPO-PSI/'
-                                'ProForma/master/monosaccharides/'
-                                'mono.obo.json')
-                             .json()['terms'].values())}
-            return sum([monosaccharides[gly[1]] * int(gly[2])
-                        for gly in re.finditer(
-                            r'([a-zA-Z]+)(\d+)',
-                            modification[modification.index(':') + 1:])])
+            with urllib.request.urlopen(
+                    'https://raw.githubusercontent.com/HUPO-PSI/ProForma/'
+                    'master/monosaccharides/mono.obo.json') as response:
+                if 400 <= response.getcode() < 600:
+                    raise URLError('Failed to retrieve the monosaccharide '
+                                   'definitions from its online resource')
+                monosaccharides_def = json.loads(response.read().decode(
+                    response.info().get_param('charset') or 'utf-8'))
+                monosaccharides = {
+                    term['name']: float(term['has_monoisotopic_mass'])
+                    for term in monosaccharides_def['terms'].values()}
+                return sum([monosaccharides[gly[1]] * int(gly[2])
+                            for gly in re.finditer(
+                                r'([a-zA-Z]+)(\d+)',
+                                modification[modification.index(':') + 1:])])
     raise ValueError(f'Unknown ProForma modification: {modification}')
 
 
@@ -258,7 +263,7 @@ def _cv_lookup(lookup: str) -> Optional[float]:
 
     Raises
     ------
-    HTTPError
+    URLError
         If the controlled vocabulary could not be retrieved from its online
         resource.
     KeyError
@@ -342,7 +347,7 @@ def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
 
     Raises
     ------
-    HTTPError
+    URLError
         If the controlled vocabulary could not be retrieved from its online
         resource.
     ValueError
@@ -363,10 +368,12 @@ def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
                'download/GNOme.obo')
     else:
         raise ValueError(f'Unknown controlled vocabulary: {cv_id}')
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        req = _session.get(url)
-        req.raise_for_status()
-        tmp.write(req.content)
+    with urllib.request.urlopen(url) as response, \
+            tempfile.NamedTemporaryFile(delete=False) as tmp:
+        if 400 <= response.getcode() < 600:
+            raise URLError(f'Failed to retrieve the {cv_id} controlled '
+                           f'vocabulary from its online resource')
+        tmp.write(response.read())
     cv = pronto.Ontology(tmp.name)
     name_to_id = {term.name.strip(): term.id for term in cv.terms()}
     # Translate from RESID identifiers to PSI-MOD identifiers.

@@ -14,9 +14,9 @@ from spectrum_utils import utils
 _aa_mass = {**mass.std_aa_mass,
             # 'B': 0,             # aspartic acid / asparagine (ambiguous mass)
             # 'Z': 0,             # glutamic acid / glutamine (ambiguous mass)
-            'J': 113.084064015,   # leucine / isoleucine
-            'U': 150.953633405,   # selenocysteine
-            'O': 237.147726925,   # pyrrolysine
+            'J': 113.08406,       # leucine / isoleucine
+            # 'U': 150.95363,     # selenocysteine (in Pyteomics)
+            # 'O': 237.14772,     # pyrrolysine (in Pyteomics)
             'X': 0}               # any amino acid, gaps (zero mass)
 aa_mass = _aa_mass.copy()
 

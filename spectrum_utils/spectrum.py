@@ -218,7 +218,7 @@ def _get_theoretical_peptide_fragments(
 
 
 @nb.njit(nb.types.Tuple((nb.float32[:], nb.float32[:], nb.int64[:]))
-         (nb.float32[::1], nb.float32[::1]))
+         (nb.float32[::1], nb.float32[::1]), cache=True)
 def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
         -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     mz, intensity = mz.reshape(-1), intensity.reshape(-1)
@@ -226,7 +226,7 @@ def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
     return mz[order], intensity[order], order
 
 
-@nb.njit
+@nb.njit(cache=True)
 def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
         -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -280,7 +280,7 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
         return mz_unique, intensity, np.arange(len(mz))
 
 
-@nb.njit
+@nb.njit(cache=True)
 def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
         -> np.ndarray:
     """
@@ -312,7 +312,7 @@ def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
     return mask
 
 
-@nb.njit
+@nb.njit(cache=True)
 def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
                                  max_charge: int, isotope: int,
                                  fragment_tol_mass: float,
@@ -365,7 +365,7 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
     return mask
 
 
-@nb.njit
+@nb.njit(cache=True)
 def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
                                max_num_peaks: int) -> np.ndarray:
     """
@@ -402,7 +402,7 @@ def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
     return mask
 
 
-@nb.njit(nb.float32[:](nb.float32[:], nb.int64))
+@nb.njit(nb.float32[:](nb.float32[:], nb.int64), cache=True)
 def _get_scaled_intensity_root(intensity: np.ndarray, degree: int)\
         -> np.ndarray:
     """
@@ -423,7 +423,7 @@ def _get_scaled_intensity_root(intensity: np.ndarray, degree: int)\
     return np.power(intensity, 1 / degree).astype(np.float32)
 
 
-@nb.njit(nb.float32[:](nb.float32[:], nb.float64))
+@nb.njit(nb.float32[:](nb.float32[:], nb.float64), cache=True)
 def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.scale_intensity`.
@@ -443,7 +443,7 @@ def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     return (np.log1p(intensity) / np.log(base)).astype(np.float32)
 
 
-@nb.njit(nb.float32[:](nb.float32[:], nb.int64))
+@nb.njit(nb.float32[:](nb.float32[:], nb.int64), cache=True)
 def _get_scaled_intensity_rank(intensity: np.ndarray, max_rank: int)\
         -> np.ndarray:
     """
@@ -465,7 +465,7 @@ def _get_scaled_intensity_rank(intensity: np.ndarray, max_rank: int)\
             .astype(np.float32))
 
 
-@nb.njit(nb.float32[:](nb.float32[:], nb.float32), fastmath=True)
+@nb.njit(nb.float32[:](nb.float32[:], nb.float32), fastmath=True, cache=True)
 def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
         -> np.ndarray:
     """
@@ -487,7 +487,7 @@ def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
     return intensity * max_intensity / intensity.max()
 
 
-@nb.njit
+@nb.njit(cache=True)
 def _get_peptide_fragment_annotation_map(
         spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
         annotation_mz: nb.typed.List, fragment_tol_mass: float,
@@ -549,7 +549,7 @@ def _get_peptide_fragment_annotation_map(
     return annotation_i_map
 
 
-@nb.njit
+@nb.njit(cache=True)
 def _get_mz_peak_index(
         spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
         fragment_mz: float, fragment_tol_mass: float,

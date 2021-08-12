@@ -1,6 +1,7 @@
 import functools
 import json
 import os
+import pickle
 import re
 import tempfile
 import urllib.request
@@ -17,7 +18,8 @@ except ImportError:
 from spectrum_utils.spectrum import aa_mass
 
 
-_cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
+# Set to None to disable caching.
+cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
 
 
 def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
@@ -278,7 +280,7 @@ def _cv_lookup(lookup: str) -> Optional[float]:
     lookup_by_id = len(cv_id) > 1
     cv_id = {'U': 'UNIMOD', 'M': 'MOD', 'R': 'RESID', 'X': 'XLMOD',
              'G': 'GNO'}.get(cv_id, cv_id)
-    cv, cv_name_to_id = _import_cv(cv_id)
+    cv, cv_name_to_id = _import_cv(cv_id, cache_dir)
     try:
         # Look up the term by its ID.
         if lookup_by_id:
@@ -330,7 +332,7 @@ def _cv_lookup(lookup: str) -> Optional[float]:
 
 
 @functools.lru_cache
-def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
+def _import_cv(cv_id: str, cache: str) -> Tuple[pronto.Ontology, Dict]:
     """
     Import a ProForma controlled vocabulary from its online resource.
 
@@ -338,6 +340,9 @@ def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
     ----------
     cv_id : str
         The controlled vocabulary identifier.
+    cache : str
+        Directory used to cache downloaded controlled vocabularies, or None to
+        disable caching.
 
     Returns
     -------
@@ -368,6 +373,13 @@ def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
                'download/GNOme.obo')
     else:
         raise ValueError(f'Unknown controlled vocabulary: {cv_id}')
+    # Try to retrieve from the cache.
+    if cache is not None:
+        cache_filename = os.path.join(cache, f'{cv_id}.pkl')
+        if os.path.isfile(cache_filename):
+            with open(cache_filename, 'rb') as f_in:
+                return pickle.load(f_in)
+    # Read from the online resource if not found in the cache.
     with urllib.request.urlopen(url) as response, \
             tempfile.NamedTemporaryFile(delete=False) as tmp:
         if 400 <= response.getcode() < 600:
@@ -382,4 +394,31 @@ def _import_cv(cv_id: str) -> Tuple[pronto.Ontology, Dict]:
             for xref in term.definition.xrefs:
                 if xref.id.startswith('RESID'):
                     name_to_id[xref.id] = term.id
+    # Save to the cache if enabled.
+    if cache is not None:
+        os.makedirs(cache, exist_ok=True)
+        with open(os.path.join(cache, f'{cv_id}.pkl'), 'wb') as f_out:
+            pickle.dump((cv, name_to_id), f_out, pickle.HIGHEST_PROTOCOL)
     return cv, name_to_id
+
+
+def clear_cache(cv_ids: Optional[Tuple[str]] = None) -> None:
+    """
+    Clear the cache of downloaded controlled vocabularies.
+
+    Parameters
+    ----------
+    cv_ids : Optional[Tuple[str]]
+        Identifiers of the controlled vocabularies to remove from the cache.
+        If None, all known files will be removed.
+    """
+    # Clear the in-memory cache.
+    _import_cv.cache_clear()
+    # Clear the on-disk cache.
+    if cache_dir is not None:
+        if cv_ids is None:
+            cv_ids = ('UNIMOD', 'MOD', 'RESID', 'XLMOD', 'GNO')
+        for cv_id in cv_ids:
+            filename = os.path.join(cache_dir, f'{cv_id}.pkl')
+            if os.path.isfile(filename):
+                os.remove(filename)

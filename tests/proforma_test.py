@@ -1,4 +1,6 @@
 import math
+import os
+import shutil
 
 import pytest
 
@@ -234,3 +236,34 @@ def test_proforma_pipe():
             ('ELVISK', {4: 79.966331}))
     assert (proforma.parse('ELVIS[Obs:+79.966|Phospho|Sulfo]K') ==
             ('ELVISK', {4: 79.966}))
+
+
+def test_proforma_cache():
+    cache_dir = '.cache_test'
+    shutil.rmtree(cache_dir, ignore_errors=True)
+    # Disable cache.
+    proforma.cache_dir = None
+    assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    # Enable cache.
+    proforma.cache_dir = cache_dir
+    assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    # Clear cache.
+    proforma.clear_cache()
+    assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    # Clean-up.
+    shutil.rmtree(cache_dir, ignore_errors=True)

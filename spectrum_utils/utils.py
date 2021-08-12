@@ -1,7 +1,7 @@
 import numba as nb
 
 
-@nb.njit(fastmath=True)
+@nb.njit(fastmath=True, cache=True)
 def mass_diff(mz1, mz2, mode_is_da):
     """
     Calculate the mass difference(s).

@@ -191,7 +191,7 @@ def _parse_modification(modification: str) -> Optional[float]:
     # Info tag.
     if modification.upper().startswith('INFO:'):
         return None
-    # Modification specified by name or mass only (no / no valid prefix).
+    # Modification specified by name or mass only (no / invalid prefix).
     if (':' not in modification or
             modification[:modification.index(':')].upper() not in (
                     'U', 'UNIMOD', 'M', 'MOD', 'R', 'RESID', 'X', 'XLMOD',
@@ -204,7 +204,12 @@ def _parse_modification(modification: str) -> Optional[float]:
             try:
                 return _cv_lookup(f'U:{modification}')
             except KeyError:
-                return _cv_lookup(f'M:{modification}')
+                try:
+                    return _cv_lookup(f'M:{modification}')
+                except KeyError:
+                    raise KeyError(f'Term {modification} not found in the '
+                                   f'UNIMOD or PSI-MOD reference controlled '
+                                   f'vocabularies')
     else:
         # Numerical mass difference (controlled vocabulary or "Obs" prefix).
         if (modification.title().startswith(('U:', 'M:', 'R:', 'X:', 'G:',
@@ -225,6 +230,7 @@ def _parse_modification(modification: str) -> Optional[float]:
                     formula=(modification[modification.index(':') + 1:]
                              .replace(' ', '')))
             except PyteomicsError:
+                # TODO
                 raise NotImplementedError('Isotopes in molecular formulas are '
                                           'not supported')
         # Calculate mass from glycan composition.

@@ -3,12 +3,11 @@ import json
 import os
 import pickle
 import re
-import tempfile
 import urllib.request
 from typing import Dict, Optional, Tuple, Union
 from urllib.error import URLError
 
-import pronto
+import fastobo
 from pyteomics.auxiliary.structures import PyteomicsError
 try:
     from pyteomics import cmass as mass
@@ -275,64 +274,24 @@ def _cv_lookup(lookup: str) -> Optional[float]:
         - If no mass was specified for a GNO term or its parent terms.
     """
     cv_id, term_lookup = lookup.split(':', 1)
-    # Name lookups are specified using single-letter abbrevations, ID lookups
+    # Name lookups are specified using single-letter abbreviations, ID lookups
     # use the full controlled vocabulary name.
     lookup_by_id = len(cv_id) > 1
     cv_id = {'U': 'UNIMOD', 'M': 'MOD', 'R': 'RESID', 'X': 'XLMOD',
              'G': 'GNO'}.get(cv_id, cv_id)
-    cv, cv_name_to_id = _import_cv(cv_id, cache_dir)
+    cv_from_id, cv_from_name = _import_cv(cv_id, cache_dir)
     try:
-        # Look up the term by its ID.
-        if lookup_by_id:
-            term_id = f'{cv_id}:{term_lookup}'
-            # Translate RESID ids (RESID is not available as a separate entity
-            # anymore but is part of PSI-MOD).
-            if cv_id == 'RESID' and term_id in cv_name_to_id:
-                term_id = cv_name_to_id[term_id]
-        # Translate the term name to its ID.
-        elif term_lookup in cv_name_to_id:
-            term_id = cv_name_to_id[term_lookup]
-        # Look up by name, but term name not found in the CV.
-        else:
-            raise KeyError(f'Term {lookup} not found in the {cv_id} '
-                           f'controlled vocabulary by name')
-        # Retrieve the term from the CV.
-        term = cv.get_term(term_id)
+        return (cv_from_id[f'{cv_id}:{term_lookup}'] if lookup_by_id else
+                cv_from_name[term_lookup])
     except KeyError:
         raise KeyError(f'Term {lookup} not found in the {cv_id} '
                        f'controlled vocabulary '
                        f'{"by ID" if lookup_by_id else "by name"}')
-    # Extract the mass difference from the term based on the originating CV.
-    if cv_id == 'UNIMOD':
-        for xref in term.xrefs:
-            if xref.id == 'delta_mono_mass':
-                return float(xref.description)
-    elif cv_id in ('MOD', 'RESID'):
-        for xref in term.xrefs:
-            if xref.id == 'DiffMono:':
-                return float(xref.description)
-    elif cv_id == 'XLMOD':
-        for annotation in term.annotations:
-            if (isinstance(annotation, pronto.pv.LiteralPropertyValue) and
-                    annotation.property == 'monoIsotopicMass:'):
-                return float(annotation.literal)
-    elif cv_id == 'GNO':
-        if 'molecular weight' not in term.name:
-            for superclass in term.superclasses():
-                if 'molecular weight' in superclass.name:
-                    term = superclass
-                    break
-            else:
-                raise ValueError(f'No mass found for term {lookup} in the '
-                                 f'GNO controlled vocabulary')
-        return float(term.name[term.name.rindex('weight ') + 7:
-                               term.name.rindex(' Da')])
-    raise KeyError(f'Term {lookup} not found in the {cv_id} controlled '
-                   f'vocabulary {"by ID" if lookup_by_id else "by name"}')
 
 
 @functools.lru_cache
-def _import_cv(cv_id: str, cache: str) -> Tuple[pronto.Ontology, Dict]:
+def _import_cv(cv_id: str, cache: Optional[str]) \
+        -> Tuple[Dict[str, float], Dict[str, float]]:
     """
     Import a ProForma controlled vocabulary from its online resource.
 
@@ -340,15 +299,15 @@ def _import_cv(cv_id: str, cache: str) -> Tuple[pronto.Ontology, Dict]:
     ----------
     cv_id : str
         The controlled vocabulary identifier.
-    cache : str
+    cache : Optional[str]
         Directory used to cache downloaded controlled vocabularies, or None to
         disable caching.
 
     Returns
     -------
-    Tuple[pronto.Ontology, Dict]
-        A tuple of (i) the controlled vocabulary, and (ii) a mapping from term
-        names to term IDs.
+    Tuple[Dict[str, float], Dict[str, float]]
+        A tuple with mappings (i) from term ID to modification mass, and
+        (ii) from term name to modification mass.
 
     Raises
     ------
@@ -356,7 +315,8 @@ def _import_cv(cv_id: str, cache: str) -> Tuple[pronto.Ontology, Dict]:
         If the controlled vocabulary could not be retrieved from its online
         resource.
     ValueError
-        If an unknown controlled vocabulary identifier is given.
+        - If an unknown controlled vocabulary identifier is given.
+        - If no mass was specified for a GNO term or its parent terms.
     """
     if cv_id == 'UNIMOD':
         url = 'http://www.unimod.org/obo/unimod.obo'
@@ -380,26 +340,70 @@ def _import_cv(cv_id: str, cache: str) -> Tuple[pronto.Ontology, Dict]:
             with open(cache_filename, 'rb') as f_in:
                 return pickle.load(f_in)
     # Read from the online resource if not found in the cache.
-    with urllib.request.urlopen(url) as response, \
-            tempfile.NamedTemporaryFile(delete=False) as tmp:
+    cv_by_id, cv_by_name, gno_graph = {}, {}, {}
+    with urllib.request.urlopen(url) as response:
         if 400 <= response.getcode() < 600:
             raise URLError(f'Failed to retrieve the {cv_id} controlled '
                            f'vocabulary from its online resource')
-        tmp.write(response.read())
-    cv = pronto.Ontology(tmp.name)
-    name_to_id = {term.name.strip(): term.id for term in cv.terms()}
-    # Translate from RESID identifiers to PSI-MOD identifiers.
-    if cv_id == 'RESID':
-        for term in cv.terms():
-            for xref in term.definition.xrefs:
-                if xref.id.startswith('RESID'):
-                    name_to_id[xref.id] = term.id
+        for frame in fastobo.load(response):
+            term_id, term_name, term_mass = str(frame.id), None, None
+            if isinstance(frame, fastobo.term.TermFrame):
+                for clause in frame:
+                    if isinstance(clause, fastobo.term.NameClause):
+                        term_name = clause.name.strip()
+                        if cv_id == 'GNO' and 'molecular weight' in term_name:
+                            term_mass = float(
+                                term_name[term_name.rindex('weight ') + 7:
+                                          term_name.rindex(' Da')])
+                    elif (cv_id == 'RESID' and
+                          isinstance(clause, fastobo.term.DefClause)):
+                        for xref in clause.xrefs:
+                            if xref.id.prefix == 'RESID':
+                                term_id = str(xref.id)
+                                break
+                    elif isinstance(clause, fastobo.term.XrefClause):
+                        term_xref = clause.raw_value()
+                        if ((cv_id == 'UNIMOD' and
+                             'delta_mono_mass' in term_xref) or
+                                (cv_id in ('MOD', 'RESID') and
+                                 'DiffMono' in term_xref and
+                                 not term_xref.endswith('"none"'))):
+                            term_mass = float(
+                                term_xref[term_xref.index('"') + 1:
+                                          term_xref.rindex('"')])
+                    elif (cv_id == 'XLMOD' and
+                          isinstance(clause, fastobo.term.PropertyValueClause)
+                          and (clause.property_value.relation.prefix ==
+                               'monoIsotopicMass')):
+                        term_mass = float(clause.property_value.value)
+                    elif (cv_id == 'GNO' and
+                          isinstance(clause, fastobo.term.IsAClause)):
+                        gno_graph[term_id] = str(clause.term), term_name
+                if term_id.startswith(f'{cv_id}:') and term_mass is not None:
+                    cv_by_id[term_id] = term_mass
+                    if term_name is not None:
+                        cv_by_name[term_name] = term_mass
+    if cv_id == 'GNO':
+        for term_id, (parent_id, term_name) in gno_graph.items():
+            if term_id not in cv_by_id:
+                terms = [(term_id, term_name)]
+                while parent_id not in cv_by_id and parent_id in gno_graph:
+                    parent_id_new, parent_name = gno_graph[parent_id]
+                    terms.append((parent_id, parent_name))
+                    parent_id = parent_id_new
+                if parent_id in cv_by_id:
+                    term_mass = cv_by_id[parent_id]
+                    for add_id, add_name in terms:
+                        cv_by_id[add_id] = cv_by_name[add_name] = term_mass
+                else:
+                    raise ValueError(f'No mass found for term {term_id} in '
+                                     f'the GNO controlled vocabulary')
     # Save to the cache if enabled.
     if cache is not None:
         os.makedirs(cache, exist_ok=True)
         with open(os.path.join(cache, f'{cv_id}.pkl'), 'wb') as f_out:
-            pickle.dump((cv, name_to_id), f_out, pickle.HIGHEST_PROTOCOL)
-    return cv, name_to_id
+            pickle.dump((cv_by_id, cv_by_name), f_out, pickle.HIGHEST_PROTOCOL)
+    return cv_by_id, cv_by_name
 
 
 def clear_cache(cv_ids: Optional[Tuple[str]] = None) -> None:

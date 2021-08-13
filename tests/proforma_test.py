@@ -3,6 +3,8 @@ import os
 import shutil
 
 import pytest
+import unittest.mock
+from urllib.error import URLError
 
 from spectrum_utils import proforma
 
@@ -15,6 +17,10 @@ def test_proforma_canonical():
     assert proforma.parse('PEPTIOE') == ('PEPTIOE', {})
     assert proforma.parse('PEUTIDE') == ('PEUTIDE', {})
     assert proforma.parse('PEPTIXDE') == ('PEPTIXDE', {})
+    with pytest.raises(ValueError):
+        proforma.parse('BEPTIDE')
+    with pytest.raises(ValueError):
+        proforma.parse('PEPTIZE')
 
 
 def test_proforma_name():
@@ -45,6 +51,15 @@ def test_proforma_name():
     # GNO (mandatory prefix).
     assert (proforma.parse('NEEYN[G:G59626AS]K') ==
             ('NEEYNK', {4: 1931.69}))
+    # Non-existing terms without prefix.
+    with pytest.raises(KeyError):
+        proforma.parse('EM[WeirdMod]EVEES[Phospho]PEK')
+    # Non-existing terms with prefix.
+    with pytest.raises(KeyError):
+        proforma.parse('EM[U:WeirdMod]EVEES[U:Phospho]PEK')
+    # Non-existing prefix (will be considered as no prefix).
+    with pytest.raises(KeyError):
+        proforma.parse('EM[RandomPrefix:Oxidation]EVEES[Phospho]PEK')
 
 
 def test_proforma_accession():
@@ -135,6 +150,9 @@ def test_proforma_formula():
     assert sequence == 'SEQUENCE'
     assert len(mass_diffs) == 1
     assert math.isclose(mass_diffs[5], 196.1463, abs_tol=0.00005)
+    # Isotopes are currently still unsupported.
+    with pytest.raises(NotImplementedError):
+        proforma.parse('SEQUEN[Formula:[13C2]CH6N]CE')
 
 
 def test_proforma_glycan():
@@ -142,6 +160,15 @@ def test_proforma_glycan():
             ('SEQUENCE', {5: 527.185019356}))
     assert (proforma.parse('SEQUEN[Glycan:HexNAc1 Hex2]CE') ==
             ('SEQUENCE', {5: 527.185019356}))
+    # Connection error.
+    with unittest.mock.patch('http.client.HTTPResponse.getcode') as mocked_req:
+        mocked_req.return_value = 404
+        cache_dir = proforma.cache_dir
+        proforma.cache_dir = '.non_existing_cache'
+        with pytest.raises(URLError):
+            proforma.parse('SEQUEN[Glycan:HexNAc1Hex2]CE')
+        shutil.rmtree(proforma.cache_dir, ignore_errors=True)
+        proforma.cache_dir = cache_dir
 
 
 def test_proforma_special():
@@ -240,6 +267,7 @@ def test_proforma_pipe():
 
 def test_proforma_cache():
     cache_dir = '.cache_test'
+    cache_dir_original = proforma.cache_dir
     shutil.rmtree(cache_dir, ignore_errors=True)
     # Disable cache.
     proforma.cache_dir = None
@@ -250,6 +278,22 @@ def test_proforma_cache():
     assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
             ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
     assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
+    # All controlled vocabularies (and monosaccharides) from scratch
+    # (without cache).
+    assert (proforma.parse('EM[U:Oxidation]EVEES[U:Phospho]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert (proforma.parse('EM[M:L-methionine sulfoxide]EVEE'
+                           'S[M:O-phospho-L-serine]PEK') ==
+            ('EMEVEESPEK', {1: 15.994915, 6: 79.966331}))
+    assert (proforma.parse('EM[R:L-methionine sulfone]EVEE'
+                           'S[R:O-phospho-L-serine]PEK') ==
+            ('EMEVEESPEK', {1: 31.989829, 6: 79.966331}))
+    assert (proforma.parse('EMEVTK[X:DSS#XL1]SESPEK') ==
+            ('EMEVTKSESPEK', {5: 138.06807961}))
+    assert (proforma.parse('NEEYN[G:G59626AS]K') ==
+            ('NEEYNK', {4: 1931.69}))
+    assert (proforma.parse('SEQUEN[Glycan:HexNAc1Hex2]CE') ==
+            ('SEQUENCE', {5: 527.185019356}))
     # Enable cache.
     proforma.cache_dir = cache_dir
     assert not os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
@@ -267,3 +311,21 @@ def test_proforma_cache():
     assert os.path.isfile(os.path.join(cache_dir, 'UNIMOD.pkl'))
     # Clean-up.
     shutil.rmtree(cache_dir, ignore_errors=True)
+    proforma.cache_dir = cache_dir_original
+
+
+def test_proforma_import_cv():
+    # Existing CVs.
+    for cv_id in ('UNIMOD', 'MOD', 'RESID', 'XLMOD', 'GNO'):
+        cv_from_id, cv_from_name = proforma._import_cv(
+            cv_id, proforma.cache_dir)
+        assert len(cv_from_id) > 0
+        assert len(cv_from_name) > 0
+    # Non-existing CV.
+    with pytest.raises(ValueError):
+        proforma._import_cv('NOCV', proforma.cache_dir)
+    # Connection error.
+    with unittest.mock.patch('http.client.HTTPResponse.getcode') as mocked_req:
+        mocked_req.return_value = 404
+        with pytest.raises(URLError):
+            proforma._import_cv('UNIMOD', None)

@@ -4,7 +4,7 @@ import os
 import pickle
 import re
 import urllib.request
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 from urllib.error import URLError
 
 import fastobo
@@ -74,7 +74,7 @@ def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
     while i < len(peptide):
         # Parse modification on residue.
         if peptide[i] == '[':
-            j, left_bracket_count, right_bracket_count = i + 1, 1, 0
+            pos, j, left_bracket_count, right_bracket_count = None, i + 1, 1, 0
             while right_bracket_count < left_bracket_count:
                 j += 1
                 left_bracket_count += peptide[j] == '['
@@ -92,9 +92,6 @@ def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
                     j += 1
                     while peptide[j] != '?':
                         j += 1
-                    pos = None
-                else:
-                    pos = None      # This shouldn't occur, so just ignore.
             # Modification as final element preceded by a hyphen indicates a
             # C-terminal modification.
             elif i > 0 and peptide[i - 1] == '-':
@@ -230,25 +227,27 @@ def _parse_modification(modification: str) -> Optional[float]:
                     formula=(modification[modification.index(':') + 1:]
                              .replace(' ', '')))
             except PyteomicsError:
-                # TODO
+                # TODO: Add isotope support to Pyteomics?
                 raise NotImplementedError('Isotopes in molecular formulas are '
                                           'not supported')
         # Calculate mass from glycan composition.
         elif modification.title().startswith('Glycan:'):
-            with urllib.request.urlopen(
-                    'https://raw.githubusercontent.com/HUPO-PSI/ProForma/'
-                    'master/monosaccharides/mono.obo.json') as response:
-                if 400 <= response.getcode() < 600:
-                    raise URLError('Failed to retrieve the monosaccharide '
-                                   'definitions from its online resource')
-                mono = json.loads(response.read().decode(
-                    response.info().get_param('charset') or 'utf-8'))
+            mono = _load_from_cache(cache_dir, 'mono.pkl')
+            if mono is None:
+                with urllib.request.urlopen(
+                        'https://raw.githubusercontent.com/HUPO-PSI/ProForma/'
+                        'master/monosaccharides/mono.obo.json') as response:
+                    if 400 <= response.getcode() < 600:
+                        raise URLError('Failed to retrieve the monosaccharide '
+                                       'definitions from its online resource')
+                    mono = json.loads(response.read().decode(
+                        response.info().get_param('charset') or 'utf-8'))
                 mono = {term['name']: float(term['has_monoisotopic_mass'])
                         for term in mono['terms'].values()}
-                return sum([mono[m[1]] * int(m[2]) for m in re.finditer(
-                    fr'({"|".join([re.escape(m) for m in mono.keys()])})(\d+)',
-                    modification[modification.index(':') + 1:])])
-    raise ValueError(f'Unknown ProForma modification: {modification}')
+                _store_in_cache(cache_dir, 'mono.pkl', mono)
+            return sum([mono[m[1]] * int(m[2]) for m in re.finditer(
+                fr'({"|".join([re.escape(m) for m in mono.keys()])})(\d+)',
+                modification[modification.index(':') + 1:])])
 
 
 def _cv_lookup(lookup: str) -> Optional[float]:
@@ -338,11 +337,9 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
     else:
         raise ValueError(f'Unknown controlled vocabulary: {cv_id}')
     # Try to retrieve from the cache.
-    if cache is not None:
-        cache_filename = os.path.join(cache, f'{cv_id}.pkl')
-        if os.path.isfile(cache_filename):
-            with open(cache_filename, 'rb') as f_in:
-                return pickle.load(f_in)
+    cv_cached = _load_from_cache(cache, f'{cv_id}.pkl')
+    if cv_cached is not None:
+        return cv_cached
     # Read from the online resource if not found in the cache.
     cv_by_id, cv_by_name, gno_graph = {}, {}, {}
     with urllib.request.urlopen(url) as response:
@@ -403,30 +400,72 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
                     raise ValueError(f'No mass found for term {term_id} in '
                                      f'the GNO controlled vocabulary')
     # Save to the cache if enabled.
-    if cache is not None:
-        os.makedirs(cache, exist_ok=True)
-        with open(os.path.join(cache, f'{cv_id}.pkl'), 'wb') as f_out:
-            pickle.dump((cv_by_id, cv_by_name), f_out, pickle.HIGHEST_PROTOCOL)
+    _store_in_cache(cache, f'{cv_id}.pkl', (cv_by_id, cv_by_name))
     return cv_by_id, cv_by_name
 
 
-def clear_cache(cv_ids: Optional[Tuple[str]] = None) -> None:
+def _store_in_cache(cache: Optional[str], filename: str, obj: Any) -> None:
     """
-    Clear the cache of downloaded controlled vocabularies.
+    Store an object in the cache.
 
     Parameters
     ----------
-    cv_ids : Optional[Tuple[str]]
-        Identifiers of the controlled vocabularies to remove from the cache.
-        If None, all known files will be removed.
+    cache : Optional[str]
+        Directory where the cached objects are stored, or None to disable
+        caching.
+    filename : str
+        Filename of the stored cache object.
+    obj : Any
+        Object to store in the cache.
+    """
+    if cache is not None:
+        os.makedirs(cache, exist_ok=True)
+        with open(os.path.join(cache, filename), 'wb') as f_out:
+            pickle.dump(obj, f_out, pickle.HIGHEST_PROTOCOL)
+
+
+def _load_from_cache(cache: Optional[str], filename: str) -> Optional[Any]:
+    """
+    Load an object from the cache.
+
+    Parameters
+    ----------
+    cache : Optional[str]
+        Directory where the cached objects are stored, or None to disable
+        caching.
+    filename : str
+        Filename of the stored cache object.
+
+    Returns
+    -------
+    Any
+        The object retrieved from the cache, or None if not found.
+    """
+    if cache is not None:
+        cache_filename = os.path.join(cache, filename)
+        if os.path.isfile(cache_filename):
+            with open(cache_filename, 'rb') as f_in:
+                return pickle.load(f_in)
+    return None
+
+
+def clear_cache(res_ids: Optional[Tuple[str]] = None) -> None:
+    """
+    Clear the cache of downloaded resources.
+
+    Parameters
+    ----------
+    res_ids : Optional[Tuple[str]]
+        Identifiers of the resources to remove from the cache. If None, all
+        known files will be removed.
     """
     # Clear the in-memory cache.
     _import_cv.cache_clear()
     # Clear the on-disk cache.
     if cache_dir is not None:
-        if cv_ids is None:
-            cv_ids = ('UNIMOD', 'MOD', 'RESID', 'XLMOD', 'GNO')
-        for cv_id in cv_ids:
+        if res_ids is None:
+            res_ids = ('UNIMOD', 'MOD', 'RESID', 'XLMOD', 'GNO', 'mono')
+        for cv_id in res_ids:
             filename = os.path.join(cache_dir, f'{cv_id}.pkl')
             if os.path.isfile(filename):
                 os.remove(filename)

@@ -1,13 +1,18 @@
+import collections
+import copy
+import enum
 import functools
 import json
 import os
 import pickle
 import re
 import urllib.request
-from typing import Any, Dict, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.error import URLError
 
 import fastobo
+import lark
 from pyteomics.auxiliary.structures import PyteomicsError
 try:
     from pyteomics import cmass as mass
@@ -21,17 +26,309 @@ from spectrum_utils.spectrum import aa_mass
 cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
 
 
-def parse(peptide: str) -> Tuple[str, Dict[Union[int, str], float]]:
+LookupType = enum.Enum('LookupType', 'ACCESSION NAME MASS')
+LabelType = enum.Enum('LabelType', 'XL BRANCH GENERAL')
+
+
+@dataclass
+class Ion:
+    ion: str
+
+
+@dataclass
+class Charge:
+    charge: int
+    ions: Optional[List[Ion]] = None
+
+
+@dataclass
+class CvEntry:
+    controlled_vocabulary: str
+    accession: Optional[str] = None
+    name: Optional[str] = None
+
+
+@dataclass
+class Mass:
+    mass: float
+    controlled_vocabulary: Optional[str] = None
+
+
+@dataclass
+class Formula:
+    formula: Optional[str] = None
+    isotopes: Optional[List[str]] = None
+
+
+@dataclass
+class Monosaccharide:
+    monosaccharide: str
+    count: int
+
+
+@dataclass
+class Glycan:
+    composition: List[Monosaccharide]
+
+
+@dataclass
+class Info:
+    message: str
+
+
+@dataclass
+class Label:
+    type: LabelType
+    label: str
+    score: Optional[float] = None
+
+
+@dataclass
+class Modification:
+    mass: Optional[float] = None
+    position: Optional[Union[int, Tuple[int, int], str]] = None
+    source: List[Union[CvEntry, Mass, Formula, Glycan, Info]] = None
+    label: Optional[Label] = None
+
+
+@dataclass
+class Proteoform:
+    sequence: str
+    modifications: List[Modification]
+    charge: Optional[Charge] = None
+
+
+# noinspection PyMethodMayBeStatic, PyPep8Naming
+class ProFormaTransformer(lark.Transformer):
+    sequence: List[str]
+    modifications: List[Modification]
+    global_modifications: Dict[str, List[Modification]]
+
+    def __init__(self):
+        super().__init__()
+        self.sequence, self.modifications = [], []
+        self.global_modifications = collections.defaultdict(list)
+
+    def proforma(self, tree) -> List[Proteoform]:
+        return [proteoform for proteoform in tree
+                if isinstance(proteoform, Proteoform)]
+
+    def proteoform(self, tree) -> Proteoform:
+        sequence = ''.join(self.sequence)
+        # Apply global modifications to the relevant residues.
+        for i, aa in enumerate(sequence):
+            if aa in self.global_modifications:
+                for mod in self.global_modifications[aa]:
+                    mod = copy.copy(mod)
+                    mod.position = i
+                    self.modifications.append(mod)
+        charge = tree[-1] if len(tree) > 1 else None
+        proteoform = Proteoform(sequence=sequence,
+                                modifications=self.modifications,
+                                charge=charge)
+        # Reset class variables.
+        self.sequence, self.modifications = [], []
+        self.global_modifications = collections.defaultdict(list)
+        return proteoform
+
+    def peptide(self, _) -> None:
+        # Residues and modifications have been written to the class variables.
+        pass
+
+    def aa(self, tree) -> None:
+        position = len(self.sequence)
+        self.sequence.append(tree[0])
+        # An amino acid token can be followed by (i) a modification on that
+        # residue, or (ii) a label (linking it to another modified residue).
+        if len(tree) == 2:
+            if isinstance(tree[1], Label):
+                self.modifications.append(
+                    Modification(position=position, label=tree[1]))
+            else:
+                tree[1].position = position
+                self.modifications.append(tree[1])
+
+    def AA(self, token) -> str:
+        return token.value
+
+    def mod_global(self, mods) -> None:
+        if len(mods) == 1:
+            # Global isotope.
+            self.modifications.append(Modification(
+                position='global', source=[Formula(isotopes=mods)]))
+        else:
+            # Global modification on a specific residue.
+            for aa in mods[1:]:
+                self.global_modifications[aa].append(mods[0])
+
+    def ISOTOPE(self, token) -> str:
+        return token.value
+
+    def mod_unknown_pos(self, mods) -> None:
+        for mod in mods:
+            if isinstance(mod, Modification):
+                mod.position = 'unknown'
+                self.modifications.append(mod)
+            else:
+                # Modification count.
+                for _ in range(int(mod) - 1):
+                    self.modifications.append(
+                        copy.copy(self.modifications[-1]))
+
+    def mod(self, mod_annotations) -> Modification:
+        mod = Modification(source=[])
+        for mod_annotation in mod_annotations:
+            if isinstance(mod_annotation, Label):
+                mod.label = mod_annotation
+            else:
+                mod.source.append(mod_annotation)
+        return mod
+
+    def mod_labile(self, mod_annotations) -> None:
+        mod = self.mod(mod_annotations)
+        mod.position = 'labile'
+        self.modifications.append(mod)
+
+    def MOD_COUNT(self, token) -> int:
+        return int(token.value)
+
+    def mod_n_term(self, mods) -> None:
+        for mod in mods:
+            if isinstance(mod, Label):
+                mod = Modification(label=mod)
+            mod.position = 'N-term'
+            self.modifications.append(mod)
+
+    def mod_c_term(self, mods) -> None:
+        for mod in mods:
+            if isinstance(mod, Label):
+                mod = Modification(label=mod)
+            mod.position = 'C-term'
+            self.modifications.append(mod)
+
+    def mod_range(self, tree) -> None:
+        position, *mods = tree
+        for mod in mods:
+            mod.position = position
+            self.modifications.append(mod)
+
+    def mod_range_pos(self, tree) -> Tuple[int, int]:
+        return len(self.sequence) - len(tree), len(self.sequence) - 1
+
+    def mod_name(self, tree) -> CvEntry:
+        cv, name = tree if len(tree) == 2 else (None, tree[0])
+        return CvEntry(controlled_vocabulary=cv, name=name)
+
+    def CV_ABBREV_OPT(self, token) -> str:
+        return self.CV_ABBREV(token)
+
+    def CV_ABBREV(self, token) -> str:
+        return {'U': 'UNIMOD', 'M': 'MOD', 'R': 'RESID', 'X': 'XLMOD',
+                'G': 'GNO'}[token.value.upper()]
+
+    def mod_accession(self, tree) -> CvEntry:
+        return CvEntry(controlled_vocabulary=tree[0], accession=tree[1])
+
+    def CV_NAME(self, token) -> str:
+        return token.value
+
+    def mod_mass(self, tree) -> Mass:
+        if len(tree) == 1:
+            return Mass(mass=tree[0])
+        elif tree[0] == 'Obs':
+            return Mass(mass=tree[1])
+        else:
+            return Mass(mass=tree[1], controlled_vocabulary=tree[0])
+
+    def MOD_MASS_OBS(self, _) -> str:
+        return 'Obs'
+
+    def MOD_MASS(self, token) -> float:
+        return float(token.value)
+
+    def mod_formula(self, tree) -> Formula:
+        *isotopes, formula = tree if len(tree) > 1 else (tree[0],)
+        return Formula(
+            formula=formula, isotopes=isotopes if isotopes else None)
+
+    def FORMULA(self, token) -> str:
+        return token.value
+
+    def mod_glycan(self, tree) -> Glycan:
+        return Glycan(composition=tree)
+
+    def monosaccharide(self, tree) -> Monosaccharide:
+        return Monosaccharide(
+            tree[0].value, int(tree[1].value) if len(tree) > 1 else 1)
+
+    def info(self, tree) -> Info:
+        return Info(tree[0])
+
+    def mod_label(self, tree) -> Label:
+        return Label(type=tree[0][0], label=tree[0][1],
+                     score=tree[1] if len(tree) > 1 else None)
+
+    def MOD_LABEL_XL(self, token) -> Tuple[LabelType, str]:
+        return LabelType.XL, token.value
+
+    def MOD_LABEL_BRANCH(self, token) -> Tuple[LabelType, str]:
+        return LabelType.BRANCH, token.value
+
+    def MOD_LABEL(self, token) -> Tuple[LabelType, str]:
+        return LabelType.GENERAL, token.value
+
+    def MOD_SCORE(self, token) -> float:
+        return float(token)
+
+    def charge(self, tree) -> Charge:
+        return Charge(charge=int(tree[0].value),
+                      ions=tree[1] if len(tree) > 1 else None)
+
+    def ion(self, tree) -> List[Ion]:
+        return [Ion(ion) for ion in tree]
+
+    def TEXT(self, token) -> str:
+        return token.value
+
+
+def parse(proforma: str) -> List[Proteoform]:
     """
-    Parse a ProForma-encoded peptide string.
+    Parse a ProForma-encoded string.
+
+    The string is parsed by building an abstract syntax tree to interpret the
+    ProForma language. Next, modifications are localized to residue positions
+    and translated into Python objects.
 
     Parameters
     ----------
-    peptide : str
-        The ProForma peptide string.
+    proforma : str
+        The ProForma string.
 
     Returns
     -------
+    List[Proteoform]
+        A list of proteoforms with their modifications (and additional)
+        information specified by the ProForma string.
+    """
+    with open('spectrum_utils/proforma.ebnf') as f_in:
+        parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
+                           lexer='dynamic_complete')
+        # TODO: Interpret modifications encoded by a CV.
+        return ProFormaTransformer().transform(parser.parse(proforma))
+
+
+def parse_regex(proforma: str) -> Tuple[str, Dict[Union[int, str], float]]:
+    """
+    Parse a ProForma-encoded string.
+
+    Parameters
+    ----------
+    proforma : str
+        The ProForma string.
+
+    Returns
+    -------
+    TODO
     Tuple[str, Dict[Union[int, str], float]]
         (1) The base peptide string without modifications, and (2) a mapping of
         modification positions and mass differences. Modification positions are

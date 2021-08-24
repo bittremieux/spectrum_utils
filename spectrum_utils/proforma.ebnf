@@ -8,32 +8,32 @@
 
 // ProForma specification: https://github.com/HUPO-PSI/ProForma/
 // Version: June 29, 2021
-proforma: (peptidoform (CROSSLINK | CHIMERIC))* peptidoform
+proforma: (proteoform (CROSSLINK | CHIMERIC))* proteoform
 CROSSLINK: "//"
 CHIMERIC: "+"
 
-peptidoform: peptide ["/" charge]
+proteoform: peptide ["/" charge]
 
 peptide: mod_global* mod_labile* mod_unknown_pos? mod_n_term? (aa | mod_range)+ mod_c_term?
 // TODO: Prefix modification order? https://github.com/HUPO-PSI/ProForma/issues/3
 // TODO: Amino acid sequence ambiguity (section 4.7).
 
-aa.10: AA [mod+ | ("[" mod_label "]")]
+aa.10: AA [mod+ | (_MOD_L mod_label _MOD_R)]
 AA: LETTER
 
-mod_global: "<" (ISOTOPE | (mod "@" (AA ",")* AA)) ">"
+mod_global: _MOD_GLOBAL_L (ISOTOPE | (mod "@" (AA ",")* AA)) _MOD_GLOBAL_R
 ISOTOPE: INT? LETTER+ SIGNED_INT?
 
-mod_unknown_pos: mod+ "?"
+mod_unknown_pos: (mod ["^" MOD_COUNT])+ "?"
 
-mod:        "[" ((mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info) mod_label? "|")* (mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info) mod_label? "]" ("^" MOD_COUNT)?
-mod_labile: "{" ((mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info)            "|")* (mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info)            "}" ("^" MOD_COUNT)?
+mod:        _MOD_L        ((mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info) mod_label? "|")* (mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info) mod_label? _MOD_R
+mod_labile: _MOD_LABILE_L ((mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info)            "|")* (mod_name | mod_accession | mod_mass | mod_formula | mod_glycan | info)            _MOD_LABILE_R
 MOD_COUNT: INT
 
-mod_n_term: (mod | ("[" mod_label "]")) "-"
-mod_c_term: "-" (mod | ("[" mod_label "]"))
+mod_n_term: (mod | (_MOD_L mod_label _MOD_R)) "-"
+mod_c_term: "-" (mod | (_MOD_L mod_label _MOD_R))
 
-mod_range: "(" mod_range_pos ")" mod+
+mod_range: _MOD_RANGE_L mod_range_pos _MOD_RANGE_R mod+
 mod_range_pos: aa+
 
 mod_name.2: ((CV_ABBREV ":") | (CV_ABBREV_OPT ":")?) TEXT
@@ -47,19 +47,19 @@ mod_mass.5: [(CV_ABBREV | MOD_MASS_OBS) ":"] MOD_MASS
 MOD_MASS_OBS: "Obs"i
 MOD_MASS: ("+" | "-") NUMBER
 
-mod_formula.5: "Formula:"i ("[" ISOTOPE "]")* FORMULA
+mod_formula.5: "Formula:"i (_MOD_L ISOTOPE _MOD_R)* FORMULA
 FORMULA: (LETTER+ SIGNED_INT? WS?)+
 
-mod_glycan.5: "Glycan:" glycan+
-glycan: GLYCAN GLYCAN_COUNT?
+mod_glycan.5: "Glycan:" monosaccharide+
+monosaccharide: MONOSACCHARIDE MONOSACCHARIDE_COUNT?
 // From: https://github.com/HUPO-PSI/ProForma/tree/master/monosaccharides
 // Version: September 13, 2020
-// Glycans have to be specified in reversed order to support greedy parsing.
-GLYCAN: "sulfate"i | "phosphate"i | "en,a-Hex"i | "d-Hex"i | "a-Hex"i | "Tri"i
-    | "Tet"i | "Sug"i | "Pen"i | "Oct"i | "Non"i | "Neu5Gc"i | "Neu5Ac"i
-    | "Neu"i | "HexS"i | "HexP"i | "HexNS"i | "HexNAc(S)"i | "HexNAc"i
-    | "HexN"i | "Hex"i | "Hep"i | "Fuc"i | "Dec"i
-GLYCAN_COUNT: INT
+// Monosaccharides have to be specified in reversed order to support greedy parsing.
+MONOSACCHARIDE: "sulfate"i | "phosphate"i | "en,a-Hex"i | "d-Hex"i | "a-Hex"i
+    | "Tri"i | "Tet"i | "Sug"i | "Pen"i | "Oct"i | "Non"i | "Neu5Gc"i
+    | "Neu5Ac"i | "Neu"i | "HexS"i | "HexP"i | "HexNS"i | "HexNAc(S)"i
+    | "HexNAc"i | "HexN"i | "Hex"i | "Hep"i | "Fuc"i | "Dec"i
+MONOSACCHARIDE_COUNT: INT
 
 info.5: "Info:"i TEXT
 
@@ -69,8 +69,17 @@ MOD_LABEL_BRANCH: "BRANCH"
 MOD_LABEL: (LETTER | DIGIT)+
 MOD_SCORE: SIGNED_NUMBER
 
-charge: CHARGE ["[" ion "]"]
+charge: CHARGE [_MOD_L ion _MOD_R]
 CHARGE: SIGNED_INT
 ion: [TEXT ","] TEXT
 
 TEXT: /.+/
+
+_MOD_L: "["
+_MOD_R: "]"
+_MOD_LABILE_L: "{"
+_MOD_LABILE_R: "}"
+_MOD_GLOBAL_L: "<"
+_MOD_GLOBAL_R: ">"
+_MOD_RANGE_L: "("
+_MOD_RANGE_R: ")"

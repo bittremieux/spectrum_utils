@@ -4,20 +4,22 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import numba as nb
 import numpy as np
 try:
-    from pyteomics import cmass as mass
+    import pyteomics.cmass as pmass
 except ImportError:
-    from pyteomics import mass
+    import pyteomics.mass as pmass
 
 from spectrum_utils import utils
 
 
-_aa_mass = {**mass.std_aa_mass,
-            # 'B': 0,             # aspartic acid / asparagine (ambiguous mass)
-            # 'Z': 0,             # glutamic acid / glutamine (ambiguous mass)
-            'J': 113.08406,       # leucine / isoleucine
-            # 'U': 150.95363,     # selenocysteine (in Pyteomics)
-            # 'O': 237.14772,     # pyrrolysine (in Pyteomics)
-            'X': 0}               # any amino acid, gaps (zero mass)
+_aa_mass = {
+    **pmass.std_aa_mass,
+    # 'B': 0,             # aspartic acid / asparagine (ambiguous mass)
+    # 'Z': 0,             # glutamic acid / glutamine (ambiguous mass)
+    'J': 113.08406,       # leucine / isoleucine
+    # 'U': 150.95363,     # selenocysteine (in Pyteomics)
+    # 'O': 237.14772,     # pyrrolysine (in Pyteomics)
+    'X': 0                # any amino acid, gaps (zero mass)
+}
 aa_mass = _aa_mass.copy()
 
 
@@ -209,10 +211,10 @@ def _get_theoretical_peptide_fragments(
                         neutral_loss=nl_name,
                         isotope=0,
                         charge=charge,
-                        calc_mz=mass.fast_mass(sequence=sequence,
-                                               ion_type=ion_type,
-                                               charge=charge,
-                                               aa_mass=aa_mass)
+                        calc_mz=pmass.fast_mass(sequence=sequence,
+                                                ion_type=ion_type,
+                                                charge=charge,
+                                                aa_mass=aa_mass)
                                 + (mod_mass + nl_mass) / charge))
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 

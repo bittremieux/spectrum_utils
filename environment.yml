@@ -5,6 +5,8 @@ channels:
   - conda-forge
 dependencies:
   - altair
+  - fastobo
+  - lark-parser
   - matplotlib
   - numba>=0.41
   - numpy

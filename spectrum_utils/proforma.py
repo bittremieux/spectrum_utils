@@ -5,7 +5,6 @@ import functools
 import json
 import os
 import pickle
-import re
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -13,13 +12,10 @@ from urllib.error import URLError
 
 import fastobo
 import lark
-from pyteomics.auxiliary.structures import PyteomicsError
 try:
-    from pyteomics import cmass as mass
+    import pyteomics.cmass as pmass
 except ImportError:
-    from pyteomics import mass
-
-from spectrum_utils.spectrum import aa_mass
+    import pyteomics.mass as pmass
 
 
 # Set to None to disable caching.
@@ -227,7 +223,8 @@ class ProFormaTransformer(lark.Transformer):
                 'G': 'GNO'}[token.value.upper()]
 
     def mod_accession(self, tree) -> CvEntry:
-        return CvEntry(controlled_vocabulary=tree[0], accession=tree[1])
+        return CvEntry(controlled_vocabulary=tree[0],
+                       accession=f'{tree[0]}:{tree[1]}')
 
     def CV_NAME(self, token) -> str:
         return token.value
@@ -291,7 +288,7 @@ class ProFormaTransformer(lark.Transformer):
         return token.value
 
 
-def parse(proforma: str) -> List[Proteoform]:
+def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     """
     Parse a ProForma-encoded string.
 
@@ -303,37 +300,16 @@ def parse(proforma: str) -> List[Proteoform]:
     ----------
     proforma : str
         The ProForma string.
+    resolve_mods : bool
+        Resolve modifications by retrieving the modification masses from the
+        corresponding controlled vocabularies or computing the masses from
+        the specified molecular or glycan compositions.
 
     Returns
     -------
     List[Proteoform]
         A list of proteoforms with their modifications (and additional)
         information specified by the ProForma string.
-    """
-    with open('spectrum_utils/proforma.ebnf') as f_in:
-        parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
-                           lexer='dynamic_complete')
-        # TODO: Interpret modifications encoded by a CV.
-        return ProFormaTransformer().transform(parser.parse(proforma))
-
-
-def parse_regex(proforma: str) -> Tuple[str, Dict[Union[int, str], float]]:
-    """
-    Parse a ProForma-encoded string.
-
-    Parameters
-    ----------
-    proforma : str
-        The ProForma string.
-
-    Returns
-    -------
-    TODO
-    Tuple[str, Dict[Union[int, str], float]]
-        (1) The base peptide string without modifications, and (2) a mapping of
-        modification positions and mass differences. Modification positions are
-        specified as their amino acid index in the peptide (0-based), 'N-term',
-        or 'C-term'.
 
     Raises
     ------
@@ -341,257 +317,180 @@ def parse_regex(proforma: str) -> Tuple[str, Dict[Union[int, str], float]]:
         If a controlled vocabulary could not be retrieved from its online
         resource.
     KeyError
-        If a specified modification could not be found in the corresponding
-        controlled vocabulary.
+        If a term was not found in its controlled vocabulary.
     NotImplementedError
-        - Inter-chain crosslinks are not supported (specified with "\\").
-        - Isotopes in a molecular formula are not supported.
-        - Modification positions ranges are not supported.
+        Mass calculation using a molecular formula that contains isotopes (not
+        supported by Pyteomics mass calculation).
     ValueError
-        - If the same label is used for multiple preferred positions.
-        - If an unknown character (amino acid) is encountered.
-        - If a modification annotation couldn't be successfully parsed.
-        - If no mass was specified for a GNO term or its parent terms.
+        If no mass was specified for a GNO term or its parent terms.
     """
-    peptide_base, modifications = [], {}
-    preferred_positions, global_modifications = set(), {}
-    if '\\' in peptide:
-        raise NotImplementedError('Inter-chain crosslinks are not supported')
-    # Extract global modifications.
-    if peptide.startswith('<'):
-        end_index = peptide.index('>')
-        modification, residues = peptide[1:end_index].split('@')
-        mod_mass = _parse_modification(modification[1:-1])
-        if mod_mass is not None:
-            global_modifications = {residue.upper(): mod_mass
-                                    for residue in residues.split(',')}
-        peptide = peptide[end_index + 1:]
-    # Extract modifications from the peptide string.
-    i = 0
-    while i < len(peptide):
-        # Parse modification on residue.
-        if peptide[i] == '[':
-            pos, j, left_bracket_count, right_bracket_count = None, i + 1, 1, 0
-            while right_bracket_count < left_bracket_count:
-                j += 1
-                left_bracket_count += peptide[j] == '['
-                right_bracket_count += peptide[j] == ']'
-            if len(peptide_base) == 0:
-                # Modification as first element followed by a hyphen indicates
-                # an N-terminal modification.
-                if peptide[j + 1] == '-':
-                    pos = 'N-term'
-                # Modification as first element followed by "?" (with optional
-                # cardinality) indicates unknown modification positions.
-                # These will be ignored because they can't be assigned to
-                # specific positions in the peptide.
-                elif peptide[j + 1] in '?^[':
-                    j += 1
-                    while peptide[j] != '?':
-                        j += 1
-            # Modification as final element preceded by a hyphen indicates a
-            # C-terminal modification.
-            elif i > 0 and peptide[i - 1] == '-':
-                pos = 'C-term'
-            # Modification on a specific residue.
-            else:
-                pos = len(peptide_base) - 1
-            # Process modifications with a valid positions that don't signify
-            # secondary locations ("#" pointing to another preferred location).
-            if pos is not None and peptide[i + 1] != '#':
-                modification = peptide[i + 1:j]
-                # Extract the preferred position tag (if applicable).
-                pref_pos = re.match(
-                    r'^(.+)(#[a-zA-z0-9]+)(\(([0-9]*[.])?[0-9]+\))?$',
-                    modification)
-                if pref_pos is not None:
-                    modification = pref_pos[1]
-                    if pref_pos[2] in preferred_positions:
-                        raise ValueError(
-                            f'Multiple preferred positions specified with '
-                            f'label "{pref_pos[2]}"')
-                    else:
-                        preferred_positions.add(pref_pos[2])
-                # If multiple modification options are specified, just take the
-                # first one.
-                for mod in modification.split('|'):
-                    mod_mass = _parse_modification(mod)
-                    if mod_mass is not None:
-                        modifications[pos] = mod_mass
-                        break
-            i = j + 1
-        # Skip N-term / C-term connectors.
-        elif peptide[i] == '-':
-            i += 1
-        # Ignore labile modifications.
-        elif peptide[i] == '{':
-            j, left_bracket_count, right_bracket_count = i + 1, 1, 0
-            while right_bracket_count < left_bracket_count:
-                j += 1
-                left_bracket_count += peptide[j] == '{'
-                right_bracket_count += peptide[j] == '}'
-            i = j + 1
-        # Modification position ranges are currently not supported because they
-        # can't be assigned to a specific residue.
-        elif peptide[i] == '(':
-            raise NotImplementedError('Modification position ranges are not '
-                                      'supported')
-        # Standard amino acid.
-        elif peptide[i] in aa_mass.keys():
-            peptide_base.append(peptide[i])
-            i += 1
-        # Give an error for amino acids whose mass can't be computed.
-        else:
-            raise ValueError(f'Unknown/unsupported amino acid "{peptide[i]}"')
-    peptide_base = ''.join(peptide_base).upper()
-    # Apply any global modifications.
-    for i, residue in enumerate(peptide_base):
-        if residue in global_modifications:
-            modifications[i] = global_modifications[residue]
-
-    return peptide_base, modifications
+    with open('spectrum_utils/proforma.ebnf') as f_in:
+        parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
+                           lexer='dynamic_complete')
+        proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+        if resolve_mods:
+            for proteoform in proteoforms:
+                for mod in proteoform.modifications:
+                    if mod.source is None:
+                        # Only a label without a modification mass/source.
+                        continue
+                    for source in mod.source:
+                        if isinstance(source, CvEntry):
+                            if source.controlled_vocabulary is None:
+                                for cv in ('UNIMOD', 'MOD'):
+                                    try:
+                                        source.controlled_vocabulary = cv
+                                        mod.mass = _resolve_cv(source)
+                                        break
+                                    except KeyError:
+                                        pass
+                                else:
+                                    raise KeyError(
+                                        f'Term "{source.name}" not found in '
+                                        f'UNIMOD or PSI-MOD')
+                            else:
+                                mod.mass = _resolve_cv(source)
+                            break
+                        elif isinstance(source, Mass):
+                            mod.mass = _resolve_mass(source)
+                            break
+                        elif isinstance(source, Formula):
+                            mod.mass = _resolve_formula(source)
+                            break
+                        elif isinstance(source, Glycan):
+                            mod.mass = _resolve_glycan(source)
+                            break
+        return proteoforms
 
 
-def _parse_modification(modification: str) -> Optional[float]:
+def _resolve_cv(cv_entry: CvEntry) -> float:
     """
-    Convert a ProForma modification string to the corresponding mass
-    difference.
+    Retrieve the modification mass from a controlled vocabulary entry.
 
     Parameters
     ----------
-    modification : str
-        The ProForma modification string.
+    cv_entry : CvEntry
+        The CV entry whose modification mass will be retrieved.
 
     Returns
     -------
-    Optional[float]
-        The modification mass difference, or `None` for info tags.
+    float
+        The modification mass.
 
     Raises
     ------
-    URLError
-        If the controlled vocabulary could not be retrieved from its online
-        resource.
-    KeyError
-        If the modification could not be found in the corresponding controlled
-        vocabulary.
-    NotImplementedError
-        Isotopes in a molecular formula (not supported by Pyteomics mass
-        calculation).
-    ValueError
-        - If the modification couldn't be successfully parsed.
-        - If no mass was specified for a GNO term or its parent terms.
-    """
-    # Info tag.
-    if modification.upper().startswith('INFO:'):
-        return None
-    # Modification specified by name or mass only (no / invalid prefix).
-    if (':' not in modification or
-            modification[:modification.index(':')].upper() not in (
-                    'U', 'UNIMOD', 'M', 'MOD', 'R', 'RESID', 'X', 'XLMOD',
-                    'G', 'GNO', 'OBS', 'FORMULA', 'GLYCAN')):
-        # Numerical mass difference.
-        if modification[0] in '+-':
-            return float(modification)
-        # Retrieve from Unimod or PSI-MOD by name.
-        else:
-            try:
-                return _cv_lookup(f'U:{modification}')
-            except KeyError:
-                try:
-                    return _cv_lookup(f'M:{modification}')
-                except KeyError:
-                    raise KeyError(f'Term {modification} not found in the '
-                                   f'UNIMOD or PSI-MOD reference controlled '
-                                   f'vocabularies')
-    else:
-        # Numerical mass difference (controlled vocabulary or "Obs" prefix).
-        if (modification.title().startswith(('U:', 'M:', 'R:', 'X:', 'G:',
-                                             'Obs:'))
-                and modification[modification.index(':') + 1] in '+-'):
-            return float(modification[modification.index(':') + 1:])
-        # Retrieve from controlled vocabulary by name or accession.
-        elif modification.upper().startswith(
-                ('U:', 'UNIMOD:', 'M:', 'MOD:', 'R:', 'RESID:',
-                 'X:', 'XLMOD:', 'G:', 'GNO:')):
-            return _cv_lookup(modification)
-        # Calculate mass from molecular formula.
-        elif modification.title().startswith('Formula:'):
-            try:
-                # Make sure there are no spaces in the molecular formula
-                # (Pyteomics mass calculation can't handle those).
-                return mass.calculate_mass(
-                    formula=(modification[modification.index(':') + 1:]
-                             .replace(' ', '')))
-            except PyteomicsError:
-                # TODO: Add isotope support to Pyteomics?
-                raise NotImplementedError('Isotopes in molecular formulas are '
-                                          'not supported')
-        # Calculate mass from glycan composition.
-        elif modification.title().startswith('Glycan:'):
-            mono = _load_from_cache(cache_dir, 'mono.pkl')
-            if mono is None:
-                with urllib.request.urlopen(
-                        'https://raw.githubusercontent.com/HUPO-PSI/ProForma/'
-                        'master/monosaccharides/mono.obo.json') as response:
-                    if 400 <= response.getcode() < 600:
-                        raise URLError('Failed to retrieve the monosaccharide '
-                                       'definitions from its online resource')
-                    mono = json.loads(response.read().decode(
-                        response.info().get_param('charset') or 'utf-8'))
-                mono = {term['name']: float(term['has_monoisotopic_mass'])
-                        for term in mono['terms'].values()}
-                _store_in_cache(cache_dir, 'mono.pkl', mono)
-            return sum([mono[m[1]] * int(m[2]) for m in re.finditer(
-                fr'({"|".join([re.escape(m) for m in mono.keys()])})(\d+)',
-                modification[modification.index(':') + 1:])])
-
-
-def _cv_lookup(lookup: str) -> Optional[float]:
-    """
-    Retrieve a term from a controlled vocabulary by identifier or name.
-
-    Parameters
-    ----------
-    lookup : str
-        The ProForma-formatted term to look up in the controlled vocabulary.
-
-    Returns
-    -------
-    Optional[float]
-        The mass difference of the modification as specified in the controlled
-        vocabulary, or None if not found.
-
-    Raises
-    ------
-    URLError
-        If the controlled vocabulary could not be retrieved from its online
-        resource.
     KeyError
         If the term was not found in its controlled vocabulary.
+    URLError
+        If the controlled vocabulary could not be retrieved from its online
+        resource.
     ValueError
-        - If an unknown controlled vocabulary identifier is given.
+        - If an unknown controlled vocabulary identifier is specified.
         - If no mass was specified for a GNO term or its parent terms.
     """
-    cv_id, term_lookup = lookup.split(':', 1)
-    # Name lookups are specified using single-letter abbreviations, ID lookups
-    # use the full controlled vocabulary name.
-    lookup_by_id = len(cv_id) > 1
-    cv_id = {'U': 'UNIMOD', 'M': 'MOD', 'R': 'RESID', 'X': 'XLMOD',
-             'G': 'GNO'}.get(cv_id, cv_id)
-    cv_from_id, cv_from_name = _import_cv(cv_id, cache_dir)
+    cv_by_accession, cv_by_name = _import_cv(
+        cv_entry.controlled_vocabulary, cache_dir)
+    key = lookup_type = None
     try:
-        return (cv_from_id[f'{cv_id}:{term_lookup}'] if lookup_by_id else
-                cv_from_name[term_lookup])
+        if cv_entry.accession is not None:
+            key, lookup_type = cv_entry.accession, 'accession'
+            cv_entry.name = cv_by_accession[key][1]
+            return cv_by_accession[key][0]
+        elif cv_entry.name is not None:
+            key, lookup_type = cv_entry.name, 'name'
+            cv_entry.accession = cv_by_name[key][1]
+            return cv_by_name[key][0]
     except KeyError:
-        raise KeyError(f'Term {lookup} not found in the {cv_id} '
-                       f'controlled vocabulary '
-                       f'{"by ID" if lookup_by_id else "by name"}')
+        raise KeyError(
+            f'Term {key} not found in the {cv_entry.controlled_vocabulary} '
+            f'controlled vocabulary by {lookup_type}')
+
+
+def _resolve_mass(mass: Mass) -> float:
+    """
+    Return the mass of a mass-based modification.
+
+    Parameters
+    ----------
+    mass : Mass
+        The mass-based modification.
+
+    Returns
+    -------
+    float
+        The modification mass.
+    """
+    return mass.mass
+
+
+def _resolve_formula(formula: Formula) -> float:
+    """
+    Calculate the mass of a molecular formula.
+
+    Parameters
+    ----------
+    formula : Formula
+        The molecular formula whose mass will be computed.
+
+    Returns
+    -------
+    float
+        The modification mass.
+
+    Raises
+    ------
+    NotImplementedError
+        Mass calculation using a molecular formula that contains isotopes (not
+        supported by Pyteomics mass calculation).
+    """
+    if formula.isotopes is not None:
+        # FIXME: Add isotope support to Pyteomics.
+        raise NotImplementedError('Mass calculation of molecular formulas with'
+                                  ' isotopes is currently not supported')
+    # Make sure there are no spaces in the molecular formula (Pyteomics mass
+    # calculation can't handle those).
+    return pmass.calculate_mass(formula=formula.formula.replace(' ', ''))
+
+
+def _resolve_glycan(glycan: Glycan) -> float:
+    """
+    Calculate the mass of a glycan based on its monosaccharide composition.
+
+    Parameters
+    ----------
+    glycan : Glycan
+        The glycan composition whose mass will be computed.
+
+    Returns
+    -------
+    float
+        The modification mass.
+
+    Raises
+    ------
+    URLError
+        If the monosaccharide definitions could not be retrieved from its
+        online resource.
+    """
+    mono = _load_from_cache(cache_dir, 'mono.pkl')
+    if mono is None:
+        with urllib.request.urlopen(
+                'https://raw.githubusercontent.com/HUPO-PSI/ProForma/master/'
+                'monosaccharides/mono.obo.json') as response:
+            if 400 <= response.getcode() < 600:
+                raise URLError('Failed to retrieve the monosaccharide '
+                               'definitions from its online resource')
+            mono = json.loads(response.read().decode(
+                response.info().get_param('charset', 'utf-8')))
+        mono = {term['name']: float(term['has_monoisotopic_mass'])
+                for term in mono['terms'].values()}
+        _store_in_cache(cache_dir, 'mono.pkl', mono)
+    return sum([mono[m.monosaccharide] * m.count for m in glycan.composition])
 
 
 @functools.lru_cache
 def _import_cv(cv_id: str, cache: Optional[str]) \
-        -> Tuple[Dict[str, float], Dict[str, float]]:
+        -> Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]:
     """
     Import a ProForma controlled vocabulary from its online resource.
 
@@ -605,9 +504,10 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
 
     Returns
     -------
-    Tuple[Dict[str, float], Dict[str, float]]
-        A tuple with mappings (i) from term ID to modification mass, and
-        (ii) from term name to modification mass.
+    Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]
+        A tuple with mappings (i) from term accession to modification mass and
+        term name, and (ii) from term name to modification mass and term
+        accession.
 
     Raises
     ------
@@ -615,7 +515,7 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
         If the controlled vocabulary could not be retrieved from its online
         resource.
     ValueError
-        - If an unknown controlled vocabulary identifier is given.
+        - If an unknown controlled vocabulary identifier is specified.
         - If no mass was specified for a GNO term or its parent terms.
     """
     if cv_id == 'UNIMOD':
@@ -638,13 +538,13 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
     if cv_cached is not None:
         return cv_cached
     # Read from the online resource if not found in the cache.
-    cv_by_id, cv_by_name, gno_graph = {}, {}, {}
+    cv_by_accession, cv_by_name, gno_graph = {}, {}, {}
     with urllib.request.urlopen(url) as response:
         if 400 <= response.getcode() < 600:
             raise URLError(f'Failed to retrieve the {cv_id} controlled '
                            f'vocabulary from its online resource')
         for frame in fastobo.load(response):
-            term_id, term_name, term_mass = str(frame.id), None, None
+            term_accession, term_name, term_mass = str(frame.id), None, None
             if isinstance(frame, fastobo.term.TermFrame):
                 for clause in frame:
                     if isinstance(clause, fastobo.term.NameClause):
@@ -657,7 +557,7 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
                           isinstance(clause, fastobo.term.DefClause)):
                         for xref in clause.xrefs:
                             if xref.id.prefix == 'RESID':
-                                term_id = str(xref.id)
+                                term_accession = str(xref.id)
                                 break
                     elif isinstance(clause, fastobo.term.XrefClause):
                         term_xref = clause.raw_value()
@@ -676,29 +576,33 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
                         term_mass = float(clause.property_value.value)
                     elif (cv_id == 'GNO' and
                           isinstance(clause, fastobo.term.IsAClause)):
-                        gno_graph[term_id] = str(clause.term), term_name
-                if term_id.startswith(f'{cv_id}:') and term_mass is not None:
-                    cv_by_id[term_id] = term_mass
+                        gno_graph[term_accession] = term_name, str(clause.term)
+                if (term_accession.startswith(f'{cv_id}:') and
+                        term_mass is not None):
+                    cv_by_accession[term_accession] = term_mass, term_name
                     if term_name is not None:
-                        cv_by_name[term_name] = term_mass
+                        cv_by_name[term_name] = term_mass, term_accession
     if cv_id == 'GNO':
-        for term_id, (parent_id, term_name) in gno_graph.items():
-            if term_id not in cv_by_id:
-                terms = [(term_id, term_name)]
-                while parent_id not in cv_by_id and parent_id in gno_graph:
-                    parent_id_new, parent_name = gno_graph[parent_id]
-                    terms.append((parent_id, parent_name))
-                    parent_id = parent_id_new
-                if parent_id in cv_by_id:
-                    term_mass = cv_by_id[parent_id]
-                    for add_id, add_name in terms:
-                        cv_by_id[add_id] = cv_by_name[add_name] = term_mass
-                else:
-                    raise ValueError(f'No mass found for term {term_id} in '
-                                     f'the GNO controlled vocabulary')
+        for term_accession, (term_name, parent_accession) in gno_graph.items():
+            if term_accession in cv_by_accession:
+                continue
+            terms = [(term_accession, term_name)]
+            while (parent_accession not in cv_by_accession and
+                   parent_accession in gno_graph):
+                parent_name, grandparent_accession = \
+                    gno_graph[parent_accession]
+                terms.append((parent_accession, parent_name))
+                parent_accession = grandparent_accession
+            if parent_accession not in cv_by_accession:
+                raise ValueError(f'No mass found for term {term_accession}'
+                                 f' in the GNO controlled vocabulary')
+            term_mass = cv_by_accession[parent_accession][0]
+            for add_accession, add_name in terms:
+                cv_by_accession[add_accession] = term_mass, add_name
+                cv_by_name[add_name] = term_mass, add_accession
     # Save to the cache if enabled.
-    _store_in_cache(cache, f'{cv_id}.pkl', (cv_by_id, cv_by_name))
-    return cv_by_id, cv_by_name
+    _store_in_cache(cache, f'{cv_id}.pkl', (cv_by_accession, cv_by_name))
+    return cv_by_accession, cv_by_name
 
 
 def _store_in_cache(cache: Optional[str], filename: str, obj: Any) -> None:

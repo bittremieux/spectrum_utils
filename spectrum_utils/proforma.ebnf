@@ -14,8 +14,7 @@ CHIMERIC: "+"
 
 proteoform: peptide ["/" charge]
 
-peptide: mod_global* mod_labile* mod_unknown_pos? mod_n_term? (aa | mod_range)+ mod_c_term?
-// TODO: Prefix modification order? https://github.com/HUPO-PSI/ProForma/issues/3
+peptide: mod_global* mod_unknown_pos? mod_labile* mod_n_term? (aa | mod_range)+ mod_c_term?
 // TODO: Amino acid sequence ambiguity (section 4.7).
 
 aa.10: AA [mod+ | (_MOD_L mod_label _MOD_R)]

@@ -9,6 +9,7 @@ except ImportError:
     import pyteomics.mass as pmass
 
 from spectrum_utils import utils
+from spectrum_utils.proforma import parse as parse_proforma
 
 
 _aa_mass = {
@@ -684,7 +685,7 @@ class MsmsSpectrum:
         self.retention_time = retention_time
         if peptide is not None:
             # Parse ProForma peptide.
-            self.peptide, self.modifications = _parse_proforma(peptide)
+            self.peptide, self.modifications = parse_proforma(peptide)
 
             self.peptide = peptide.upper()
             for aa in self.peptide:

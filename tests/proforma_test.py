@@ -94,6 +94,7 @@ def test_proforma_xlink():
             ('EMEVTKSESPEK', {5: 138.06807961}))
     assert (proforma.parse('EMEVTK[XLMOD:02001]SESPEK') ==
             ('EMEVTKSESPEK', {5: 138.06807961}))
+
     # Inter-chain crosslinks.
     with pytest.raises(NotImplementedError):
         proforma.parse(
@@ -191,11 +192,16 @@ def test_proforma_special():
                            'S[Phospho]PEK[iTRAQ4plex]-[Methyl]') ==
             ('EMEVNESPEK', {'N-term': 144.102063, 1: 15.994915, 6: 79.966331,
                             9: 144.102063, 'C-term': 14.01565}))
-    assert (proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK') ==
-            ('EMEVNESPEK', {}))
+
+    # How should synonims be handled? (I dont really work with glycans so I dont know how prevalent this issue is)
+    # assert (proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK') ==
+    #         ('EMEVNESPEK', {}))
 
 
 def test_proforma_ambiguous_position():
+    # TODO:
+    #    Consider if unknown-position modification masses should be returned as {'unk1': 15.2, 'unk2': 15.3 ...}
+    #    or any other name (but have it returned), same for labile so the precursor mass can be calculated correctly.
     # Unknown modification position.
     assert (proforma.parse('[Phospho]?EM[Oxidation]EVTSESPEK') ==
             ('EMEVTSESPEK', {1: 15.994915}))
@@ -207,7 +213,15 @@ def test_proforma_ambiguous_position():
             ('EMEVTSESPEK', {'N-term': 42.010565, 1: 15.994915}))
     assert (proforma.parse('[Phospho]^2?[Acetyl]-EM[Oxidation]EVTSESPEK') ==
             ('EMEVTSESPEK', {'N-term': 42.010565, 1: 15.994915}))
+
     # Multiple possible modification positions.
+    # Note JSPP: I do not aggree with this being the correct behavior. but the 
+    # proforma standard states 
+    # > A  single  preferred  location  for  the  modification  MUST  be  specified,  so  that  the 
+    # > sequence  can  be  easily  rendered  in  visualization  tools.  The  preferred  location  for
+    # > the modification is indicated by the position of the modification notation in the amino acid 
+    # > sequence.
+
     assert (proforma.parse('EM[Oxidation]EVT[#g1]S[#g1]ES[Phospho#g1]PEK') ==
             ('EMEVTSESPEK', {1: 15.994915, 7: 79.966331}))
     with pytest.raises(ValueError):
@@ -263,6 +277,9 @@ def test_proforma_pipe():
             ('ELVISK', {4: 79.966331}))
     assert (proforma.parse('ELVIS[Obs:+79.966|Phospho|Sulfo]K') ==
             ('ELVISK', {4: 79.966}))
+    # Parsing gives priority to the first element in the pipe
+    assert (proforma.parse('ELVIS[Obs:+75.978|U:Phospho]K') ==
+            ('ELVISK', {4: 75.978}))
 
 
 def test_proforma_cache():

@@ -12,13 +12,18 @@ from urllib.error import URLError
 
 import fastobo
 import lark
+from lark.exceptions import VisitError, UnexpectedCharacters
+
 try:
     import pyteomics.cmass as pmass
 except ImportError:
     import pyteomics.mass as pmass
 
 
+_supported_aas = set(list(pmass.std_aa_mass) + ['X'])
+
 # Set to None to disable caching.
+# TODO use system variables to find a cache directory
 cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
 
 
@@ -93,6 +98,17 @@ class Proteoform:
     modifications: List[Modification]
     charge: Optional[Charge] = None
 
+    def astuple(self):
+        mod_dict = {}
+        for y in self.modifications:
+            if y.source is not None or y.mass is not None:
+                if y.position != 'labile' and y.position != 'unknown':
+                    if isinstance(y.position, tuple):
+                        raise NotImplementedError(f"Unable to handle Ranges of modification positions {y.position}")
+                    if y.mass is not None:
+                        mod_dict.update({y.position: y.mass})
+        return (self.sequence, mod_dict)
+
 
 # noinspection PyMethodMayBeStatic, PyPep8Naming
 class ProFormaTransformer(lark.Transformer):
@@ -106,8 +122,7 @@ class ProFormaTransformer(lark.Transformer):
         self.global_modifications = collections.defaultdict(list)
 
     def proforma(self, tree) -> List[Proteoform]:
-        return [proteoform for proteoform in tree
-                if isinstance(proteoform, Proteoform)]
+        return [proteoform for proteoform in tree if isinstance(proteoform, Proteoform)]
 
     def proteoform(self, tree) -> Proteoform:
         sequence = ''.join(self.sequence)
@@ -119,9 +134,9 @@ class ProFormaTransformer(lark.Transformer):
                     mod.position = i
                     self.modifications.append(mod)
         charge = tree[-1] if len(tree) > 1 else None
-        proteoform = Proteoform(sequence=sequence,
-                                modifications=self.modifications,
-                                charge=charge)
+        proteoform = Proteoform(
+            sequence=sequence, modifications=self.modifications, charge=charge
+        )
         # Reset class variables.
         self.sequence, self.modifications = [], []
         self.global_modifications = collections.defaultdict(list)
@@ -133,14 +148,17 @@ class ProFormaTransformer(lark.Transformer):
 
     def aa(self, tree) -> None:
         position = len(self.sequence)
+        if tree[0] not in _supported_aas:
+            raise ValueError(f'Aminoacid {tree[0]} is not supported')
         self.sequence.append(tree[0])
         # An amino acid token can be followed by (i) a modification on that
         # residue, or (ii) a label (linking it to another modified residue).
         if len(tree) == 2:
             if isinstance(tree[1], Label):
                 self.modifications.append(
-                    Modification(position=position, label=tree[1]))
-            else:
+                    Modification(position=position, label=tree[1])
+                )
+            elif tree[1] is not None:
                 tree[1].position = position
                 self.modifications.append(tree[1])
 
@@ -150,8 +168,9 @@ class ProFormaTransformer(lark.Transformer):
     def mod_global(self, mods) -> None:
         if len(mods) == 1:
             # Global isotope.
-            self.modifications.append(Modification(
-                position='global', source=[Formula(isotopes=mods)]))
+            self.modifications.append(
+                Modification(position='global', source=[Formula(isotopes=mods)])
+            )
         else:
             # Global modification on a specific residue.
             for aa in mods[1:]:
@@ -162,14 +181,15 @@ class ProFormaTransformer(lark.Transformer):
 
     def mod_unknown_pos(self, mods) -> None:
         for mod in mods:
+            if mod is None:
+                continue
             if isinstance(mod, Modification):
                 mod.position = 'unknown'
                 self.modifications.append(mod)
             else:
                 # Modification count.
                 for _ in range(int(mod) - 1):
-                    self.modifications.append(
-                        copy.copy(self.modifications[-1]))
+                    self.modifications.append(copy.copy(self.modifications[-1]))
 
     def mod(self, mod_annotations) -> Modification:
         mod = Modification(source=[])
@@ -219,12 +239,12 @@ class ProFormaTransformer(lark.Transformer):
         return self.CV_ABBREV(token)
 
     def CV_ABBREV(self, token) -> str:
-        return {'U': 'UNIMOD', 'M': 'MOD', 'R': 'RESID', 'X': 'XLMOD',
-                'G': 'GNO'}[token.value.upper()]
+        return {'U': 'UNIMOD', 'M': 'MOD', 'R': 'RESID', 'X': 'XLMOD', 'G': 'GNO'}[
+            token.value.upper()
+        ]
 
     def mod_accession(self, tree) -> CvEntry:
-        return CvEntry(controlled_vocabulary=tree[0],
-                       accession=f'{tree[0]}:{tree[1]}')
+        return CvEntry(controlled_vocabulary=tree[0], accession=f'{tree[0]}:{tree[1]}')
 
     def CV_NAME(self, token) -> str:
         return token.value
@@ -232,6 +252,9 @@ class ProFormaTransformer(lark.Transformer):
     def mod_mass(self, tree) -> Mass:
         if len(tree) == 1:
             return Mass(mass=tree[0])
+        # It is unclear to me when it would generate a 2-element list
+        elif len(tree) == 3:
+            return Mass(mass=tree[2], controlled_vocabulary=tree[0])
         elif tree[0] == 'Obs':
             return Mass(mass=tree[1])
         else:
@@ -245,8 +268,7 @@ class ProFormaTransformer(lark.Transformer):
 
     def mod_formula(self, tree) -> Formula:
         *isotopes, formula = tree if len(tree) > 1 else (tree[0],)
-        return Formula(
-            formula=formula, isotopes=isotopes if isotopes else None)
+        return Formula(formula=formula, isotopes=isotopes if isotopes else None)
 
     def FORMULA(self, token) -> str:
         return token.value
@@ -255,15 +277,15 @@ class ProFormaTransformer(lark.Transformer):
         return Glycan(composition=tree)
 
     def monosaccharide(self, tree) -> Monosaccharide:
-        return Monosaccharide(
-            tree[0].value, int(tree[1].value) if len(tree) > 1 else 1)
+        return Monosaccharide(tree[0].value, int(tree[1].value) if len(tree) > 1 else 1)
 
     def info(self, tree) -> Info:
         return Info(tree[0])
 
     def mod_label(self, tree) -> Label:
-        return Label(type=tree[0][0], label=tree[0][1],
-                     score=tree[1] if len(tree) > 1 else None)
+        return Label(
+            type=tree[0][0], label=tree[0][1], score=tree[1] if len(tree) > 1 else None
+        )
 
     def MOD_LABEL_XL(self, token) -> Tuple[LabelType, str]:
         return LabelType.XL, token.value
@@ -278,8 +300,9 @@ class ProFormaTransformer(lark.Transformer):
         return float(token)
 
     def charge(self, tree) -> Charge:
-        return Charge(charge=int(tree[0].value),
-                      ions=tree[1] if len(tree) > 1 else None)
+        return Charge(
+            charge=int(tree[0].value), ions=tree[1] if len(tree) > 1 else None
+        )
 
     def ion(self, tree) -> List[Ion]:
         return [Ion(ion) for ion in tree]
@@ -288,7 +311,7 @@ class ProFormaTransformer(lark.Transformer):
         return token.value
 
 
-def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
+def parse(proforma: str, resolve_mods: bool = True) -> List[Proteoform]:
     """
     Parse a ProForma-encoded string.
 
@@ -324,12 +347,52 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     ValueError
         If no mass was specified for a GNO term or its parent terms.
     """
+
+    if '\\' in proforma:
+        raise NotImplementedError(
+            'There is currently no support for inter-chain crosslinks'
+        )
+
     with open('spectrum_utils/proforma.ebnf') as f_in:
-        parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
-                           lexer='dynamic_complete')
-        proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+        parser = lark.Lark(
+            f_in.read(), start='proforma', parser='earley', lexer='dynamic_complete'
+        )
+
+        try:
+            proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+        except VisitError as e:
+            raise e.orig_exc
+        except UnexpectedCharacters as e:
+            raise NotImplementedError
+
         if resolve_mods:
             for proteoform in proteoforms:
+                labels = [
+                    x.label.label
+                    for x in proteoform.modifications
+                    if x.label is not None
+                ]
+                if len(labels) != len(set(labels)):
+                    final_mods = []
+                    for lab in set(labels):
+                        tmp_mods = [x for x in proteoform.modifications if x.label is not None and x.label.label == lab]
+
+                        if lab is None or len(tmp_mods) == 1:
+                            final_mods.extend(tmp_mods)
+
+                        tmp_mods = [x for x in tmp_mods if x.source is not None]
+                        
+                        if len(tmp_mods) != 1:
+                            raise ValueError(
+                                (
+                                    f'Duplicate labels "{lab}" in "{proforma}", '
+                                    ' currently unable to handle Multiple possible modification positions'
+                                )
+                            )
+
+                        final_mods.append([tmp_mods[0]])
+                    
+
                 for mod in proteoform.modifications:
                     if mod.source is None:
                         # Only a label without a modification mass/source.
@@ -347,7 +410,8 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                                 else:
                                     raise KeyError(
                                         f'Term "{source.name}" not found in '
-                                        f'UNIMOD or PSI-MOD')
+                                        f'UNIMOD or PSI-MOD'
+                                    )
                             else:
                                 mod.mass = _resolve_cv(source)
                             break
@@ -360,7 +424,13 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                         elif isinstance(source, Glycan):
                             mod.mass = _resolve_glycan(source)
                             break
-        return proteoforms
+                        elif isinstance(source, Info):
+                            break
+                        else:
+                            raise NotImplementedError
+
+        proteoforms = [x.astuple() for x in proteoforms]
+        return proteoforms if len(proteoforms) > 1 else proteoforms[0]
 
 
 def _resolve_cv(cv_entry: CvEntry) -> float:
@@ -381,6 +451,8 @@ def _resolve_cv(cv_entry: CvEntry) -> float:
     ------
     KeyError
         If the term was not found in its controlled vocabulary.
+    NotImplementedError
+        If the term is an inter-chain crosslinked peptide.
     URLError
         If the controlled vocabulary could not be retrieved from its online
         resource.
@@ -388,9 +460,9 @@ def _resolve_cv(cv_entry: CvEntry) -> float:
         - If an unknown controlled vocabulary identifier is specified.
         - If no mass was specified for a GNO term or its parent terms.
     """
-    cv_by_accession, cv_by_name = _import_cv(
-        cv_entry.controlled_vocabulary, cache_dir)
+    cv_by_accession, cv_by_name = _import_cv(cv_entry.controlled_vocabulary, cache_dir)
     key = lookup_type = None
+
     try:
         if cv_entry.accession is not None:
             key, lookup_type = cv_entry.accession, 'accession'
@@ -401,9 +473,10 @@ def _resolve_cv(cv_entry: CvEntry) -> float:
             cv_entry.accession = cv_by_name[key][1]
             return cv_by_name[key][0]
     except KeyError:
-        raise KeyError(
-            f'Term {key} not found in the {cv_entry.controlled_vocabulary} '
-            f'controlled vocabulary by {lookup_type}')
+            raise KeyError(
+                f'Term {key} not found in the {cv_entry.controlled_vocabulary} '
+                f'controlled vocabulary by {lookup_type}'
+            )
 
 
 def _resolve_mass(mass: Mass) -> float:
@@ -445,8 +518,10 @@ def _resolve_formula(formula: Formula) -> float:
     """
     if formula.isotopes is not None:
         # FIXME: Add isotope support to Pyteomics.
-        raise NotImplementedError('Mass calculation of molecular formulas with'
-                                  ' isotopes is currently not supported')
+        raise NotImplementedError(
+            'Mass calculation of molecular formulas with'
+            ' isotopes is currently not supported'
+        )
     # Make sure there are no spaces in the molecular formula (Pyteomics mass
     # calculation can't handle those).
     return pmass.calculate_mass(formula=formula.formula.replace(' ', ''))
@@ -475,22 +550,31 @@ def _resolve_glycan(glycan: Glycan) -> float:
     mono = _load_from_cache(cache_dir, 'mono.pkl')
     if mono is None:
         with urllib.request.urlopen(
-                'https://raw.githubusercontent.com/HUPO-PSI/ProForma/master/'
-                'monosaccharides/mono.obo.json') as response:
+            'https://raw.githubusercontent.com/HUPO-PSI/ProForma/master/'
+            'monosaccharides/mono.obo.json'
+        ) as response:
             if 400 <= response.getcode() < 600:
-                raise URLError('Failed to retrieve the monosaccharide '
-                               'definitions from its online resource')
-            mono = json.loads(response.read().decode(
-                response.info().get_param('charset', 'utf-8')))
-        mono = {term['name']: float(term['has_monoisotopic_mass'])
-                for term in mono['terms'].values()}
+                raise URLError(
+                    'Failed to retrieve the monosaccharide '
+                    'definitions from its online resource'
+                )
+            mono = json.loads(
+                response.read().decode(response.info().get_param('charset', 'utf-8'))
+            )
+        mono = {
+            term['name']: float(term['has_monoisotopic_mass'])
+            for term in mono['terms'].values()
+        }
+        # The following line allows spaces between monosaccharides in the annotation
+        mono.update({' ': 0.0}) 
         _store_in_cache(cache_dir, 'mono.pkl', mono)
     return sum([mono[m.monosaccharide] * m.count for m in glycan.composition])
 
 
 @functools.lru_cache
-def _import_cv(cv_id: str, cache: Optional[str]) \
-        -> Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]:
+def _import_cv(
+    cv_id: str, cache: Optional[str]
+) -> Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]:
     """
     Import a ProForma controlled vocabulary from its online resource.
 
@@ -523,14 +607,20 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
     elif cv_id in ('MOD', 'RESID'):
         # RESID is not available as a separate entity anymore but is part of
         # PSI-MOD.
-        url = ('https://raw.githubusercontent.com/HUPO-PSI/psi-mod-CV/master/'
-               'PSI-MOD.obo')
+        url = (
+            'https://raw.githubusercontent.com/HUPO-PSI/psi-mod-CV/master/'
+            'PSI-MOD.obo'
+        )
     elif cv_id == 'XLMOD':
-        url = ('https://raw.githubusercontent.com/HUPO-PSI/mzIdentML/master/'
-               'cv/XLMOD.obo')
+        url = (
+            'https://raw.githubusercontent.com/HUPO-PSI/mzIdentML/master/'
+            'cv/XLMOD.obo'
+        )
     elif cv_id == 'GNO':
-        url = ('https://github.com/glygen-glycan-data/GNOme/releases/latest/'
-               'download/GNOme.obo')
+        url = (
+            'https://github.com/glygen-glycan-data/GNOme/releases/latest/'
+            'download/GNOme.obo'
+        )
     else:
         raise ValueError(f'Unknown controlled vocabulary: {cv_id}')
     # Try to retrieve from the cache.
@@ -541,8 +631,10 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
     cv_by_accession, cv_by_name, gno_graph = {}, {}, {}
     with urllib.request.urlopen(url) as response:
         if 400 <= response.getcode() < 600:
-            raise URLError(f'Failed to retrieve the {cv_id} controlled '
-                           f'vocabulary from its online resource')
+            raise URLError(
+                f'Failed to retrieve the {cv_id} controlled '
+                f'vocabulary from its online resource'
+            )
         for frame in fastobo.load(response):
             term_accession, term_name, term_mass = str(frame.id), None, None
             if isinstance(frame, fastobo.term.TermFrame):
@@ -551,34 +643,41 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
                         term_name = clause.name.strip()
                         if cv_id == 'GNO' and 'molecular weight' in term_name:
                             term_mass = float(
-                                term_name[term_name.rindex('weight ') + 7:
-                                          term_name.rindex(' Da')])
-                    elif (cv_id == 'RESID' and
-                          isinstance(clause, fastobo.term.DefClause)):
+                                term_name[
+                                    term_name.rindex('weight ')
+                                    + 7 : term_name.rindex(' Da')
+                                ]
+                            )
+                    elif cv_id == 'RESID' and isinstance(
+                        clause, fastobo.term.DefClause
+                    ):
                         for xref in clause.xrefs:
                             if xref.id.prefix == 'RESID':
                                 term_accession = str(xref.id)
                                 break
                     elif isinstance(clause, fastobo.term.XrefClause):
                         term_xref = clause.raw_value()
-                        if ((cv_id == 'UNIMOD' and
-                             'delta_mono_mass' in term_xref) or
-                                (cv_id in ('MOD', 'RESID') and
-                                 'DiffMono' in term_xref and
-                                 not term_xref.endswith('"none"'))):
+                        if (cv_id == 'UNIMOD' and 'delta_mono_mass' in term_xref) or (
+                            cv_id in ('MOD', 'RESID')
+                            and 'DiffMono' in term_xref
+                            and not term_xref.endswith('"none"')
+                        ):
                             term_mass = float(
-                                term_xref[term_xref.index('"') + 1:
-                                          term_xref.rindex('"')])
-                    elif (cv_id == 'XLMOD' and
-                          isinstance(clause, fastobo.term.PropertyValueClause)
-                          and (clause.property_value.relation.prefix ==
-                               'monoIsotopicMass')):
+                                term_xref[
+                                    term_xref.index('"') + 1 : term_xref.rindex('"')
+                                ]
+                            )
+                    elif (
+                        cv_id == 'XLMOD'
+                        and isinstance(clause, fastobo.term.PropertyValueClause)
+                        and (
+                            clause.property_value.relation.prefix == 'monoIsotopicMass'
+                        )
+                    ):
                         term_mass = float(clause.property_value.value)
-                    elif (cv_id == 'GNO' and
-                          isinstance(clause, fastobo.term.IsAClause)):
+                    elif cv_id == 'GNO' and isinstance(clause, fastobo.term.IsAClause):
                         gno_graph[term_accession] = term_name, str(clause.term)
-                if (term_accession.startswith(f'{cv_id}:') and
-                        term_mass is not None):
+                if term_accession.startswith(f'{cv_id}:') and term_mass is not None:
                     cv_by_accession[term_accession] = term_mass, term_name
                     if term_name is not None:
                         cv_by_name[term_name] = term_mass, term_accession
@@ -587,15 +686,18 @@ def _import_cv(cv_id: str, cache: Optional[str]) \
             if term_accession in cv_by_accession:
                 continue
             terms = [(term_accession, term_name)]
-            while (parent_accession not in cv_by_accession and
-                   parent_accession in gno_graph):
-                parent_name, grandparent_accession = \
-                    gno_graph[parent_accession]
+            while (
+                parent_accession not in cv_by_accession
+                and parent_accession in gno_graph
+            ):
+                parent_name, grandparent_accession = gno_graph[parent_accession]
                 terms.append((parent_accession, parent_name))
                 parent_accession = grandparent_accession
             if parent_accession not in cv_by_accession:
-                raise ValueError(f'No mass found for term {term_accession}'
-                                 f' in the GNO controlled vocabulary')
+                raise ValueError(
+                    f'No mass found for term {term_accession}'
+                    f' in the GNO controlled vocabulary'
+                )
             term_mass = cv_by_accession[parent_accession][0]
             for add_accession, add_name in terms:
                 cv_by_accession[add_accession] = term_mass, add_name

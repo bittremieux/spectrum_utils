@@ -57,7 +57,7 @@ monosaccharide: MONOSACCHARIDE MONOSACCHARIDE_COUNT?
 MONOSACCHARIDE: "sulfate"i | "phosphate"i | "en,a-Hex"i | "d-Hex"i | "a-Hex"i
     | "Tri"i | "Tet"i | "Sug"i | "Pen"i | "Oct"i | "Non"i | "Neu5Gc"i
     | "Neu5Ac"i | "Neu"i | "HexS"i | "HexP"i | "HexNS"i | "HexNAc(S)"i
-    | "HexNAc"i | "HexN"i | "Hex"i | "Hep"i | "Fuc"i | "Dec"i
+    | "HexNAc"i | "HexN"i | "Hex"i | "Hep"i | "Fuc"i | "Dec"i | " "
 MONOSACCHARIDE_COUNT: INT
 
 info.5: "Info:"i TEXT

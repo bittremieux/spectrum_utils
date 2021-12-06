@@ -257,7 +257,9 @@ class ProFormaTransformer(lark.Transformer):
         return token.value
 
     def mod_glycan(self, tree) -> Glycan:
-        return Glycan(composition=tree)
+        # Ignore optional whitespace in monosaccharide composition.
+        return Glycan(
+            composition=[t for t in tree if isinstance(t, Monosaccharide)])
 
     def monosaccharide(self, tree) -> Monosaccharide:
         return Monosaccharide(

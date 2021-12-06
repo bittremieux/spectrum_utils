@@ -339,7 +339,7 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                     if mod.source is None:
                         # Only a label without a modification mass/source.
                         continue
-                    for source in mod.source:
+                    for source in reversed(mod.source):
                         if isinstance(source, CvEntry):
                             if source.controlled_vocabulary is None:
                                 for cv in ('UNIMOD', 'MOD'):
@@ -355,16 +355,12 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                                         f'UNIMOD or PSI-MOD')
                             else:
                                 mod.mass = _resolve_cv(source)
-                            break
                         elif isinstance(source, Mass):
                             mod.mass = _resolve_mass(source)
-                            break
                         elif isinstance(source, Formula):
                             mod.mass = _resolve_formula(source)
-                            break
                         elif isinstance(source, Glycan):
                             mod.mass = _resolve_glycan(source)
-                            break
         return proteoforms
 
 

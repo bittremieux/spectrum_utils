@@ -39,7 +39,7 @@ class Charge:
 
 @dataclass
 class CvEntry:
-    controlled_vocabulary: str
+    controlled_vocabulary: Optional[str]
     accession: Optional[str] = None
     name: Optional[str] = None
 

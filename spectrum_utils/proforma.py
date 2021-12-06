@@ -99,11 +99,13 @@ class ProFormaTransformer(lark.Transformer):
     sequence: List[str]
     modifications: List[Modification]
     global_modifications: Dict[str, List[Modification]]
+    range_pos: List[int]
 
     def __init__(self):
         super().__init__()
         self.sequence, self.modifications = [], []
         self.global_modifications = collections.defaultdict(list)
+        self.range_pos = []
 
     def proforma(self, tree) -> List[Proteoform]:
         return [proteoform for proteoform in tree
@@ -203,13 +205,16 @@ class ProFormaTransformer(lark.Transformer):
             self.modifications.append(mod)
 
     def mod_range(self, tree) -> None:
-        position, *mods = tree
+        _, position, *mods = tree
         for mod in mods:
             mod.position = position
             self.modifications.append(mod)
 
-    def mod_range_pos(self, tree) -> Tuple[int, int]:
-        return len(self.sequence) - len(tree), len(self.sequence) - 1
+    def mod_range_pos(self, _) -> Tuple[int, int]:
+        return self.range_pos.pop(), len(self.sequence) - 1
+
+    def MOD_RANGE_L(self, _) -> None:
+        self.range_pos.append(len(self.sequence))
 
     def mod_name(self, tree) -> CvEntry:
         cv, name = tree if len(tree) == 2 else (None, tree[0])

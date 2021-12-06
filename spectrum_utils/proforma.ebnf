@@ -32,8 +32,8 @@ MOD_COUNT: INT
 mod_n_term: (mod | (_MOD_L mod_label _MOD_R)) "-"
 mod_c_term: "-" (mod | (_MOD_L mod_label _MOD_R))
 
-mod_range: _MOD_RANGE_L mod_range_pos _MOD_RANGE_R mod+
-mod_range_pos: aa+
+mod_range: MOD_RANGE_L mod_range_pos _MOD_RANGE_R mod+
+mod_range_pos: (aa | mod_range)+
 
 mod_name.2: ((CV_ABBREV ":") | (CV_ABBREV_OPT ":")?) TEXT
 CV_ABBREV_OPT: "U"i | "M"i
@@ -80,5 +80,5 @@ _MOD_LABILE_L: "{"
 _MOD_LABILE_R: "}"
 _MOD_GLOBAL_L: "<"
 _MOD_GLOBAL_R: ">"
-_MOD_RANGE_L: "("
+MOD_RANGE_L: "("
 _MOD_RANGE_R: ")"

@@ -1,5 +1,6 @@
 import operator
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+import warnings
 
 import numba as nb
 import numpy as np
@@ -38,6 +39,11 @@ def static_modification(amino_acid: str, mass_diff: float) -> None:
         monoisotopic mass.
     """
     global aa_mass
+    if _aa_mass[amino_acid] != aa_mass[amino_acid]:
+        curr_mass_diff = aa_mass[amino_acid] - _aa_mass[amino_acid]
+        warnings.warn((
+            f"Amino acid {amino_acid} already has a mass offset of {curr_mass_diff},"
+            f" the provided mass of {mass_diff} will be added to that"))
     aa_mass[amino_acid] += mass_diff
 
 

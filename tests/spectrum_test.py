@@ -75,6 +75,9 @@ def test_get_theoretical_fragments_static_mod():
         fragment_mz = fragments[f'{fragment.ion_type}_{fragment.charge}']
         assert fragment.calc_mz == pytest.approx(fragment_mz)
     assert spectrum.aa_mass['Y'] == pytest.approx(163.06333 + 79.96633)
+    with pytest.warns(UserWarning):
+        spectrum.static_modification('Y', 79.96633)
+        assert spectrum.aa_mass['Y'] != pytest.approx(163.06333)
     spectrum.reset_modifications()
     assert spectrum.aa_mass['Y'] == pytest.approx(163.06333)
 

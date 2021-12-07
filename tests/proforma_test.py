@@ -1,9 +1,11 @@
+import lark
 import pytest
 
 from spectrum_utils import proforma
 
 
-def test_proforma_canonical():
+def test_proforma_unmodified():
+    # Sequences containing standard amino acids.
     assert proforma.parse("PEPTIDE") == [
         proforma.Proteoform(sequence="PEPTIDE", modifications=[])
     ]
@@ -13,7 +15,17 @@ def test_proforma_canonical():
     assert proforma.parse("MNPQRSTVWY") == [
         proforma.Proteoform(sequence="MNPQRSTVWY", modifications=[])
     ]
-    # Ambiguous amino acids.
+    # Sequences are case insensitive.
+    assert proforma.parse("peptide") == [
+        proforma.Proteoform(sequence="PEPTIDE", modifications=[])
+    ]
+    assert proforma.parse("acdefghikl") == [
+        proforma.Proteoform(sequence="ACDEFGHIKL", modifications=[])
+    ]
+    assert proforma.parse("mnpqrstvwy") == [
+        proforma.Proteoform(sequence="MNPQRSTVWY", modifications=[])
+    ]
+    # Sequences containing ambiguous amino acids.
     assert proforma.parse("PEPTJDE") == [
         proforma.Proteoform(sequence="PEPTJDE", modifications=[])
     ]
@@ -35,7 +47,7 @@ def test_proforma_canonical():
 
 
 def test_proforma_name():
-    # Unimod without prefix.
+    # Unimod named modification without prefix.
     assert proforma.parse("EM[Oxidation]EVEES[Phospho]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -88,7 +100,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # Unimod with prefix.
+    # Unimod named modification with prefix.
     assert proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -141,7 +153,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # Unimod with internal brackets in the name.
+    # Unimod named modification with internal brackets in the name.
     assert proforma.parse("EM[Oxidation]EVE[Cation:Mg[II]]ES[Phospho]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -215,7 +227,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # PSI-MOD without prefix.
+    # PSI-MOD named modification without prefix.
     assert proforma.parse(
         "EM[L-methionine sulfoxide]EVEE" "S[O-phospho-L-serine]PEK"
     ) == [
@@ -274,7 +286,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # PSI-MOD with prefix.
+    # PSI-MOD named modification with prefix.
     assert proforma.parse(
         "EM[M:L-methionine sulfoxide]EVEE" "S[M:O-phospho-L-serine]PEK"
     ) == [
@@ -303,7 +315,7 @@ def test_proforma_name():
         )
     ]
     assert proforma.parse(
-        "EM[L-methionine sulfoxide]EVEE" "S[O-phospho-L-serine]PEK", True
+        "EM[M:L-methionine sulfoxide]EVEE" "S[M:O-phospho-L-serine]PEK", True
     ) == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -333,7 +345,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # RESID (mandatory prefix).
+    # RESID named modification (mandatory prefix).
     assert proforma.parse(
         "EM[R:L-methionine sulfone]EVEE" "S[R:O-phospho-L-serine]PEK"
     ) == [
@@ -392,7 +404,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # XL-MOD (mandatory prefix).
+    # XL-MOD named modification (mandatory prefix).
     assert proforma.parse("EMEVTK[X:DSS#XL1]SESPEK") == [
         proforma.Proteoform(
             sequence="EMEVTKSESPEK",
@@ -432,7 +444,7 @@ def test_proforma_name():
             ],
         )
     ]
-    # GNO (mandatory prefix).
+    # GNO named modification (mandatory prefix).
     assert proforma.parse("NEEYN[G:G59626AS]K") == [
         proforma.Proteoform(
             sequence="NEEYNK",
@@ -476,10 +488,14 @@ def test_proforma_name():
     # Non-existing prefix (will be considered as no prefix).
     with pytest.raises(KeyError):
         proforma.parse("EM[RandomPrefix:Oxidation]EVEES[Phospho]PEK", True)
+    # Mixing of terms without a prefix from different CVs is not allowed
+    # (specification document section 4.2.1).
+    with pytest.warns(SyntaxWarning):
+        proforma.parse("EM[L-methionine sulfoxide]EVEES[Phospho]PEK", True)
 
 
 def test_proforma_accession():
-    # Unimod.
+    # Unimod modification by accession.
     assert proforma.parse("EM[UNIMOD:35]EVEES[UNIMOD:56]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -534,7 +550,7 @@ def test_proforma_accession():
             ],
         )
     ]
-    # PSI-MOD.
+    # PSI-MOD modification by accession.
     assert proforma.parse("EM[MOD:00719]EVEES[MOD:00046]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -587,7 +603,7 @@ def test_proforma_accession():
             ],
         )
     ]
-    # RESID.
+    # RESID modification by accession.
     assert proforma.parse("EM[RESID:AA0581]EVEES[RESID:AA0037]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -642,7 +658,7 @@ def test_proforma_accession():
             ],
         )
     ]
-    # GNO.
+    # GNO modification by accession.
     assert proforma.parse("NEEYN[GNO:G59626AS]K") == [
         proforma.Proteoform(
             sequence="NEEYNK",
@@ -678,7 +694,7 @@ def test_proforma_accession():
         )
     ]
     assert proforma.parse(
-        "YPVLN[GNO:G62765YT]VTMP" "N[GNO:G02815KT]NSNGKFDK"
+        "YPVLN[GNO:G62765YT]VTMPN[GNO:G02815KT]NSNGKFDK"
     ) == [
         proforma.Proteoform(
             sequence="YPVLNVTMPNNSNGKFDK",
@@ -705,7 +721,7 @@ def test_proforma_accession():
         )
     ]
     assert proforma.parse(
-        "YPVLN[GNO:G62765YT]VTMP" "N[GNO:G02815KT]NSNGKFDK", True
+        "YPVLN[GNO:G62765YT]VTMPN[GNO:G02815KT]NSNGKFDK", True
     ) == [
         proforma.Proteoform(
             sequence="YPVLNVTMPNNSNGKFDK",
@@ -737,17 +753,25 @@ def test_proforma_accession():
     ]
     # Invalid accessions.
     with pytest.raises(KeyError):
+        proforma.parse("EM[M:00719]EVEES[M:00046]PEK", True)
+    with pytest.raises(KeyError):
+        proforma.parse("EM[U:35]EVEES[U:56]PEK", True)
+    with pytest.raises(KeyError):
+        proforma.parse("EM[R:AA0581]EVEES[R:AA0037]PEK", True)
+    with pytest.raises(KeyError):
         proforma.parse("EM[UNIMOD:one]EVEES[UNIMOD:two]PEK", True)
     with pytest.raises(KeyError):
         proforma.parse("EM[MOD:one]EVEES[MOD:two]PEK", True)
     with pytest.raises(KeyError):
         proforma.parse("EM[RESID:one]EVEES[RESID:two]PEK", True)
     with pytest.raises(KeyError):
+        proforma.parse("YPVLN[XLMOD:one]VTMPN[XLMOD:two]NSNGKFDK", True)
+    with pytest.raises(KeyError):
         proforma.parse("YPVLN[GNO:one]VTMPN[GNO:two]NSNGKFDK", True)
 
 
 def test_proforma_xlink():
-    # Crosslink notation.
+    # DSS crosslink between two lysines.
     assert proforma.parse("EMEVTK[XLMOD:02001#XL1]SESPEK[#XL1]") == [
         proforma.Proteoform(
             sequence="EMEVTKSESPEK",
@@ -800,8 +824,10 @@ def test_proforma_xlink():
             ],
         )
     ]
+    # DSS crosslink between two lysines and an EDC cross-link between two other
+    # lysines.
     assert proforma.parse(
-        "EMK[XLMOD:02000#XL1]EVTKSE[XLMOD:02010#XL2]S" "K[#XL1]PEK[#XL2]AR"
+        "EMK[XLMOD:02000#XL1]EVTKSE[XLMOD:02010#XL2]SK[#XL1]PEK[#XL2]AR"
     ) == [
         proforma.Proteoform(
             sequence="EMKEVTKSESKPEKAR",
@@ -846,7 +872,7 @@ def test_proforma_xlink():
         )
     ]
     assert proforma.parse(
-        "EMK[XLMOD:02000#XL1]EVTKSE[XLMOD:02010#XL2]S" "K[#XL1]PEK[#XL2]AR",
+        "EMK[XLMOD:02000#XL1]EVTKSE[XLMOD:02010#XL2]SK[#XL1]PEK[#XL2]AR",
         True,
     ) == [
         proforma.Proteoform(
@@ -896,6 +922,7 @@ def test_proforma_xlink():
             ],
         )
     ]
+    # "Dead end" crosslink.
     assert proforma.parse("EMEVTK[XLMOD:02001#XL1]SESPEK") == [
         proforma.Proteoform(
             sequence="EMEVTKSESPEK",
@@ -970,7 +997,7 @@ def test_proforma_xlink():
             ],
         )
     ]
-    # Inter-chain crosslinks.
+    # Inter-chain crosslink.
     assert proforma.parse(
         "SEK[XLMOD:02001#XL1]UENCE//EMEVTK[XLMOD:02001#XL1]SESPEK"
     ) == [
@@ -1010,7 +1037,7 @@ def test_proforma_xlink():
         ),
     ]
     assert proforma.parse(
-        "SEK[XLMOD:02001#XL1]UENCE//" "EMEVTK[XLMOD:02001#XL1]SESPEK", True
+        "SEK[XLMOD:02001#XL1]UENCE//EMEVTK[XLMOD:02001#XL1]SESPEK", True
     ) == [
         proforma.Proteoform(
             sequence="SEKUENCE",
@@ -1082,7 +1109,7 @@ def test_proforma_xlink():
         ),
     ]
     assert proforma.parse(
-        "SEK[XLMOD:02001#XL1]UENCE//" "EMEVTK[XLMOD:02001#XL1]SESPEK", True
+        "SEK[XLMOD:02001#XL1]UENCE//EMEVTK[XLMOD:02001#XL1]SESPEK", True
     ) == [
         proforma.Proteoform(
             sequence="SEKUENCE",
@@ -1123,7 +1150,7 @@ def test_proforma_xlink():
             ],
         ),
     ]
-    # Disulfide linkages.
+    # Disulfide linkage.
     assert proforma.parse("EVTSEKC[MOD:00034#XL1]LEMSC[#XL1]EFD") == [
         proforma.Proteoform(
             sequence="EVTSEKCLEMSCEFD",
@@ -1176,7 +1203,7 @@ def test_proforma_xlink():
         )
     ]
     assert proforma.parse(
-        "EVTSEKC[L-cystine (cross-link)#XL1]LEMS" "C[#XL1]EFD"
+        "EVTSEKC[L-cystine (cross-link)#XL1]LEMSC[#XL1]EFD"
     ) == [
         proforma.Proteoform(
             sequence="EVTSEKCLEMSCEFD",
@@ -1203,7 +1230,7 @@ def test_proforma_xlink():
         )
     ]
     assert proforma.parse(
-        "EVTSEKC[L-cystine (cross-link)#XL1]LEMS" "C[#XL1]EFD", True
+        "EVTSEKC[L-cystine (cross-link)#XL1]LEMSC[#XL1]EFD", True
     ) == [
         proforma.Proteoform(
             sequence="EVTSEKCLEMSCEFD",
@@ -1232,10 +1259,8 @@ def test_proforma_xlink():
         )
     ]
     assert proforma.parse(
-        "FVNQHLC[MOD:00034#XL1]GSHLVEALYLVC[MOD:00034#XL2]G"
-        "ERGFFYTPKA//"
-        "GIVEQC[MOD:00034#XL3]C[#XL1]TSIC[#XL3]SLYQLENY"
-        "C[#XL2]N"
+        "FVNQHLC[MOD:00034#XL1]GSHLVEALYLVC[MOD:00034#XL2]GERGFFYTPKA//"
+        "GIVEQC[MOD:00034#XL3]C[#XL1]TSIC[#XL3]SLYQLENYC[#XL2]N"
     ) == [
         proforma.Proteoform(
             sequence="FVNQHLCGSHLVEALYLVCGERGFFYTPKA",
@@ -1300,10 +1325,8 @@ def test_proforma_xlink():
         ),
     ]
     assert proforma.parse(
-        "FVNQHLC[MOD:00034#XL1]GSHLVEALYLVC[MOD:00034#XL2]G"
-        "ERGFFYTPKA//"
-        "GIVEQC[MOD:00034#XL3]C[#XL1]TSIC[#XL3]SLYQLENY"
-        "C[#XL2]N",
+        "FVNQHLC[MOD:00034#XL1]GSHLVEALYLVC[MOD:00034#XL2]GERGFFYTPKA//"
+        "GIVEQC[MOD:00034#XL3]C[#XL1]TSIC[#XL3]SLYQLENYC[#XL2]N",
         True,
     ) == [
         proforma.Proteoform(
@@ -1535,8 +1558,8 @@ def test_proforma_xlink():
         )
     ]
     assert proforma.parse(
-        "EVTSEKC[MOD:00798]LEMSC[MOD:00798]EFDEVTSEK"
-        "C[MOD:00798]LEMSC[MOD:00798]EFD"
+        "EVTSEKC[MOD:00798]LEMSC[MOD:00798]EFDEVTSEKC[MOD:00798]LEMS"
+        "C[MOD:00798]EFD"
     ) == [
         proforma.Proteoform(
             sequence="EVTSEKCLEMSCEFDEVTSEKCLEMSCEFD",
@@ -1577,8 +1600,8 @@ def test_proforma_xlink():
         )
     ]
     assert proforma.parse(
-        "EVTSEKC[MOD:00798]LEMSC[MOD:00798]EFDEVTSEK"
-        "C[MOD:00798]LEMSC[MOD:00798]EFD",
+        "EVTSEKC[MOD:00798]LEMSC[MOD:00798]EFDEVTSEKC[MOD:00798]LEMS"
+        "C[MOD:00798]EFD",
         True,
     ) == [
         proforma.Proteoform(
@@ -1714,7 +1737,7 @@ def test_proforma_branch():
                     ),
                 ),
             ],
-        )
+        ),
     ]
     assert proforma.parse("ETFGD[MOD:00093#BRANCH]//R[#BRANCH]ATER", True) == [
         proforma.Proteoform(
@@ -1746,7 +1769,7 @@ def test_proforma_branch():
                     ),
                 ),
             ],
-        )
+        ),
     ]
     assert proforma.parse(
         "AVTKYTSSK[MOD:00134#BRANCH]//"
@@ -1773,18 +1796,18 @@ def test_proforma_branch():
             sequence="AGKQLEDGRTLSDYNIQKESTLHLVLRLRG",
             modifications=[
                 proforma.Modification(
-                    position='C-term',
+                    position="C-term",
                     label=proforma.Label(
                         type=proforma.LabelType.BRANCH, label="BRANCH"
                     ),
                 ),
             ],
-        )
+        ),
     ]
     assert proforma.parse(
         "AVTKYTSSK[MOD:00134#BRANCH]//"
         "AGKQLEDGRTLSDYNIQKESTLHLVLRLRG-[#BRANCH]",
-        True
+        True,
     ) == [
         proforma.Proteoform(
             sequence="AVTKYTSSK",
@@ -1809,18 +1832,18 @@ def test_proforma_branch():
             sequence="AGKQLEDGRTLSDYNIQKESTLHLVLRLRG",
             modifications=[
                 proforma.Modification(
-                    position='C-term',
+                    position="C-term",
                     label=proforma.Label(
                         type=proforma.LabelType.BRANCH, label="BRANCH"
                     ),
                 ),
             ],
-        )
+        ),
     ]
 
 
 def test_proforma_delta_mass():
-    # No prefix.
+    # Delta mass without prefix.
     assert proforma.parse("EM[+15.9949]EVEES[+79.9663]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -1901,7 +1924,7 @@ def test_proforma_delta_mass():
             ],
         )
     ]
-    # CV prefix.
+    # Delta mass with CV prefix.
     assert proforma.parse("EM[U:+15.9949]EVEES[U:+79.9663]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -1998,7 +2021,7 @@ def test_proforma_delta_mass():
             ],
         )
     ]
-    # Experimentally observed prefix.
+    # Delta mass with experimentally observed prefix.
     assert proforma.parse("EM[U:+15.995]EVEES[Obs:+79.978]PEK") == [
         proforma.Proteoform(
             sequence="EMEVEESPEK",
@@ -2013,9 +2036,7 @@ def test_proforma_delta_mass():
                 ),
                 proforma.Modification(
                     position=6,
-                    source=[
-                        proforma.Mass(mass=79.978, controlled_vocabulary=None)
-                    ],
+                    source=[proforma.Mass(mass=79.978)],
                 ),
             ],
         )
@@ -2036,9 +2057,7 @@ def test_proforma_delta_mass():
                 proforma.Modification(
                     mass=79.978,
                     position=6,
-                    source=[
-                        proforma.Mass(mass=79.978, controlled_vocabulary=None)
-                    ],
+                    source=[proforma.Mass(mass=79.978)],
                 ),
             ],
         )
@@ -2052,11 +2071,7 @@ def test_proforma_gap():
             modifications=[
                 proforma.Modification(
                     position=4,
-                    source=[
-                        proforma.Mass(
-                            mass=367.0537, controlled_vocabulary=None
-                        )
-                    ],
+                    source=[proforma.Mass(mass=367.0537)],
                 ),
             ],
         )
@@ -2068,11 +2083,7 @@ def test_proforma_gap():
                 proforma.Modification(
                     mass=367.0537,
                     position=4,
-                    source=[
-                        proforma.Mass(
-                            mass=367.0537, controlled_vocabulary=None
-                        )
-                    ],
+                    source=[proforma.Mass(mass=367.0537)],
                 ),
             ],
         )
@@ -2124,6 +2135,29 @@ def test_proforma_formula():
             ],
         )
     ]
+    assert proforma.parse("SEQUEN[Formula:HN-1O2]CE") == [
+        proforma.Proteoform(
+            sequence="SEQUENCE",
+            modifications=[
+                proforma.Modification(
+                    position=5,
+                    source=[proforma.Formula(formula="HN-1O2")],
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse("SEQUEN[Formula:HN-1O2]CE", True) == [
+        proforma.Proteoform(
+            sequence="SEQUENCE",
+            modifications=[
+                proforma.Modification(
+                    mass=18.99458026639,
+                    position=5,
+                    source=[proforma.Formula(formula="HN-1O2")],
+                ),
+            ],
+        )
+    ]
     # Mass calculation of isotopes is currently still unsupported.
     assert proforma.parse("SEQUEN[Formula:[13C2]CH6N]CE") == [
         proforma.Proteoform(
@@ -2141,6 +2175,10 @@ def test_proforma_formula():
     # FIXME: Add isotope support to Pyteomics.
     with pytest.raises(NotImplementedError):
         proforma.parse("SEQUEN[Formula:[13C2]CH6N]CE", True)
+    with pytest.raises(NotImplementedError):
+        proforma.parse("SEQUEN[Formula:[13C2][12C-2]H2N]CE", True)
+    with pytest.raises(NotImplementedError):
+        proforma.parse("SEQUEN[Formula:[13C2]C-2H2N]CE", True)
 
 
 def test_proforma_glycan():
@@ -2296,7 +2334,7 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "[iTRAQ4plex]-EM[U:Oxidation]EVNES[Phospho]PE" "K[iTRAQ4plex]-[Methyl]"
+        "[iTRAQ4plex]-EM[U:Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]-[Methyl]"
     ) == [
         proforma.Proteoform(
             sequence="EMEVNESPEK",
@@ -2345,8 +2383,7 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "[iTRAQ4plex]-EM[U:Oxidation]EVNES[Phospho]PE"
-        "K[iTRAQ4plex]-[Methyl]",
+        "[iTRAQ4plex]-EM[U:Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]-[Methyl]",
         True,
     ) == [
         proforma.Proteoform(
@@ -2412,7 +2449,7 @@ def test_proforma_special():
     ]
     # Labile modifications.
     assert proforma.parse(
-        "{Glycan:Hex}EM[U:Oxidation]EVNES[Phospho]PE" "K[iTRAQ4plex]"
+        "{Glycan:Hex}EM[U:Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]"
     ) == [
         proforma.Proteoform(
             sequence="EMEVNESPEK",
@@ -2453,7 +2490,7 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "{Glycan:Hex}EM[U:Oxidation]EVNES[Phospho]PE" "K[iTRAQ4plex]", True
+        "{Glycan:Hex}EM[U:Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]", True
     ) == [
         proforma.Proteoform(
             sequence="EMEVNESPEK",
@@ -2504,8 +2541,7 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNE"
-        "S[Phospho]PEK[iTRAQ4plex]"
+        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]"
     ) == [
         proforma.Proteoform(
             sequence="EMEVNESPEK",
@@ -2554,8 +2590,7 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNE"
-        "S[Phospho]PEK[iTRAQ4plex]",
+        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]",
         True,
     ) == [
         proforma.Proteoform(
@@ -2618,8 +2653,8 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNE"
-        "S[Phospho]PEK[iTRAQ4plex]-[Methyl]"
+        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]"
+        "-[Methyl]"
     ) == [
         proforma.Proteoform(
             sequence="EMEVNESPEK",
@@ -2676,8 +2711,8 @@ def test_proforma_special():
         )
     ]
     assert proforma.parse(
-        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNE"
-        "S[Phospho]PEK[iTRAQ4plex]-[Methyl]",
+        "{Glycan:Hex}[iTRAQ4plex]-EM[Oxidation]EVNES[Phospho]PEK[iTRAQ4plex]"
+        "-[Methyl]",
         True,
     ) == [
         proforma.Proteoform(
@@ -2855,7 +2890,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     assert proforma.parse(
-        "[Phospho][Phospho]?[Acetyl]-EM[Oxidation]" "EVTSESPEK"
+        "[Phospho][Phospho]?[Acetyl]-EM[Oxidation]EVTSESPEK"
     ) == [
         proforma.Proteoform(
             sequence="EMEVTSESPEK",
@@ -2896,7 +2931,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     assert proforma.parse(
-        "[Phospho][Phospho]?[Acetyl]-EM[Oxidation]" "EVTSESPEK", True
+        "[Phospho][Phospho]?[Acetyl]-EM[Oxidation]EVTSESPEK", True
     ) == [
         proforma.Proteoform(
             sequence="EMEVTSESPEK",
@@ -2949,7 +2984,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     assert proforma.parse(
-        "[Phospho]^2[Methyl]?[Acetyl]-EM[Oxidation]" "EVTSESPEK"
+        "[Phospho]^2[Methyl]?[Acetyl]-EM[Oxidation]EVTSESPEK"
     ) == [
         proforma.Proteoform(
             sequence="EMEVTSESPEK",
@@ -2998,7 +3033,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     assert proforma.parse(
-        "[Phospho]^2[Methyl]?[Acetyl]-EM[Oxidation]" "EVTSESPEK", True
+        "[Phospho]^2[Methyl]?[Acetyl]-EM[Oxidation]EVTSESPEK", True
     ) == [
         proforma.Proteoform(
             sequence="EMEVTSESPEK",
@@ -3326,7 +3361,7 @@ def test_proforma_ambiguous_position():
     ]
     # Modification localization score.
     assert proforma.parse(
-        "EM[Oxidation]EVT[#g1(0.01)]S[#g1(0.09)]E" "S[Phospho#g1(0.90)]PEK"
+        "EM[Oxidation]EVT[#g1(0.01)]S[#g1(0.09)]ES[Phospho#g1(0.90)]PEK"
     ) == [
         proforma.Proteoform(
             sequence="EMEVTSESPEK",
@@ -3413,8 +3448,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     assert proforma.parse(
-        "[Phospho#s1]?EM[Oxidation]EVT[#s1(0.01)]"
-        "S[#s1(0.09)]ES[#s1(0.90)]PEK"
+        "[Phospho#s1]?EM[Oxidation]EVT[#s1(0.01)]S[#s1(0.09)]ES[#s1(0.90)]PEK"
     ) == [
         proforma.Proteoform(
             sequence="EMEVTSESPEK",
@@ -3458,8 +3492,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     assert proforma.parse(
-        "[Phospho#s1]?EM[Oxidation]EVT[#s1(0.01)]"
-        "S[#s1(0.09)]ES[#s1(0.90)]PEK",
+        "[Phospho#s1]?EM[Oxidation]EVT[#s1(0.01)]S[#s1(0.09)]ES[#s1(0.90)]PEK",
         True,
     ) == [
         proforma.Proteoform(
@@ -3509,9 +3542,231 @@ def test_proforma_ambiguous_position():
             ],
         )
     ]
+    # Scoring ranges of positions.
+    assert proforma.parse(
+        "PROT(EOSFORMS)[+19.0523#g1(0.01)]ISK[#g1(0.99)]"
+    ) == [
+        proforma.Proteoform(
+            sequence="PROTEOSFORMSISK",
+            modifications=[
+                proforma.Modification(
+                    position=(4, 11),
+                    source=[proforma.Mass(mass=19.0523)],
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.01
+                    ),
+                ),
+                proforma.Modification(
+                    position=14,
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.99
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "PROT(EOSFORMS)[+19.0523#g1(0.01)]ISK[#g1(0.99)]", True
+    ) == [
+        proforma.Proteoform(
+            sequence="PROTEOSFORMSISK",
+            modifications=[
+                proforma.Modification(
+                    mass=19.0523,
+                    position=(4, 11),
+                    source=[proforma.Mass(mass=19.0523)],
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.01
+                    ),
+                ),
+                proforma.Modification(
+                    position=14,
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.99
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "PR[#g1(0.91)]OT(EOC[Carbamidomethyl]FORMS)[+19.05233#g1(0.09)]ISK"
+    ) == [
+        proforma.Proteoform(
+            sequence="PROTEOCFORMSISK",
+            modifications=[
+                proforma.Modification(
+                    position=1,
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.91
+                    ),
+                ),
+                proforma.Modification(
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None, name="Carbamidomethyl"
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=(4, 11),
+                    source=[proforma.Mass(mass=19.05233)],
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.09
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "PR[#g1(0.91)]OT(EOC[Carbamidomethyl]FORMS)[+19.05233#g1(0.09)]ISK",
+        True,
+    ) == [
+        proforma.Proteoform(
+            sequence="PROTEOCFORMSISK",
+            modifications=[
+                proforma.Modification(
+                    position=1,
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.91
+                    ),
+                ),
+                proforma.Modification(
+                    mass=57.021464,
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:4",
+                            name="Carbamidomethyl",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=19.05233,
+                    position=(4, 11),
+                    source=[proforma.Mass(mass=19.05233)],
+                    label=proforma.Label(
+                        proforma.LabelType.GENERAL, "g1", 0.09
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "MPGLVDSNPAPPESQEKKPLK(PCCACPETKKARDACIIEKGEEHCGHLIEAHKECMRALGFKI)"
+        "[Oxidation][Oxidation][half cystine][half cystine]",
+    ) == [
+        proforma.Proteoform(
+            sequence="MPGLVDSNPAPPESQEKKPLKPCCACPETKKARDACIIEKGEEHCGHLIEAHKECM"
+            "RALGFKI",
+            modifications=[
+                proforma.Modification(
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="half cystine",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="half cystine",
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "MPGLVDSNPAPPESQEKKPLK(PCCACPETKKARDACIIEKGEEHCGHLIEAHKECMRALGFKI)"
+        "[Oxidation][Oxidation][half cystine][half cystine]",
+        True,
+    ) == [
+        proforma.Proteoform(
+            sequence="MPGLVDSNPAPPESQEKKPLKPCCACPETKKARDACIIEKGEEHCGHLIEAHKECM"
+            "RALGFKI",
+            modifications=[
+                proforma.Modification(
+                    mass=15.994915,
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:35",
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=15.994915,
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:35",
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=-1.007825,
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:00798",
+                            name="half cystine",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=-1.007825,
+                    position=(21, 62),
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:00798",
+                            name="half cystine",
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
 
 
 def test_proforma_global_modification():
+    with pytest.raises(NotImplementedError):
+        proforma.parse("<13C>ATPEILTVNSIGQLK", True)
+    with pytest.raises(NotImplementedError):
+        proforma.parse("<15N>ATPEILTVNSIGQLK", True)
+    with pytest.raises(NotImplementedError):
+        proforma.parse("<D>ATPEILTVNSIGQLK", True)
+    with pytest.raises(NotImplementedError):
+        proforma.parse("<13C><15N>ATPEILTVNSIGQLK", True)
     assert proforma.parse(
         "<[S-carboxamidomethyl-L-cysteine]@C>" "ATPEILTCNSIGCLK"
     ) == [
@@ -3695,6 +3950,172 @@ def test_proforma_global_modification():
             ],
         )
     ]
+    assert proforma.parse(
+        "<[MOD:01090]@C>[Phospho]?EM[Oxidation]EVTSECSPEK"
+    ) == [
+        proforma.Proteoform(
+            sequence="EMEVTSECSPEK",
+            modifications=[
+                proforma.Modification(
+                    position="unknown",
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="Phospho",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=7,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:01090",
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "<[MOD:01090]@C>[Phospho]?EM[Oxidation]EVTSECSPEK", True
+    ) == [
+        proforma.Proteoform(
+            sequence="EMEVTSECSPEK",
+            modifications=[
+                proforma.Modification(
+                    mass=79.966331,
+                    position="unknown",
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:21",
+                            name="Phospho",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=15.994915,
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:35",
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=57.021464,
+                    position=7,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:01090",
+                            name="iodoacetamide derivatized amino-terminal "
+                            "residue",
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "<[MOD:01090]@C>[Acetyl]-EM[Oxidation]EVTSECSPEK"
+    ) == [
+        proforma.Proteoform(
+            sequence="EMEVTSECSPEK",
+            modifications=[
+                proforma.Modification(
+                    position="N-term",
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="Acetyl",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary=None,
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    position=7,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:01090",
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "<[MOD:01090]@C>[Acetyl]-EM[Oxidation]EVTSECSPEK", True
+    ) == [
+        proforma.Proteoform(
+            sequence="EMEVTSECSPEK",
+            modifications=[
+                proforma.Modification(
+                    mass=42.010565,
+                    position="N-term",
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:1",
+                            name="Acetyl",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=15.994915,
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:35",
+                            name="Oxidation",
+                        )
+                    ],
+                ),
+                proforma.Modification(
+                    mass=57.021464,
+                    position=7,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:01090",
+                            name="iodoacetamide derivatized amino-terminal "
+                            "residue",
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
+
+
+def test_proforma_ambiguous_sequence():
+    # FIXME
+    with pytest.raises(lark.exceptions.UnexpectedCharacters):
+        proforma.parse("(?DQ)NGTWEM[Oxidation]ESNENFEGYM[Oxidation]K", True)
+    with pytest.raises(lark.exceptions.UnexpectedCharacters):
+        proforma.parse("(?N)NGTWEM[Oxidation]ESNENFEGYM[Oxidation]K", True)
 
 
 def test_proforma_info():
@@ -3774,7 +4195,7 @@ def test_proforma_info():
         )
     ]
     assert proforma.parse(
-        "ELVIS[Phospho|INFO:newly discovered|" "INFO:really awesome]K"
+        "ELVIS[Phospho|INFO:newly discovered|INFO:really awesome]K"
     ) == [
         proforma.Proteoform(
             sequence="ELVISK",
@@ -3793,7 +4214,7 @@ def test_proforma_info():
         )
     ]
     assert proforma.parse(
-        "ELVIS[Phospho|INFO:newly discovered|" "INFO:really awesome]K", True
+        "ELVIS[Phospho|INFO:newly discovered|INFO:really awesome]K", True
     ) == [
         proforma.Proteoform(
             sequence="ELVISK",

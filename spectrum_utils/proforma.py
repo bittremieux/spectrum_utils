@@ -96,37 +96,37 @@ class Proteoform:
 
 # noinspection PyMethodMayBeStatic, PyPep8Naming
 class ProFormaTransformer(lark.Transformer):
-    sequence: List[str]
-    modifications: List[Modification]
-    global_modifications: Dict[str, List[Modification]]
-    range_pos: List[int]
+    _sequence: List[str]
+    _modifications: List[Modification]
+    _global_modifications: Dict[str, List[Modification]]
+    _range_pos: List[int]
 
     def __init__(self):
         super().__init__()
-        self.sequence, self.modifications = [], []
-        self.global_modifications = collections.defaultdict(list)
-        self.range_pos = []
+        self._sequence, self._modifications = [], []
+        self._global_modifications = collections.defaultdict(list)
+        self._range_pos = []
 
     def proforma(self, tree) -> List[Proteoform]:
         return [proteoform for proteoform in tree
                 if isinstance(proteoform, Proteoform)]
 
     def proteoform(self, tree) -> Proteoform:
-        sequence = ''.join(self.sequence)
+        sequence = ''.join(self._sequence)
         # Apply global modifications to the relevant residues.
         for i, aa in enumerate(sequence):
-            if aa in self.global_modifications:
-                for mod in self.global_modifications[aa]:
+            if aa in self._global_modifications:
+                for mod in self._global_modifications[aa]:
                     mod = copy.copy(mod)
                     mod.position = i
-                    self.modifications.append(mod)
+                    self._modifications.append(mod)
         charge = tree[-1] if len(tree) > 1 else None
         proteoform = Proteoform(sequence=sequence,
-                                modifications=self.modifications,
+                                modifications=self._modifications,
                                 charge=charge)
         # Reset class variables.
-        self.sequence, self.modifications = [], []
-        self.global_modifications = collections.defaultdict(list)
+        self._sequence, self._modifications = [], []
+        self._global_modifications = collections.defaultdict(list)
         return proteoform
 
     def peptide(self, _) -> None:
@@ -134,17 +134,17 @@ class ProFormaTransformer(lark.Transformer):
         pass
 
     def aa(self, tree) -> None:
-        position = len(self.sequence)
-        self.sequence.append(tree[0])
+        position = len(self._sequence)
+        self._sequence.append(tree[0])
         # An amino acid token can be followed by (i) a modification on that
         # residue, or (ii) a label (linking it to another modified residue).
         if len(tree) == 2:
             if isinstance(tree[1], Label):
-                self.modifications.append(
+                self._modifications.append(
                     Modification(position=position, label=tree[1]))
             else:
                 tree[1].position = position
-                self.modifications.append(tree[1])
+                self._modifications.append(tree[1])
 
     def AA(self, token) -> str:
         return token.value
@@ -152,12 +152,12 @@ class ProFormaTransformer(lark.Transformer):
     def mod_global(self, mods) -> None:
         if len(mods) == 1:
             # Global isotope.
-            self.modifications.append(Modification(
+            self._modifications.append(Modification(
                 position='global', source=[Formula(isotopes=mods)]))
         else:
             # Global modification on a specific residue.
             for aa in mods[1:]:
-                self.global_modifications[aa].append(mods[0])
+                self._global_modifications[aa].append(mods[0])
 
     def ISOTOPE(self, token) -> str:
         return token.value
@@ -166,12 +166,12 @@ class ProFormaTransformer(lark.Transformer):
         for mod in mods:
             if isinstance(mod, Modification):
                 mod.position = 'unknown'
-                self.modifications.append(mod)
+                self._modifications.append(mod)
             else:
                 # Modification count.
                 for _ in range(int(mod) - 1):
-                    self.modifications.append(
-                        copy.copy(self.modifications[-1]))
+                    self._modifications.append(
+                        copy.copy(self._modifications[-1]))
 
     def mod(self, mod_annotations) -> Modification:
         mod = Modification(source=[])
@@ -185,7 +185,7 @@ class ProFormaTransformer(lark.Transformer):
     def mod_labile(self, mod_annotations) -> None:
         mod = self.mod(mod_annotations)
         mod.position = 'labile'
-        self.modifications.append(mod)
+        self._modifications.append(mod)
 
     def MOD_COUNT(self, token) -> int:
         return int(token.value)
@@ -195,26 +195,26 @@ class ProFormaTransformer(lark.Transformer):
             if isinstance(mod, Label):
                 mod = Modification(label=mod)
             mod.position = 'N-term'
-            self.modifications.append(mod)
+            self._modifications.append(mod)
 
     def mod_c_term(self, mods) -> None:
         for mod in mods:
             if isinstance(mod, Label):
                 mod = Modification(label=mod)
             mod.position = 'C-term'
-            self.modifications.append(mod)
+            self._modifications.append(mod)
 
     def mod_range(self, tree) -> None:
         _, position, *mods = tree
         for mod in mods:
             mod.position = position
-            self.modifications.append(mod)
+            self._modifications.append(mod)
 
     def mod_range_pos(self, _) -> Tuple[int, int]:
-        return self.range_pos.pop(), len(self.sequence) - 1
+        return self._range_pos.pop(), len(self._sequence) - 1
 
     def MOD_RANGE_L(self, _) -> None:
-        self.range_pos.append(len(self.sequence))
+        self._range_pos.append(len(self._sequence))
 
     def mod_name(self, tree) -> CvEntry:
         cv, name = tree if len(tree) == 2 else (None, tree[0])

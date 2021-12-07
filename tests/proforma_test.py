@@ -4635,7 +4635,7 @@ def test_proforma_charge():
                     ],
                 ),
                 proforma.Modification(
-                    position='C-term',
+                    position="C-term",
                     source=[
                         proforma.CvEntry(
                             controlled_vocabulary="UNIMOD",
@@ -4701,7 +4701,7 @@ def test_proforma_charge():
                 ),
                 proforma.Modification(
                     mass=14.01565,
-                    position='C-term',
+                    position="C-term",
                     source=[
                         proforma.CvEntry(
                             controlled_vocabulary="UNIMOD",
@@ -4745,4 +4745,19 @@ def test_proforma_charge():
             modifications=[],
             charge=proforma.Charge(-1, [proforma.Ion("+e-")]),
         )
+    ]
+
+
+def test_proforma_chimeric():
+    assert proforma.parse("EMEVEESPEK/2+ELVISLIVER/3") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[],
+            charge=proforma.Charge(2),
+        ),
+        proforma.Proteoform(
+            sequence="ELVISLIVER",
+            modifications=[],
+            charge=proforma.Charge(3),
+        ),
     ]

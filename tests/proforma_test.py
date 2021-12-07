@@ -4111,7 +4111,7 @@ def test_proforma_global_modification():
 
 
 def test_proforma_ambiguous_sequence():
-    # FIXME
+    # FIXME: Support for amino acid sequence ambiguity.
     with pytest.raises(lark.exceptions.UnexpectedCharacters):
         proforma.parse("(?DQ)NGTWEM[Oxidation]ESNENFEGYM[Oxidation]K", True)
     with pytest.raises(lark.exceptions.UnexpectedCharacters):
@@ -4523,5 +4523,226 @@ def test_proforma_pipe():
                     ],
                 ),
             ],
+        )
+    ]
+
+
+def test_proforma_charge():
+    assert proforma.parse("EMEVEESPEK/2") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[],
+            charge=proforma.Charge(2),
+        )
+    ]
+    assert proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK/3") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[
+                proforma.Modification(
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="Oxidation",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="Phospho",
+                        ),
+                    ],
+                ),
+            ],
+            charge=proforma.Charge(3),
+        )
+    ]
+    assert proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK/3", True) == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[
+                proforma.Modification(
+                    mass=15.994915,
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:35",
+                            name="Oxidation",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    mass=79.966331,
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:21",
+                            name="Phospho",
+                        ),
+                    ],
+                ),
+            ],
+            charge=proforma.Charge(3),
+        )
+    ]
+    assert proforma.parse(
+        "[U:iTRAQ4plex]-EM[U:Oxidation]EVNES[U:Phospho]PEK[U:iTRAQ4plex]"
+        "-[U:Methyl]/3"
+    ) == [
+        proforma.Proteoform(
+            sequence="EMEVNESPEK",
+            modifications=[
+                proforma.Modification(
+                    position="N-term",
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="iTRAQ4plex",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="Oxidation",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="Phospho",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    position=9,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="iTRAQ4plex",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    position='C-term',
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            name="Methyl",
+                        ),
+                    ],
+                ),
+            ],
+            charge=proforma.Charge(3),
+        )
+    ]
+    assert proforma.parse(
+        "[U:iTRAQ4plex]-EM[U:Oxidation]EVNES[U:Phospho]PEK[U:iTRAQ4plex]"
+        "-[U:Methyl]/3",
+        True,
+    ) == [
+        proforma.Proteoform(
+            sequence="EMEVNESPEK",
+            modifications=[
+                proforma.Modification(
+                    mass=144.102063,
+                    position="N-term",
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:214",
+                            name="iTRAQ4plex",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    mass=15.994915,
+                    position=1,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:35",
+                            name="Oxidation",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    mass=79.966331,
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:21",
+                            name="Phospho",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    mass=144.102063,
+                    position=9,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:214",
+                            name="iTRAQ4plex",
+                        ),
+                    ],
+                ),
+                proforma.Modification(
+                    mass=14.01565,
+                    position='C-term',
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:34",
+                            name="Methyl",
+                        ),
+                    ],
+                ),
+            ],
+            charge=proforma.Charge(3),
+        )
+    ]
+    assert proforma.parse("EMEVEESPEK/2[+2Na+,+H+]") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[],
+            charge=proforma.Charge(
+                2, [proforma.Ion("+2Na+"), proforma.Ion("+H+")]
+            ),
+        )
+    ]
+    assert proforma.parse("EMEVEESPEK/1[+2Na+,-H+]") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[],
+            charge=proforma.Charge(
+                1, [proforma.Ion("+2Na+"), proforma.Ion("-H+")]
+            ),
+        )
+    ]
+    assert proforma.parse("EMEVEESPEK/-2[2I-]") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[],
+            charge=proforma.Charge(-2, [proforma.Ion("2I-")]),
+        )
+    ]
+    assert proforma.parse("EMEVEESPEK/-1[+e-]") == [
+        proforma.Proteoform(
+            sequence="EMEVEESPEK",
+            modifications=[],
+            charge=proforma.Charge(-1, [proforma.Ion("+e-")]),
         )
     ]

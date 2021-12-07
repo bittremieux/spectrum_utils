@@ -6,6 +6,7 @@ import json
 import os
 import pickle
 import urllib.request
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from urllib.error import URLError
@@ -349,6 +350,7 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     except lark.visitors.VisitError as e:
         raise e.orig_exc
     if resolve_mods:
+        cvs_no_prefix = set()
         for proteoform in proteoforms:
             for mod in proteoform.modifications:
                 if mod.source is None:
@@ -361,6 +363,7 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                                 try:
                                     source.controlled_vocabulary = cv
                                     mod.mass = _resolve_cv(source)
+                                    cvs_no_prefix.add(cv)
                                     break
                                 except KeyError:
                                     pass
@@ -376,6 +379,9 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                         mod.mass = _resolve_formula(source)
                     elif isinstance(source, Glycan):
                         mod.mass = _resolve_glycan(source)
+        if len(cvs_no_prefix) > 1:
+            warnings.warn('CVs should not be mixed for terms without a prefix',
+                          SyntaxWarning)
     return proteoforms
 
 

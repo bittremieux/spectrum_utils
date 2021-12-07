@@ -151,7 +151,7 @@ class ProFormaTransformer(lark.Transformer):
                 self._modifications.append(tree[1])
 
     def AA(self, token) -> str:
-        return token.value
+        return token.value.upper()
 
     def mod_global(self, mods) -> None:
         if len(mods) == 1:

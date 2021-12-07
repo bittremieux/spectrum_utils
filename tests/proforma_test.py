@@ -2833,6 +2833,30 @@ def test_proforma_special():
             ],
         )
     ]
+    # Example: N-terminal or first AA acetylation?
+    assert proforma.parse("[#g1]-K[Acetyl#g1]EMEVTSESPEK", True) == [
+        proforma.Proteoform(
+            sequence="KEMEVTSESPEK",
+            modifications=[
+                proforma.Modification(
+                    position="N-term",
+                    label=proforma.Label(proforma.LabelType.GENERAL, 'g1')
+                ),
+                proforma.Modification(
+                    mass=42.010565,
+                    position=0,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:1",
+                            name="Acetyl",
+                        )
+                    ],
+                    label=proforma.Label(proforma.LabelType.GENERAL, 'g1')
+                ),
+            ],
+        )
+    ]
 
 
 def test_proforma_ambiguous_position():

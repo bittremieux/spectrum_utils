@@ -7,7 +7,7 @@ import os
 import pickle
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from urllib.error import URLError
 
 import fastobo
@@ -100,12 +100,14 @@ class ProFormaTransformer(lark.Transformer):
     _modifications: List[Modification]
     _global_modifications: Dict[str, List[Modification]]
     _range_pos: List[int]
+    _preferred_labels = Set[str]
 
     def __init__(self):
         super().__init__()
         self._sequence, self._modifications = [], []
         self._global_modifications = collections.defaultdict(list)
         self._range_pos = []
+        self._preferred_labels = set()
 
     def proforma(self, tree) -> List[Proteoform]:
         return [proteoform for proteoform in tree
@@ -127,6 +129,7 @@ class ProFormaTransformer(lark.Transformer):
         # Reset class variables.
         self._sequence, self._modifications = [], []
         self._global_modifications = collections.defaultdict(list)
+        self._preferred_labels = set()
         return proteoform
 
     def peptide(self, _) -> None:
@@ -177,6 +180,12 @@ class ProFormaTransformer(lark.Transformer):
         mod = Modification(source=[])
         for mod_annotation in mod_annotations:
             if isinstance(mod_annotation, Label):
+                if mod_annotation.label in self._preferred_labels:
+                    raise ValueError(
+                        'There should only be a single preferred location per '
+                        'possible set of modification positions')
+                else:
+                    self._preferred_labels.add(mod_annotation.label)
                 mod.label = mod_annotation
             else:
                 mod.source.append(mod_annotation)
@@ -335,7 +344,10 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     with open(os.path.join(dir_name, 'proforma.ebnf')) as f_in:
         parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
                            lexer='dynamic_complete', import_paths=[dir_name])
-    proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+    try:
+        proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+    except lark.visitors.VisitError as e:
+        raise e.orig_exc
     if resolve_mods:
         for proteoform in proteoforms:
             for mod in proteoform.modifications:

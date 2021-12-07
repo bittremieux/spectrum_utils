@@ -3023,9 +3023,8 @@ def test_proforma_ambiguous_position():
             ],
         )
     ]
-    # FIXME: Make sure that all modification labels are unique.
-    # with pytest.raises(ValueError):
-    #     proforma.parse('EM[Oxidation]EVT[#g1]S[Phospho#g1]ES[Phospho#g1]PEK')
+    with pytest.raises(ValueError):
+        proforma.parse('EM[Oxidation]EVT[#g1]S[Phospho#g1]ES[Phospho#g1]PEK')
     # Ranges of modification positions.
     assert proforma.parse("PROT(EOSFORMS)[+19.0523]ISK") == [
         proforma.Proteoform(

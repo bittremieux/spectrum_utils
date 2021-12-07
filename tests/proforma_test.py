@@ -1631,6 +1631,192 @@ def test_proforma_xlink():
             ],
         )
     ]
+    assert proforma.parse("EVTSEKC[UNIMOD:374#XL1]LEMSC[#XL1]EFD") == [
+        proforma.Proteoform(
+            sequence="EVTSEKCLEMSCEFD",
+            modifications=[
+                proforma.Modification(
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:374",
+                        )
+                    ],
+                    label=proforma.Label(
+                        type=proforma.LabelType.XL, label="XL1"
+                    ),
+                ),
+                proforma.Modification(
+                    position=11,
+                    label=proforma.Label(
+                        type=proforma.LabelType.XL, label="XL1"
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse("EVTSEKC[UNIMOD:374#XL1]LEMSC[#XL1]EFD", True) == [
+        proforma.Proteoform(
+            sequence="EVTSEKCLEMSCEFD",
+            modifications=[
+                proforma.Modification(
+                    mass=-1.007825,
+                    position=6,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="UNIMOD",
+                            accession="UNIMOD:374",
+                            name="Dehydro",
+                        )
+                    ],
+                    label=proforma.Label(
+                        type=proforma.LabelType.XL, label="XL1"
+                    ),
+                ),
+                proforma.Modification(
+                    position=11,
+                    label=proforma.Label(
+                        type=proforma.LabelType.XL, label="XL1"
+                    ),
+                ),
+            ],
+        )
+    ]
+
+
+def test_proforma_branch():
+    assert proforma.parse("ETFGD[MOD:00093#BRANCH]//R[#BRANCH]ATER") == [
+        proforma.Proteoform(
+            sequence="ETFGD",
+            modifications=[
+                proforma.Modification(
+                    position=4,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:00093",
+                        )
+                    ],
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        ),
+        proforma.Proteoform(
+            sequence="RATER",
+            modifications=[
+                proforma.Modification(
+                    position=0,
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse("ETFGD[MOD:00093#BRANCH]//R[#BRANCH]ATER", True) == [
+        proforma.Proteoform(
+            sequence="ETFGD",
+            modifications=[
+                proforma.Modification(
+                    mass=-0.984016,
+                    position=4,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:00093",
+                            name="L-aspartic acid 1-amide",
+                        )
+                    ],
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        ),
+        proforma.Proteoform(
+            sequence="RATER",
+            modifications=[
+                proforma.Modification(
+                    position=0,
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "AVTKYTSSK[MOD:00134#BRANCH]//"
+        "AGKQLEDGRTLSDYNIQKESTLHLVLRLRG-[#BRANCH]"
+    ) == [
+        proforma.Proteoform(
+            sequence="AVTKYTSSK",
+            modifications=[
+                proforma.Modification(
+                    position=8,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:00134",
+                        )
+                    ],
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        ),
+        proforma.Proteoform(
+            sequence="AGKQLEDGRTLSDYNIQKESTLHLVLRLRG",
+            modifications=[
+                proforma.Modification(
+                    position='C-term',
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        )
+    ]
+    assert proforma.parse(
+        "AVTKYTSSK[MOD:00134#BRANCH]//"
+        "AGKQLEDGRTLSDYNIQKESTLHLVLRLRG-[#BRANCH]",
+        True
+    ) == [
+        proforma.Proteoform(
+            sequence="AVTKYTSSK",
+            modifications=[
+                proforma.Modification(
+                    mass=-18.010565,
+                    position=8,
+                    source=[
+                        proforma.CvEntry(
+                            controlled_vocabulary="MOD",
+                            accession="MOD:00134",
+                            name="N6-glycyl-L-lysine",
+                        )
+                    ],
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        ),
+        proforma.Proteoform(
+            sequence="AGKQLEDGRTLSDYNIQKESTLHLVLRLRG",
+            modifications=[
+                proforma.Modification(
+                    position='C-term',
+                    label=proforma.Label(
+                        type=proforma.LabelType.BRANCH, label="BRANCH"
+                    ),
+                ),
+            ],
+        )
+    ]
 
 
 def test_proforma_delta_mass():

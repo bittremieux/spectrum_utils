@@ -5,6 +5,7 @@
 %import common.SIGNED_INT
 %import common.SIGNED_NUMBER
 %import common.WS
+%import .monosaccharide.MONOSACCHARIDE
 
 // ProForma specification: https://github.com/HUPO-PSI/ProForma/
 // Version: June 29, 2021
@@ -51,13 +52,6 @@ FORMULA: (LETTER+ SIGNED_INT? WS?)+
 
 mod_glycan.5: "Glycan:" (monosaccharide WS?)+
 monosaccharide: MONOSACCHARIDE MONOSACCHARIDE_COUNT?
-// From: https://github.com/HUPO-PSI/ProForma/tree/master/monosaccharides
-// Version: September 13, 2020
-// Monosaccharides have to be specified in reversed order to support greedy parsing.
-MONOSACCHARIDE: "sulfate"i | "phosphate"i | "en,a-Hex"i | "d-Hex"i | "a-Hex"i
-    | "Tri"i | "Tet"i | "Sug"i | "Pen"i | "Oct"i | "Non"i | "Neu5Gc"i
-    | "Neu5Ac"i | "Neu"i | "HexS"i | "HexP"i | "HexNS"i | "HexNAc(S)"i
-    | "HexNAc"i | "HexN"i | "Hex"i | "Hep"i | "Fuc"i | "Dec"i
 MONOSACCHARIDE_COUNT: INT
 
 info.5: "Info:"i TEXT

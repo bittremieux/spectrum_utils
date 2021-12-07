@@ -2563,39 +2563,38 @@ def test_proforma_special():
             ],
         )
     ]
-    # FIXME: Support glycan synonyms.
-    # assert proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK') == [
-    #     proforma.Proteoform(
-    #         sequence='EMEVNESPEK',
-    #         modifications=[
-    #             proforma.Modification(
-    #                 position='labile',
-    #                 source=[proforma.Glycan(
-    #                     composition=[proforma.Monosaccharide('Hex', 1)])]),
-    #             proforma.Modification(
-    #                 position='labile',
-    #                 source=[proforma.Glycan(
-    #                     composition=[proforma.Monosaccharide('NeuAc', 1)])]),
-    #         ]
-    #     )
-    # ]
-    # assert proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK', True) == [
-    #     proforma.Proteoform(
-    #         sequence='EMEVNESPEK',
-    #         modifications=[
-    #             proforma.Modification(
-    #                 mass=162.052823418,
-    #                 position='labile',
-    #                 source=[proforma.Glycan(
-    #                     composition=[proforma.Monosaccharide('Hex', 1)])]),
-    #             proforma.Modification(
-    #                 mass=291.095416506,
-    #                 position='labile',
-    #                 source=[proforma.Glycan(
-    #                     composition=[proforma.Monosaccharide('NeuAc', 1)])]),
-    #         ]
-    #     )
-    # ]
+    assert proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK') == [
+        proforma.Proteoform(
+            sequence='EMEVNESPEK',
+            modifications=[
+                proforma.Modification(
+                    position='labile',
+                    source=[proforma.Glycan(
+                        composition=[proforma.Monosaccharide('Hex', 1)])]),
+                proforma.Modification(
+                    position='labile',
+                    source=[proforma.Glycan(
+                        composition=[proforma.Monosaccharide('NeuAc', 1)])]),
+            ]
+        )
+    ]
+    assert proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK', True) == [
+        proforma.Proteoform(
+            sequence='EMEVNESPEK',
+            modifications=[
+                proforma.Modification(
+                    mass=162.052823418,
+                    position='labile',
+                    source=[proforma.Glycan(
+                        composition=[proforma.Monosaccharide('Hex', 1)])]),
+                proforma.Modification(
+                    mass=291.095416506,
+                    position='labile',
+                    source=[proforma.Glycan(
+                        composition=[proforma.Monosaccharide('NeuAc', 1)])]),
+            ]
+        )
+    ]
 
 
 def test_proforma_ambiguous_position():

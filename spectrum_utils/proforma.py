@@ -331,39 +331,40 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     ValueError
         If no mass was specified for a GNO term or its parent terms.
     """
-    with open('spectrum_utils/proforma.ebnf') as f_in:
+    dir_name = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_name, 'proforma.ebnf')) as f_in:
         parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
-                           lexer='dynamic_complete')
-        proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
-        if resolve_mods:
-            for proteoform in proteoforms:
-                for mod in proteoform.modifications:
-                    if mod.source is None:
-                        # Only a label without a modification mass/source.
-                        continue
-                    for source in reversed(mod.source):
-                        if isinstance(source, CvEntry):
-                            if source.controlled_vocabulary is None:
-                                for cv in ('UNIMOD', 'MOD'):
-                                    try:
-                                        source.controlled_vocabulary = cv
-                                        mod.mass = _resolve_cv(source)
-                                        break
-                                    except KeyError:
-                                        pass
-                                else:
-                                    raise KeyError(
-                                        f'Term "{source.name}" not found in '
-                                        f'UNIMOD or PSI-MOD')
+                           lexer='dynamic_complete', import_paths=[dir_name])
+    proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+    if resolve_mods:
+        for proteoform in proteoforms:
+            for mod in proteoform.modifications:
+                if mod.source is None:
+                    # Only a label without a modification mass/source.
+                    continue
+                for source in reversed(mod.source):
+                    if isinstance(source, CvEntry):
+                        if source.controlled_vocabulary is None:
+                            for cv in ('UNIMOD', 'MOD'):
+                                try:
+                                    source.controlled_vocabulary = cv
+                                    mod.mass = _resolve_cv(source)
+                                    break
+                                except KeyError:
+                                    pass
                             else:
-                                mod.mass = _resolve_cv(source)
-                        elif isinstance(source, Mass):
-                            mod.mass = _resolve_mass(source)
-                        elif isinstance(source, Formula):
-                            mod.mass = _resolve_formula(source)
-                        elif isinstance(source, Glycan):
-                            mod.mass = _resolve_glycan(source)
-        return proteoforms
+                                raise KeyError(
+                                    f'Term "{source.name}" not found in '
+                                    f'UNIMOD or PSI-MOD')
+                        else:
+                            mod.mass = _resolve_cv(source)
+                    elif isinstance(source, Mass):
+                        mod.mass = _resolve_mass(source)
+                    elif isinstance(source, Formula):
+                        mod.mass = _resolve_formula(source)
+                    elif isinstance(source, Glycan):
+                        mod.mass = _resolve_glycan(source)
+    return proteoforms
 
 
 def _resolve_cv(cv_entry: CvEntry) -> float:
@@ -483,10 +484,14 @@ def _resolve_glycan(glycan: Glycan) -> float:
             if 400 <= response.getcode() < 600:
                 raise URLError('Failed to retrieve the monosaccharide '
                                'definitions from its online resource')
-            mono = json.loads(response.read().decode(
+            mono_json = json.loads(response.read().decode(
                 response.info().get_param('charset', 'utf-8')))
-        mono = {term['name']: float(term['has_monoisotopic_mass'])
-                for term in mono['terms'].values()}
+        mono = {}
+        for term in mono_json['terms'].values():
+            mass = float(term['has_monoisotopic_mass'])
+            mono[term['name']] = mass
+            for synonym in term.get('synonym', []):
+                mono[synonym] = mass
         _store_in_cache(cache_dir, 'mono.pkl', mono)
     return sum([mono[m.monosaccharide] * m.count for m in glycan.composition])
 

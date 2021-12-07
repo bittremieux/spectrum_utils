@@ -38,12 +38,12 @@ mod_range_pos: (aa | mod_range)+
 
 mod_name.2: ((CV_ABBREV ":") | (CV_ABBREV_OPT ":")?) TEXT
 CV_ABBREV_OPT: "U"i | "M"i
-CV_ABBREV: "U"i | "M"i | "R"i | "X"i | "G"i
+CV_ABBREV: "R"i | "X"i | "G"i
 
 mod_accession.5: CV_NAME ":" TEXT
 CV_NAME: "UNIMOD"i | "MOD"i | "RESID"i | "XLMOD"i | "GNO"i
 
-mod_mass.5: [(CV_ABBREV | MOD_MASS_OBS) ":"] MOD_MASS
+mod_mass.5: [(CV_ABBREV_OPT | CV_ABBREV | MOD_MASS_OBS) ":"] MOD_MASS
 MOD_MASS_OBS: "Obs"i
 MOD_MASS: ("+" | "-") NUMBER
 

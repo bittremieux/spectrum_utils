@@ -972,7 +972,7 @@ def test_proforma_xlink():
     ]
     # Inter-chain crosslinks.
     assert proforma.parse(
-        "SEK[XLMOD:02001#XL1]UENCE//" "EMEVTK[XLMOD:02001#XL1]SESPEK"
+        "SEK[XLMOD:02001#XL1]UENCE//EMEVTK[XLMOD:02001#XL1]SESPEK"
     ) == [
         proforma.Proteoform(
             sequence="SEKUENCE",
@@ -1952,6 +1952,7 @@ def test_proforma_formula():
             ],
         )
     ]
+    # FIXME: Add isotope support to Pyteomics.
     with pytest.raises(NotImplementedError):
         proforma.parse("SEQUEN[Formula:[13C2]CH6N]CE", True)
 
@@ -2563,36 +2564,52 @@ def test_proforma_special():
             ],
         )
     ]
-    assert proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK') == [
+    assert proforma.parse("{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK") == [
         proforma.Proteoform(
-            sequence='EMEVNESPEK',
+            sequence="EMEVNESPEK",
             modifications=[
                 proforma.Modification(
-                    position='labile',
-                    source=[proforma.Glycan(
-                        composition=[proforma.Monosaccharide('Hex', 1)])]),
+                    position="labile",
+                    source=[
+                        proforma.Glycan(
+                            composition=[proforma.Monosaccharide("Hex", 1)]
+                        )
+                    ],
+                ),
                 proforma.Modification(
-                    position='labile',
-                    source=[proforma.Glycan(
-                        composition=[proforma.Monosaccharide('NeuAc', 1)])]),
-            ]
+                    position="labile",
+                    source=[
+                        proforma.Glycan(
+                            composition=[proforma.Monosaccharide("NeuAc", 1)]
+                        )
+                    ],
+                ),
+            ],
         )
     ]
-    assert proforma.parse('{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK', True) == [
+    assert proforma.parse("{Glycan:Hex}{Glycan:NeuAc}EMEVNESPEK", True) == [
         proforma.Proteoform(
-            sequence='EMEVNESPEK',
+            sequence="EMEVNESPEK",
             modifications=[
                 proforma.Modification(
                     mass=162.052823418,
-                    position='labile',
-                    source=[proforma.Glycan(
-                        composition=[proforma.Monosaccharide('Hex', 1)])]),
+                    position="labile",
+                    source=[
+                        proforma.Glycan(
+                            composition=[proforma.Monosaccharide("Hex", 1)]
+                        )
+                    ],
+                ),
                 proforma.Modification(
                     mass=291.095416506,
-                    position='labile',
-                    source=[proforma.Glycan(
-                        composition=[proforma.Monosaccharide('NeuAc', 1)])]),
-            ]
+                    position="labile",
+                    source=[
+                        proforma.Glycan(
+                            composition=[proforma.Monosaccharide("NeuAc", 1)]
+                        )
+                    ],
+                ),
+            ],
         )
     ]
 
@@ -3024,7 +3041,7 @@ def test_proforma_ambiguous_position():
         )
     ]
     with pytest.raises(ValueError):
-        proforma.parse('EM[Oxidation]EVT[#g1]S[Phospho#g1]ES[Phospho#g1]PEK')
+        proforma.parse("EM[Oxidation]EVT[#g1]S[Phospho#g1]ES[Phospho#g1]PEK")
     # Ranges of modification positions.
     assert proforma.parse("PROT(EOSFORMS)[+19.0523]ISK") == [
         proforma.Proteoform(

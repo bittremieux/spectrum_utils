@@ -24,7 +24,9 @@ except ImportError:
 cache_dir = appdirs.user_cache_dir('spectrum_utils', False)
 
 
+# noinspection PyArgumentList
 LookupType = enum.Enum('LookupType', 'ACCESSION NAME MASS')
+# noinspection PyArgumentList
 LabelType = enum.Enum('LabelType', 'XL BRANCH GENERAL')
 
 
@@ -346,6 +348,7 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     with open(os.path.join(dir_name, 'proforma.ebnf')) as f_in:
         parser = lark.Lark(f_in.read(), start='proforma', parser='earley',
                            lexer='dynamic_complete', import_paths=[dir_name])
+    # noinspection PyUnresolvedReferences
     try:
         proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
     except lark.visitors.VisitError as e:

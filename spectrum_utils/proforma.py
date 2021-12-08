@@ -335,7 +335,7 @@ class Modification:
 @dataclass
 class Proteoform:
     sequence: str
-    modifications: List[Modification]
+    modifications: List[Modification] = None
     charge: Optional[Charge] = None
 
 
@@ -372,7 +372,11 @@ class ProFormaTransformer(lark.Transformer):
         charge = tree[-1] if len(tree) > 1 else None
         self._modifications.sort(key=_modification_sort_key)
         proteoform = Proteoform(
-            sequence=sequence, modifications=self._modifications, charge=charge
+            sequence=sequence,
+            modifications=self._modifications
+            if len(self._modifications) > 0
+            else None,
+            charge=charge,
         )
         # Reset class variables.
         self._sequence, self._modifications = [], []

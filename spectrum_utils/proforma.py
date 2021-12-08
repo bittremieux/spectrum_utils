@@ -4,10 +4,10 @@ import copy
 import enum
 import functools
 import json
+import math
 import os
 import pickle
 import urllib.request
-import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from urllib.error import URLError
@@ -44,8 +44,16 @@ class Charge:
 
 class ModificationSource(abc.ABC):
     @abc.abstractmethod
-    def mass(self):
-        return None
+    def mass(self) -> float:
+        """
+        Get the mass of the modification from its source.
+
+        Returns
+        -------
+        float
+            The modification mass.
+        """
+        return math.nan
 
 
 @dataclass
@@ -90,7 +98,7 @@ class CvEntry(ModificationSource):
 
     def mass(self) -> float:
         """
-        Return the mass of the modification term as defined in its CV.
+        Get the mass of the modification, as defined by its CV term.
 
         Returns
         -------
@@ -103,7 +111,7 @@ class CvEntry(ModificationSource):
 
     def _resolve(self) -> None:
         """
-        Resolve a term in its controlled vocabulary.
+        Resolve the term in its controlled vocabulary.
 
         Raises
         ------
@@ -169,7 +177,7 @@ class Mass(ModificationSource):
 
     def mass(self) -> float:
         """
-        Return the mass of the mass-based modification.
+        Get the mass of the modification.
 
         Returns
         -------
@@ -187,7 +195,7 @@ class Formula(ModificationSource):
 
     def mass(self) -> float:
         """
-        Calculate the mass of the molecular formula.
+        Get the mass of the modification, computed from its molecular formula.
 
         Returns
         -------
@@ -226,7 +234,7 @@ class Glycan(ModificationSource):
 
     def mass(self) -> float:
         """
-        Calculate the mass of the glycan based on its monosaccharide
+        Get the mass of the modification, computed from its monosaccharide
         composition.
 
         Returns
@@ -277,10 +285,37 @@ class Label:
 
 @dataclass
 class Modification:
-    mass: Optional[float] = None
-    position: Optional[Union[int, Tuple[int, int], str]] = None
+    mass: Optional[float]
+    position: Union[int, Tuple[int, int], str]
     source: List[ModificationSource] = None
     label: Optional[Label] = None
+    _mass: float = field(default=None, init=False, repr=False)
+    _position: Union[int, Tuple[int, int], str] = field(
+        default=None, init=False, repr=False)
+
+    @property
+    def mass(self) -> float:
+        if self._mass is None:
+            for source in self.source:
+                source_mass = source.mass()
+                if source_mass is not None and not math.isnan(source_mass):
+                    self._mass = source_mass
+                    break
+            else:
+                self._mass = None
+        return self._mass
+
+    @mass.setter
+    def mass(self, mass: float):
+        self._mass = mass
+
+    @property
+    def position(self) -> Union[int, Tuple[int, int], str]:
+        return self._position
+
+    @position.setter
+    def position(self, position: Union[int, Tuple[int, int], str]):
+        self._position = position
 
 
 @dataclass
@@ -511,10 +546,6 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
     ----------
     proforma : str
         The ProForma string.
-    resolve_mods : bool
-        Resolve modifications by retrieving the modification masses from the
-        corresponding controlled vocabularies or computing the masses from
-        the specified molecular or glycan compositions.
 
     Returns
     -------
@@ -541,43 +572,9 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
                            lexer='dynamic_complete', import_paths=[dir_name])
     # noinspection PyUnresolvedReferences
     try:
-        proteoforms = ProFormaTransformer().transform(parser.parse(proforma))
+        return ProFormaTransformer().transform(parser.parse(proforma))
     except lark.visitors.VisitError as e:
         raise e.orig_exc
-    if resolve_mods:
-        cvs_no_prefix = set()
-        for proteoform in proteoforms:
-            for mod in proteoform.modifications:
-                if mod.source is None:
-                    # Only a label without a modification mass/source.
-                    continue
-                for source in reversed(mod.source):
-                    if isinstance(source, CvEntry):
-                        if source.controlled_vocabulary is None:
-                            for cv in ('UNIMOD', 'MOD'):
-                                try:
-                                    source.controlled_vocabulary = cv
-                                    mod.mass = _resolve_cv(source)
-                                    cvs_no_prefix.add(cv)
-                                    break
-                                except KeyError:
-                                    pass
-                            else:
-                                raise KeyError(
-                                    f'Term "{source.name}" not found in '
-                                    f'UNIMOD or PSI-MOD')
-                        else:
-                            mod.mass = _resolve_cv(source)
-                    elif isinstance(source, Mass):
-                        mod.mass = _resolve_mass(source)
-                    elif isinstance(source, Formula):
-                        mod.mass = _resolve_formula(source)
-                    elif isinstance(source, Glycan):
-                        mod.mass = _resolve_glycan(source)
-        if len(cvs_no_prefix) > 1:
-            warnings.warn('CVs should not be mixed for terms without a prefix',
-                          SyntaxWarning)
-    return proteoforms
 
 
 @functools.lru_cache

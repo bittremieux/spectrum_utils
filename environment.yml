@@ -5,6 +5,7 @@ channels:
   - conda-forge
 dependencies:
   - altair
+  - appdirs
   - fastobo
   - lark-parser
   - matplotlib

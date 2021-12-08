@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from urllib.error import URLError
 
+import appdirs
 import fastobo
 import lark
 try:
@@ -20,7 +21,7 @@ except ImportError:
 
 
 # Set to None to disable caching.
-cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'spectrum_utils')
+cache_dir = appdirs.user_cache_dir('spectrum_utils', False)
 
 
 LookupType = enum.Enum('LookupType', 'ACCESSION NAME MASS')

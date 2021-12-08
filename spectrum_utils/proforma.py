@@ -337,8 +337,7 @@ class ProFormaTransformer(lark.Transformer):
         super().__init__()
         self._sequence, self._modifications = [], []
         self._global_modifications = collections.defaultdict(list)
-        self._range_pos = []
-        self._preferred_labels = set()
+        self._range_pos, self._preferred_labels = [], set()
 
     def proforma(self, tree) -> List[Proteoform]:
         return [proteoform for proteoform in tree
@@ -354,13 +353,14 @@ class ProFormaTransformer(lark.Transformer):
                     mod.position = i
                     self._modifications.append(mod)
         charge = tree[-1] if len(tree) > 1 else None
+        self._modifications.sort(key=_modification_sort_key)
         proteoform = Proteoform(sequence=sequence,
                                 modifications=self._modifications,
                                 charge=charge)
         # Reset class variables.
         self._sequence, self._modifications = [], []
         self._global_modifications = collections.defaultdict(list)
-        self._preferred_labels = set()
+        self._range_pos, self._preferred_labels = [], set()
         return proteoform
 
     def peptide(self, _) -> None:
@@ -468,7 +468,7 @@ class ProFormaTransformer(lark.Transformer):
                 'G': 'GNO'}[token.value.upper()]
 
     def mod_accession(self, tree) -> CvEntry:
-        return CvEntry(tree[0], f'{tree[0]}:{tree[1]}', None)
+        return CvEntry(tree[0], f'{tree[0]}:{tree[1]}')
 
     def CV_NAME(self, token) -> str:
         return token.value
@@ -534,7 +534,22 @@ class ProFormaTransformer(lark.Transformer):
         return token.value
 
 
-def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
+def _modification_sort_key(mod: Modification):
+    if isinstance(mod.position, int):
+        return mod.position
+    elif isinstance(mod.position, tuple):
+        return mod.position[0]
+    elif mod.position == 'N-term':
+        return -1
+    elif mod.position == 'C-term':
+        return math.inf
+    elif mod.position == 'labile':
+        return -2
+    elif mod.position == 'unknown':
+        return -3
+
+
+def parse(proforma: str) -> List[Proteoform]:
     """
     Parse a ProForma-encoded string.
 

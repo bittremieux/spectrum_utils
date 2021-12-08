@@ -1,3 +1,4 @@
+import abc
 import collections
 import copy
 import enum
@@ -7,7 +8,7 @@ import os
 import pickle
 import urllib.request
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from urllib.error import URLError
 
@@ -41,23 +42,175 @@ class Charge:
     ions: Optional[List[Ion]] = None
 
 
-@dataclass
-class CvEntry:
-    controlled_vocabulary: Optional[str]
-    accession: Optional[str] = None
-    name: Optional[str] = None
+class ModificationSource(abc.ABC):
+    @abc.abstractmethod
+    def mass(self):
+        return None
 
 
 @dataclass
-class Mass:
+class CvEntry(ModificationSource):
+    controlled_vocabulary: str
+    accession: str
+    name: str
+    _controlled_vocabulary: Optional[str] = field(init=False, repr=False)
+    _accession: Optional[str] = field(init=False, repr=False)
+    _name: Optional[str] = field(init=False, repr=False)
+    _mass: float = field(default=None, init=False, repr=False)
+
+    @property
+    def controlled_vocabulary(self) -> str:
+        if self._controlled_vocabulary is None:
+            self._resolve()
+        return self._controlled_vocabulary
+
+    @controlled_vocabulary.setter
+    def controlled_vocabulary(self, controlled_vocabulary: str):
+        self._controlled_vocabulary = controlled_vocabulary
+
+    @property
+    def accession(self) -> str:
+        if self._accession is None:
+            self._resolve()
+        return self._accession
+
+    @accession.setter
+    def accession(self, accession: str):
+        self._accession = accession
+
+    @property
+    def name(self) -> str:
+        if self._name is None:
+            self._resolve()
+        return self._name
+
+    @name.setter
+    def name(self, name: str):
+        self._name = name
+
+    def mass(self) -> float:
+        """
+        Return the mass of the modification term as defined in its CV.
+
+        Returns
+        -------
+        float
+            The modification mass.
+        """
+        if self._mass is None:
+            self._resolve()
+        return self._mass
+
+    def _resolve(self) -> None:
+        """
+        Resolve a term in its controlled vocabulary.
+
+        Raises
+        ------
+        KeyError
+            If the term was not found in its controlled vocabulary.
+        URLError
+            If the controlled vocabulary could not be retrieved from its online
+            resource.
+        ValueError
+            - If an unknown controlled vocabulary identifier is specified.
+            - If no mass was specified for a GNO term or its parent terms.
+        """
+        if self._controlled_vocabulary is None:
+            for cv in ('UNIMOD', 'MOD'):
+                try:
+                    self._controlled_vocabulary = cv
+                    self._read_from_cv()
+                    break
+                except KeyError:
+                    pass
+            else:
+                self._controlled_vocabulary = None
+                raise KeyError(
+                    f'Term "{self._name}" not found in UNIMOD or PSI-MOD')
+        else:
+            self._read_from_cv()
+
+    def _read_from_cv(self):
+        """
+        Read the term in its controlled vocabulary entry.
+
+        Raises
+        ------
+        KeyError
+            If the term was not found in its controlled vocabulary.
+        URLError
+            If the controlled vocabulary could not be retrieved from its online
+            resource.
+        ValueError
+            - If an unknown controlled vocabulary identifier is specified.
+            - If no mass was specified for a GNO term or its parent terms.
+        """
+        cv_by_accession, cv_by_name = _import_cv(
+            self._controlled_vocabulary, cache_dir)
+        key = lookup_type = None
+        try:
+            if self._accession is not None:
+                key, lookup_type = self._accession, 'accession'
+                self._mass, self._name = cv_by_accession[key]
+            elif self._name is not None:
+                key, lookup_type = self._name, 'name'
+                self._mass, self._accession = cv_by_name[key]
+        except KeyError:
+            raise KeyError(
+                f'Term {key} not found in the {self._controlled_vocabulary} '
+                f'controlled vocabulary by {lookup_type}')
+
+
+@dataclass
+class Mass(ModificationSource):
     mass: float
     controlled_vocabulary: Optional[str] = None
 
+    def mass(self) -> float:
+        """
+        Return the mass of the mass-based modification.
+
+        Returns
+        -------
+        float
+            The modification mass.
+        """
+        return self.mass
+
 
 @dataclass
-class Formula:
+class Formula(ModificationSource):
     formula: Optional[str] = None
     isotopes: Optional[List[str]] = None
+    _mass: float = field(default=None, init=False, repr=False)
+
+    def mass(self) -> float:
+        """
+        Calculate the mass of the molecular formula.
+
+        Returns
+        -------
+        float
+            The modification mass.
+
+        Raises
+        ------
+        NotImplementedError
+            Mass calculation using a molecular formula that contains isotopes
+            (not supported by Pyteomics mass calculation).
+        """
+        if self._mass is None:
+            if self.isotopes is not None:
+                # FIXME: Add isotope support to Pyteomics.
+                raise NotImplementedError(
+                    'Mass calculation of molecular formulas with isotopes is '
+                    'currently not supported')
+            # Make sure there are no spaces in the molecular formula (Pyteomics
+            # mass calculation can't handle those).
+            self._mass = pmass.calculate_mass(
+                formula=self.formula.replace(' ', ''))
+        return self._mass
 
 
 @dataclass
@@ -67,8 +220,47 @@ class Monosaccharide:
 
 
 @dataclass
-class Glycan:
+class Glycan(ModificationSource):
     composition: List[Monosaccharide]
+    _mass: float = field(default=None, init=False, repr=False)
+
+    def mass(self) -> float:
+        """
+        Calculate the mass of the glycan based on its monosaccharide
+        composition.
+
+        Returns
+        -------
+        float
+            The modification mass.
+
+        Raises
+        ------
+        URLError
+            If the monosaccharide definitions could not be retrieved from its
+            online resource.
+        """
+        if self._mass is None:
+            mono = _load_from_cache(cache_dir, 'mono.pkl')
+            if mono is None:
+                with urllib.request.urlopen(
+                        'https://raw.githubusercontent.com/HUPO-PSI/ProForma/'
+                        'master/monosaccharides/mono.obo.json') as response:
+                    if 400 <= response.getcode() < 600:
+                        raise URLError('Failed to retrieve the monosaccharide '
+                                       'definitions from its online resource')
+                    mono_json = json.loads(response.read().decode(
+                        response.info().get_param('charset', 'utf-8')))
+                mono = {}
+                for term in mono_json['terms'].values():
+                    mass = float(term['has_monoisotopic_mass'])
+                    mono[term['name']] = mass
+                    for synonym in term.get('synonym', []):
+                        mono[synonym] = mass
+                _store_in_cache(cache_dir, 'mono.pkl', mono)
+            self._mass = sum([mono[m.monosaccharide] * m.count
+                              for m in self.composition])
+        return self._mass
 
 
 @dataclass
@@ -87,7 +279,7 @@ class Label:
 class Modification:
     mass: Optional[float] = None
     position: Optional[Union[int, Tuple[int, int], str]] = None
-    source: List[Union[CvEntry, Mass, Formula, Glycan, Info]] = None
+    source: List[ModificationSource] = None
     label: Optional[Label] = None
 
 
@@ -231,7 +423,7 @@ class ProFormaTransformer(lark.Transformer):
 
     def mod_name(self, tree) -> CvEntry:
         cv, name = tree if len(tree) == 2 else (None, tree[0])
-        return CvEntry(controlled_vocabulary=cv, name=name)
+        return CvEntry(cv, None, name)
 
     def CV_ABBREV_OPT(self, token) -> str:
         return self.CV_ABBREV(token)
@@ -241,8 +433,7 @@ class ProFormaTransformer(lark.Transformer):
                 'G': 'GNO'}[token.value.upper()]
 
     def mod_accession(self, tree) -> CvEntry:
-        return CvEntry(controlled_vocabulary=tree[0],
-                       accession=f'{tree[0]}:{tree[1]}')
+        return CvEntry(tree[0], f'{tree[0]}:{tree[1]}', None)
 
     def CV_NAME(self, token) -> str:
         return token.value
@@ -387,135 +578,6 @@ def parse(proforma: str, resolve_mods: bool = False) -> List[Proteoform]:
             warnings.warn('CVs should not be mixed for terms without a prefix',
                           SyntaxWarning)
     return proteoforms
-
-
-def _resolve_cv(cv_entry: CvEntry) -> float:
-    """
-    Retrieve the modification mass from a controlled vocabulary entry.
-
-    Parameters
-    ----------
-    cv_entry : CvEntry
-        The CV entry whose modification mass will be retrieved.
-
-    Returns
-    -------
-    float
-        The modification mass.
-
-    Raises
-    ------
-    KeyError
-        If the term was not found in its controlled vocabulary.
-    URLError
-        If the controlled vocabulary could not be retrieved from its online
-        resource.
-    ValueError
-        - If an unknown controlled vocabulary identifier is specified.
-        - If no mass was specified for a GNO term or its parent terms.
-    """
-    cv_by_accession, cv_by_name = _import_cv(
-        cv_entry.controlled_vocabulary, cache_dir)
-    key = lookup_type = None
-    try:
-        if cv_entry.accession is not None:
-            key, lookup_type = cv_entry.accession, 'accession'
-            cv_entry.name = cv_by_accession[key][1]
-            return cv_by_accession[key][0]
-        elif cv_entry.name is not None:
-            key, lookup_type = cv_entry.name, 'name'
-            cv_entry.accession = cv_by_name[key][1]
-            return cv_by_name[key][0]
-    except KeyError:
-        raise KeyError(
-            f'Term {key} not found in the {cv_entry.controlled_vocabulary} '
-            f'controlled vocabulary by {lookup_type}')
-
-
-def _resolve_mass(mass: Mass) -> float:
-    """
-    Return the mass of a mass-based modification.
-
-    Parameters
-    ----------
-    mass : Mass
-        The mass-based modification.
-
-    Returns
-    -------
-    float
-        The modification mass.
-    """
-    return mass.mass
-
-
-def _resolve_formula(formula: Formula) -> float:
-    """
-    Calculate the mass of a molecular formula.
-
-    Parameters
-    ----------
-    formula : Formula
-        The molecular formula whose mass will be computed.
-
-    Returns
-    -------
-    float
-        The modification mass.
-
-    Raises
-    ------
-    NotImplementedError
-        Mass calculation using a molecular formula that contains isotopes (not
-        supported by Pyteomics mass calculation).
-    """
-    if formula.isotopes is not None:
-        # FIXME: Add isotope support to Pyteomics.
-        raise NotImplementedError('Mass calculation of molecular formulas with'
-                                  ' isotopes is currently not supported')
-    # Make sure there are no spaces in the molecular formula (Pyteomics mass
-    # calculation can't handle those).
-    return pmass.calculate_mass(formula=formula.formula.replace(' ', ''))
-
-
-def _resolve_glycan(glycan: Glycan) -> float:
-    """
-    Calculate the mass of a glycan based on its monosaccharide composition.
-
-    Parameters
-    ----------
-    glycan : Glycan
-        The glycan composition whose mass will be computed.
-
-    Returns
-    -------
-    float
-        The modification mass.
-
-    Raises
-    ------
-    URLError
-        If the monosaccharide definitions could not be retrieved from its
-        online resource.
-    """
-    mono = _load_from_cache(cache_dir, 'mono.pkl')
-    if mono is None:
-        with urllib.request.urlopen(
-                'https://raw.githubusercontent.com/HUPO-PSI/ProForma/master/'
-                'monosaccharides/mono.obo.json') as response:
-            if 400 <= response.getcode() < 600:
-                raise URLError('Failed to retrieve the monosaccharide '
-                               'definitions from its online resource')
-            mono_json = json.loads(response.read().decode(
-                response.info().get_param('charset', 'utf-8')))
-        mono = {}
-        for term in mono_json['terms'].values():
-            mass = float(term['has_monoisotopic_mass'])
-            mono[term['name']] = mass
-            for synonym in term.get('synonym', []):
-                mono[synonym] = mass
-        _store_in_cache(cache_dir, 'mono.pkl', mono)
-    return sum([mono[m.monosaccharide] * m.count for m in glycan.composition])
 
 
 @functools.lru_cache

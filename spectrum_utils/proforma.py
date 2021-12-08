@@ -57,20 +57,41 @@ class ModificationSource(abc.ABC):
         return math.nan
 
 
-@dataclass
 class CvEntry(ModificationSource):
     controlled_vocabulary: str
     accession: str
     name: str
-    _controlled_vocabulary: Optional[str] = field(init=False, repr=False)
-    _accession: Optional[str] = field(init=False, repr=False)
-    _name: Optional[str] = field(init=False, repr=False)
-    _mass: float = field(default=None, init=False, repr=False)
+
+    def __init__(
+        self,
+        controlled_vocabulary: Optional[str] = None,
+        accession: Optional[str] = None,
+        name: Optional[str] = None,
+    ):
+        super().__init__()
+        self._controlled_vocabulary = controlled_vocabulary
+        self._accession = accession
+        self._name = name
+        self._mass = None
+
+    def __repr__(self):
+        return (f"CvEntry(controlled_vocabulary={self.controlled_vocabulary}, "
+                f"accession={self.accession}, name={self.name})")
 
     @property
     def controlled_vocabulary(self) -> str:
         if self._controlled_vocabulary is None:
-            self._resolve()
+            for cv in ("UNIMOD", "MOD"):
+                try:
+                    self._read_from_cv(cv, name=self._name)
+                    self._controlled_vocabulary = cv
+                    break
+                except KeyError:
+                    pass
+            else:
+                raise KeyError(
+                    f'Term "{self._name}" not found in UNIMOD or PSI-MOD'
+                )
         return self._controlled_vocabulary
 
     @controlled_vocabulary.setter
@@ -80,7 +101,7 @@ class CvEntry(ModificationSource):
     @property
     def accession(self) -> str:
         if self._accession is None:
-            self._resolve()
+            self._read_from_cv(self.controlled_vocabulary, name=self._name)
         return self._accession
 
     @accession.setter
@@ -90,7 +111,9 @@ class CvEntry(ModificationSource):
     @property
     def name(self) -> str:
         if self._name is None:
-            self._resolve()
+            self._read_from_cv(
+                self.controlled_vocabulary, accession=self._accession
+            )
         return self._name
 
     @name.setter
@@ -107,44 +130,33 @@ class CvEntry(ModificationSource):
             The modification mass.
         """
         if self._mass is None:
-            self._resolve()
+            # Force resolving from the CV.
+            if self._accession is not None:
+                self._read_from_cv(
+                    self.controlled_vocabulary, accession=self._accession
+                )
+            elif self._name is not None:
+                self._read_from_cv(self.controlled_vocabulary, name=self._name)
         return self._mass
 
-    def _resolve(self) -> None:
-        """
-        Resolve the term in its controlled vocabulary.
-
-        Raises
-        ------
-        KeyError
-            If the term was not found in its controlled vocabulary.
-        URLError
-            If the controlled vocabulary could not be retrieved from its online
-            resource.
-        ValueError
-            - If an unknown controlled vocabulary identifier is specified.
-            - If no mass was specified for a GNO term or its parent terms.
-        """
-        if self._controlled_vocabulary is None:
-            for cv in ("UNIMOD", "MOD"):
-                try:
-                    self._controlled_vocabulary = cv
-                    self._read_from_cv()
-                    break
-                except KeyError:
-                    pass
-            else:
-                self._controlled_vocabulary = None
-                raise KeyError(
-                    f'Term "{self._name}" not found in UNIMOD or PSI-MOD'
-                )
-        else:
-            self._read_from_cv()
-
-    def _read_from_cv(self):
+    def _read_from_cv(
+        self,
+        cv: str,
+        accession: Optional[str] = None,
+        name: Optional[str] = None,
+    ):
         """
         Read the term in its controlled vocabulary entry.
 
+        Parameters
+        ----------
+        cv : str
+            The controlled vocabulary identifier.
+        accession : Optional[str]
+            The accession to query the CV. Set as `None` to query by name,
+        name : Optional[str]
+            The name to query the CV. Set as `None` to query by accession,
+
         Raises
         ------
         KeyError
@@ -156,21 +168,21 @@ class CvEntry(ModificationSource):
             - If an unknown controlled vocabulary identifier is specified.
             - If no mass was specified for a GNO term or its parent terms.
         """
-        cv_by_accession, cv_by_name = _import_cv(
-            self._controlled_vocabulary, cache_dir
-        )
-        key = lookup_type = None
+        cv_by_accession, cv_by_name = _import_cv(cv, cache_dir)
+        key, lookup_type = None, None
         try:
-            if self._accession is not None:
-                key, lookup_type = self._accession, "accession"
-                self._mass, self._name = cv_by_accession[key]
-            elif self._name is not None:
-                key, lookup_type = self._name, "name"
-                self._mass, self._accession = cv_by_name[key]
+            if accession is not None:
+                key, lookup_type = self.accession, "accession"
+                self._mass, self.name = cv_by_accession[key]
+            elif name is not None:
+                key, lookup_type = self.name, "name"
+                self._mass, self.accession = cv_by_name[key]
+            else:
+                raise ValueError("No name or accession given")
         except KeyError:
             raise KeyError(
-                f"Term {key} not found in the {self._controlled_vocabulary} "
-                f"controlled vocabulary by {lookup_type}"
+                f"Term {key} not found in the {cv} controlled vocabulary by "
+                f"{lookup_type}"
             )
 
 
@@ -296,40 +308,37 @@ class Label:
     score: Optional[float] = None
 
 
-@dataclass
 class Modification:
     mass: Optional[float]
     position: Union[int, Tuple[int, int], str]
     source: List[ModificationSource] = None
     label: Optional[Label] = None
-    _mass: Optional[float] = field(default=None, init=False, repr=False)
-    _position: Union[int, Tuple[int, int], str] = field(
-        default=None, init=False, repr=False
-    )
+    _mass: field(default=None, init=False, repr=False)
 
-    @property
-    def mass(self) -> float:
+    def __init__(
+            self,
+            mass: Optional[float] = None,
+            position: Optional[Union[int, Tuple[int, int], str]] = None,
+            source: Optional[List[ModificationSource]] = None,
+            label: Optional[Label] = None
+    ):
+        self.position = position
+        self.source = source
+        self.label = label
+        self._mass = mass
+
+    def __repr__(self):
+        return (f"Modification(mass={self._mass}, position={self.position}, "
+                f"source={self.source}, label={self.label})")
+
+    @functools.cached_property
+    def mass(self) -> Optional[float]:
         if self._mass is None:
             for source in self.source:
                 source_mass = source.mass()
                 if source_mass is not None and not math.isnan(source_mass):
                     self._mass = source_mass
-                    break
-            else:
-                self._mass = None
         return self._mass
-
-    @mass.setter
-    def mass(self, mass: float):
-        self._mass = mass
-
-    @property
-    def position(self) -> Union[int, Tuple[int, int], str]:
-        return self._position
-
-    @position.setter
-    def position(self, position: Union[int, Tuple[int, int], str]):
-        self._position = position
 
 
 @dataclass

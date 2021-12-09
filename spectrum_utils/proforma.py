@@ -333,18 +333,20 @@ class Modification:
 
     @functools.cached_property
     def mass(self) -> Optional[float]:
-        if self._mass is None:
+        if self._mass is None and self.source is not None:
             for source in self.source:
-                source_mass = source.mass()
-                if source_mass is not None and not math.isnan(source_mass):
-                    self._mass = source_mass
+                if isinstance(source, ModificationSource):
+                    source_mass = source.get_mass()
+                    if source_mass is not None and not math.isnan(source_mass):
+                        self._mass = source_mass
+                        break
         return self._mass
 
 
 @dataclass
 class Proteoform:
     sequence: str
-    modifications: List[Modification] = None
+    modifications: Optional[List[Modification]] = None
     charge: Optional[Charge] = None
 
 

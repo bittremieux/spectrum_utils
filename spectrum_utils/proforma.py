@@ -45,7 +45,7 @@ class Charge:
 
 class ModificationSource(abc.ABC):
     @abc.abstractmethod
-    def mass(self) -> float:
+    def get_mass(self) -> float:
         """
         Get the mass of the modification from its source.
 
@@ -120,7 +120,7 @@ class CvEntry(ModificationSource):
     def name(self, name: str):
         self._name = name
 
-    def mass(self) -> float:
+    def get_mass(self) -> float:
         """
         Get the mass of the modification, as defined by its CV term.
 
@@ -191,7 +191,7 @@ class Mass(ModificationSource):
     mass: float
     controlled_vocabulary: Optional[str] = None
 
-    def mass(self) -> float:
+    def get_mass(self) -> float:
         """
         Get the mass of the modification.
 
@@ -209,7 +209,7 @@ class Formula(ModificationSource):
     isotopes: Optional[List[str]] = None
     _mass: float = field(default=None, init=False, repr=False)
 
-    def mass(self) -> float:
+    def get_mass(self) -> float:
         """
         Get the mass of the modification, computed from its molecular formula.
 
@@ -250,7 +250,7 @@ class Glycan(ModificationSource):
     composition: List[Monosaccharide]
     _mass: float = field(default=None, init=False, repr=False)
 
-    def mass(self) -> float:
+    def get_mass(self) -> float:
         """
         Get the mass of the modification, computed from its monosaccharide
         composition.

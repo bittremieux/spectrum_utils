@@ -1,15 +1,27 @@
 import abc
 import collections
 import copy
+import datetime
 import enum
 import functools
 import json
 import math
 import os
 import pickle
+import re
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    BinaryIO,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Sequence,
+    Tuple,
+    Union,
+)
 from urllib.error import URLError
 
 import appdirs
@@ -75,8 +87,10 @@ class CvEntry(ModificationSource):
         self._mass = None
 
     def __repr__(self):
-        return (f"CvEntry(controlled_vocabulary={self.controlled_vocabulary}, "
-                f"accession={self.accession}, name={self.name})")
+        return (
+            f"CvEntry(controlled_vocabulary={self.controlled_vocabulary}, "
+            f"accession={self.accession}, name={self.name})"
+        )
 
     @property
     def controlled_vocabulary(self) -> str:
@@ -316,11 +330,11 @@ class Modification:
     _mass: field(default=None, init=False, repr=False)
 
     def __init__(
-            self,
-            mass: Optional[float] = None,
-            position: Optional[Union[int, Tuple[int, int], str]] = None,
-            source: Optional[List[ModificationSource]] = None,
-            label: Optional[Label] = None
+        self,
+        mass: Optional[float] = None,
+        position: Optional[Union[int, Tuple[int, int], str]] = None,
+        source: Optional[List[ModificationSource]] = None,
+        label: Optional[Label] = None,
     ):
         self.position = position
         self.source = source
@@ -328,8 +342,10 @@ class Modification:
         self._mass = mass
 
     def __repr__(self):
-        return (f"Modification(mass={self._mass}, position={self.position}, "
-                f"source={self.source}, label={self.label})")
+        return (
+            f"Modification(mass={self._mass}, position={self.position}, "
+            f"source={self.source}, label={self.label})"
+        )
 
     @functools.cached_property
     def mass(self) -> Optional[float]:
@@ -719,76 +735,129 @@ def _import_cv(
         )
     else:
         raise ValueError(f"Unknown controlled vocabulary: {cv_id}")
-    # Try to retrieve from the cache.
+
+    # Try to read the CV from the cache first.
     cv_cached = _load_from_cache(cache, f"{cv_id}.pkl")
     if cv_cached is not None:
-        return cv_cached
-    # Read from the online resource if not found in the cache.
-    cv_by_accession, cv_by_name, gno_graph = {}, {}, {}
+        cv, date_cache = cv_cached
+        # Check that the cached resource is up to date.
+        match = re.fullmatch(
+            r"^https://(?:raw\.githubusercontent|github)\.com/"
+            r"([^/]+)/([^/]+)/(?:master|releases/latest/download)/(.+)$",
+            url,
+        )
+        if match is not None:
+            owner_name, repo_name, filename = match.group(1, 2, 3)
+            with urllib.request.urlopen(
+                f"https://api.github.com/repos/{owner_name}/{repo_name}/"
+                f"commits?path={filename}&per_page=1&page=1"
+            ) as response:
+                if response.getcode() < 400:
+                    date_url = datetime.datetime.strptime(
+                        json.load(response)[0]["commit"]["author"]["date"],
+                        "%Y-%m-%dT%H:%M:%SZ",
+                    )
+                    if date_cache >= date_url:
+                        return cv
+        else:
+            # Just use the cached resource if we can't compare timestamps.
+            return cv
+
+    # If we're here it means that we should retrieve the CV from its URL.
     with urllib.request.urlopen(url) as response:
         if 400 <= response.getcode() < 600:
             raise URLError(
-                f"Failed to retrieve the {cv_id} controlled "
-                f"vocabulary from its online resource"
+                f"Failed to retrieve the {cv_id} resource from its URL"
             )
-        for frame in fastobo.load(response):
-            term_accession, term_name, term_mass = str(frame.id), None, None
-            if isinstance(frame, fastobo.term.TermFrame):
-                for clause in frame:
-                    if isinstance(clause, fastobo.term.NameClause):
-                        term_name = clause.name.strip()
-                        if cv_id == "GNO" and "molecular weight" in term_name:
-                            term_mass = float(
-                                term_name[
-                                    term_name.rindex("weight ")
-                                    + 7 : term_name.rindex(" Da")
-                                ]
-                            )
-                    elif cv_id == "RESID" and isinstance(
-                        clause, fastobo.term.DefClause
-                    ):
-                        for xref in clause.xrefs:
-                            if xref.id.prefix == "RESID":
-                                term_accession = str(xref.id)
-                                break
-                    elif isinstance(clause, fastobo.term.XrefClause):
-                        term_xref = clause.raw_value()
-                        if (
-                            cv_id == "UNIMOD"
-                            and "delta_mono_mass" in term_xref
-                        ) or (
-                            cv_id in ("MOD", "RESID")
-                            and "DiffMono" in term_xref
-                            and not term_xref.endswith('"none"')
-                        ):
-                            term_mass = float(
-                                term_xref[
-                                    term_xref.index('"')
-                                    + 1 : term_xref.rindex('"')
-                                ]
-                            )
-                    elif (
-                        cv_id == "XLMOD"
-                        and isinstance(
-                            clause, fastobo.term.PropertyValueClause
+        cv = _parse_obo(response, cv_id)
+    # Save to the cache if enabled.
+    _store_in_cache(cache, f"{cv_id}.pkl", (cv, datetime.datetime.utcnow()))
+    return cv
+
+
+def _parse_obo(
+    obo_fh: BinaryIO, cv_id: str
+) -> Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]:
+    """
+    Parse an OBO controlled vocabulary.
+
+    Supported OBO files are: UNIMOD, MOD (including RESID), XLMOD, GNO.
+
+    Parameters
+    ----------
+    obo_fh : BinaryIO
+        The OBO file handle.
+    cv_id : str
+        The controlled vocabulary identifier.
+
+    Returns
+    -------
+    Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]
+        A tuple with mappings (i) from term accession to modification mass and
+        term name, and (ii) from term name to modification mass and term
+        accession.
+
+    Raises
+    ------
+    ValueError
+        If no mass was specified for a GNO term or its parent terms.
+    """
+    cv_by_accession, cv_by_name, gno_graph = {}, {}, {}
+    for frame in fastobo.load(obo_fh):
+        term_accession, term_name, term_mass = str(frame.id), None, None
+        if isinstance(frame, fastobo.term.TermFrame):
+            for clause in frame:
+                if isinstance(clause, fastobo.term.NameClause):
+                    term_name = clause.name.strip()
+                    if cv_id == "GNO" and "molecular weight" in term_name:
+                        term_mass = float(
+                            term_name[
+                                term_name.rindex("weight ")
+                                + 7 : term_name.rindex(" Da")
+                            ]
                         )
-                        and (
-                            clause.property_value.relation.prefix
-                            == "monoIsotopicMass"
-                        )
-                    ):
-                        term_mass = float(clause.property_value.value)
-                    elif cv_id == "GNO" and isinstance(
-                        clause, fastobo.term.IsAClause
-                    ):
-                        gno_graph[term_accession] = term_name, str(clause.term)
-                if (
-                    term_accession.startswith(f"{cv_id}:")
-                    and term_mass is not None
+                elif cv_id == "RESID" and isinstance(
+                    clause, fastobo.term.DefClause
                 ):
-                    cv_by_accession[term_accession] = term_mass, term_name
-                    if term_name is not None:
-                        cv_by_name[term_name] = term_mass, term_accession
+                    for xref in clause.xrefs:
+                        if xref.id.prefix == "RESID":
+                            term_accession = str(xref.id)
+                            break
+                elif isinstance(clause, fastobo.term.XrefClause):
+                    term_xref = clause.raw_value()
+                    if (
+                        cv_id == "UNIMOD" and "delta_mono_mass" in term_xref
+                    ) or (
+                        cv_id in ("MOD", "RESID")
+                        and "DiffMono" in term_xref
+                        and not term_xref.endswith('"none"')
+                    ):
+                        term_mass = float(
+                            term_xref[
+                                term_xref.index('"')
+                                + 1 : term_xref.rindex('"')
+                            ]
+                        )
+                elif (
+                    cv_id == "XLMOD"
+                    and isinstance(clause, fastobo.term.PropertyValueClause)
+                    and (
+                        clause.property_value.relation.prefix
+                        == "monoIsotopicMass"
+                    )
+                ):
+                    term_mass = float(clause.property_value.value)
+                elif cv_id == "GNO" and isinstance(
+                    clause, fastobo.term.IsAClause
+                ):
+                    gno_graph[term_accession] = term_name, str(clause.term)
+            if (
+                term_accession.startswith(f"{cv_id}:")
+                and term_mass is not None
+            ):
+                cv_by_accession[term_accession] = term_mass, term_name
+                if term_name is not None:
+                    cv_by_name[term_name] = term_mass, term_accession
     if cv_id == "GNO":
         for term_accession, (term_name, parent_accession) in gno_graph.items():
             if term_accession in cv_by_accession:
@@ -805,15 +874,13 @@ def _import_cv(
                 parent_accession = grandparent_accession
             if parent_accession not in cv_by_accession:
                 raise ValueError(
-                    f"No mass found for term {term_accession}"
-                    f" in the GNO controlled vocabulary"
+                    f"No mass found for term {term_accession} in the GNO "
+                    f"controlled vocabulary"
                 )
             term_mass = cv_by_accession[parent_accession][0]
             for add_accession, add_name in terms:
                 cv_by_accession[add_accession] = term_mass, add_name
                 cv_by_name[add_name] = term_mass, add_accession
-    # Save to the cache if enabled.
-    _store_in_cache(cache, f"{cv_id}.pkl", (cv_by_accession, cv_by_name))
     return cv_by_accession, cv_by_name
 
 
@@ -862,13 +929,13 @@ def _load_from_cache(cache: Optional[str], filename: str) -> Optional[Any]:
     return None
 
 
-def clear_cache(res_ids: Optional[Tuple[str]] = None) -> None:
+def clear_cache(resource_ids: Optional[Sequence[str]] = None) -> None:
     """
-    Clear the cache of downloaded resources.
+    Clear the downloaded resources from the cache.
 
     Parameters
     ----------
-    res_ids : Optional[Tuple[str]]
+    resource_ids : Optional[Sequence[str]]
         Identifiers of the resources to remove from the cache. If None, all
         known files will be removed.
     """
@@ -876,9 +943,9 @@ def clear_cache(res_ids: Optional[Tuple[str]] = None) -> None:
     _import_cv.cache_clear()
     # Clear the on-disk cache.
     if cache_dir is not None:
-        if res_ids is None:
-            res_ids = ("UNIMOD", "MOD", "RESID", "XLMOD", "GNO", "mono")
-        for cv_id in res_ids:
+        if resource_ids is None:
+            resource_ids = ("UNIMOD", "MOD", "RESID", "XLMOD", "GNO", "mono")
+        for cv_id in resource_ids:
             filename = os.path.join(cache_dir, f"{cv_id}.pkl")
             if os.path.isfile(filename):
                 os.remove(filename)

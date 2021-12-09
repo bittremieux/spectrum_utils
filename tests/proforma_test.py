@@ -249,6 +249,21 @@ def test_proforma_name():
     ]
     with pytest.raises(KeyError):
         print(proteoform.modifications[0].mass)
+    # Trigger resolving via accession (instead of mass in the preceding tests).
+    proteoform = proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK")[0]
+    assert proteoform.sequence == "EMEVEESPEK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 2
+    )
+    assert (
+        proteoform.modifications[0].source[0].controlled_vocabulary == "UNIMOD"
+    )
+    assert proteoform.modifications[0].source[0].accession == "UNIMOD:35"
+    assert proteoform.modifications[0].source[0].name == "Oxidation"
+    assert proteoform.modifications[0].mass == 15.994915
+    assert proteoform.modifications[0].position == 1
+    assert proteoform.modifications[0].label is None
 
 
 # noinspection DuplicatedCode

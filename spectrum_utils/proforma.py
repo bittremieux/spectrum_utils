@@ -98,7 +98,7 @@ class CvEntry(ModificationSource):
             for cv in ("UNIMOD", "MOD"):
                 try:
                     self._read_from_cv(cv, name=self._name)
-                    self._controlled_vocabulary = cv
+                    self.controlled_vocabulary = cv
                     break
                 except KeyError:
                     pass

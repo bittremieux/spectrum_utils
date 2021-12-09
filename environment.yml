@@ -13,3 +13,4 @@ dependencies:
   - numpy
   - pandas
   - pyteomics
+  - python>=3.8

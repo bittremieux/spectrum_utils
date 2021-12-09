@@ -615,6 +615,8 @@ def _modification_sort_key(mod: Modification):
         return -2
     elif mod.position == "unknown":
         return -3
+    elif mod.position == "global":
+        return -4
 
 
 def parse(proforma: str) -> List[Proteoform]:

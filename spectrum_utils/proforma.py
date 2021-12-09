@@ -281,29 +281,7 @@ class Glycan(ModificationSource):
             online resource.
         """
         if self._mass is None:
-            mono = _load_from_cache(cache_dir, "mono.pkl")
-            if mono is None:
-                with urllib.request.urlopen(
-                    "https://raw.githubusercontent.com/HUPO-PSI/ProForma/"
-                    "master/monosaccharides/mono.obo.json"
-                ) as response:
-                    if 400 <= response.getcode() < 600:
-                        raise URLError(
-                            "Failed to retrieve the monosaccharide definitions"
-                            " from its online resource"
-                        )
-                    mono_json = json.loads(
-                        response.read().decode(
-                            response.info().get_param("charset", "utf-8")
-                        )
-                    )
-                mono = {}
-                for term in mono_json["terms"].values():
-                    mass = float(term["has_monoisotopic_mass"])
-                    mono[term["name"]] = mass
-                    for synonym in term.get("synonym", []):
-                        mono[synonym] = mass
-                _store_in_cache(cache_dir, "mono.pkl", mono)
+            mono = _import_cv("mono", cache_dir)
             self._mass = sum(
                 [mono[m.monosaccharide] * m.count for m in self.composition]
             )
@@ -686,7 +664,10 @@ def parse(proforma: str) -> List[Proteoform]:
 @functools.lru_cache
 def _import_cv(
     cv_id: str, cache: Optional[str]
-) -> Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]:
+) -> Union[
+    Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]],
+    Dict[str, float],
+]:
     """
     Import a ProForma controlled vocabulary from its online resource.
 
@@ -700,10 +681,17 @@ def _import_cv(
 
     Returns
     -------
-    Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]]
-        A tuple with mappings (i) from term accession to modification mass and
-        term name, and (ii) from term name to modification mass and term
-        accession.
+    Union[
+        Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]],
+        Dict[str, float],
+    ]
+        - For modification controlled vocabularies:
+          A tuple with mappings (i) from term accession to modification mass
+          and term name, and (ii) from term name to modification mass and term
+          accession.
+        - For the monosaccharide controlled vocabulary:
+          A dictionary with as keys the monosaccharide strings and as values
+          the corresponding masses.
 
     Raises
     ------
@@ -733,6 +721,11 @@ def _import_cv(
             "https://github.com/glygen-glycan-data/GNOme/releases/latest/"
             "download/GNOme.obo"
         )
+    elif cv_id == "mono":
+        url = (
+            "https://raw.githubusercontent.com/HUPO-PSI/ProForma/master/"
+            "monosaccharides/mono.obo.json"
+        )
     else:
         raise ValueError(f"Unknown controlled vocabulary: {cv_id}")
 
@@ -740,7 +733,7 @@ def _import_cv(
     cv_cached = _load_from_cache(cache, f"{cv_id}.pkl")
     if cv_cached is not None:
         cv, date_cache = cv_cached
-        # Check that the cached resource is up to date.
+        # Check that the cached CV is up to date.
         match = re.fullmatch(
             r"^https://(?:raw\.githubusercontent|github)\.com/"
             r"([^/]+)/([^/]+)/(?:master|releases/latest/download)/(.+)$",
@@ -760,16 +753,30 @@ def _import_cv(
                     if date_cache >= date_url:
                         return cv
         else:
-            # Just use the cached resource if we can't compare timestamps.
+            # Just use the cached CV if we can't compare timestamps.
             return cv
 
     # If we're here it means that we should retrieve the CV from its URL.
     with urllib.request.urlopen(url) as response:
         if 400 <= response.getcode() < 600:
             raise URLError(
-                f"Failed to retrieve the {cv_id} resource from its URL"
+                f"Failed to retrieve the {cv_id} controlled vocabulary from "
+                f"its URL"
             )
-        cv = _parse_obo(response, cv_id)
+        if cv_id in ("UNIMOD", "MOD", "RESID", "XLMOD", "GNO"):
+            cv = _parse_obo(response, cv_id)
+        elif cv_id == "mono":
+            mono_json = json.loads(
+                response.read().decode(
+                    response.info().get_param("charset", "utf-8")
+                )
+            )
+            cv = {}
+            for term in mono_json["terms"].values():
+                mass = float(term["has_monoisotopic_mass"])
+                cv[term["name"]] = mass
+                for synonym in term.get("synonym", []):
+                    cv[synonym] = mass
     # Save to the cache if enabled.
     _store_in_cache(cache, f"{cv_id}.pkl", (cv, datetime.datetime.utcnow()))
     return cv

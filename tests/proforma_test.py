@@ -1,3 +1,8 @@
+import os
+import shutil
+import unittest.mock
+from urllib.error import URLError
+
 import lark
 import pytest
 
@@ -2226,3 +2231,211 @@ def test_proforma_chimeric():
     assert proteoform.modifications is None
     assert proteoform.charge.charge == 3
     assert proteoform.charge.ions is None
+
+
+def test_proforma_urlerror():
+    # Connection error.
+    with unittest.mock.patch("http.client.HTTPResponse.getcode") as mocked_req:
+        mocked_req.return_value = 404
+        cache_dir = proforma.cache_dir
+        proforma.cache_dir = ".non_existing_cache"
+        proteoform = proforma.parse("SEQUEN[Glycan:HexNAc1Hex2]CE")[0]
+        with pytest.raises(URLError):
+            print(proteoform.modifications[0].mass)
+        shutil.rmtree(proforma.cache_dir, ignore_errors=True)
+        proforma.cache_dir = cache_dir
+
+
+# noinspection DuplicatedCode
+# noinspection PyUnresolvedReferences
+def test_proforma_cache():
+    cache_dir = ".cache_test"
+    cache_dir_original = proforma.cache_dir
+    shutil.rmtree(cache_dir, ignore_errors=True)
+    # Disable cache.
+    proforma.cache_dir = None
+    assert not os.path.isfile(os.path.join(cache_dir, "UNIMOD.pkl"))
+    proteoform = proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK")[0]
+    assert proteoform.sequence == "EMEVEESPEK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 2
+    )
+    assert proteoform.modifications[0].mass == 15.994915
+    assert proteoform.modifications[0].position == 1
+    assert (
+        proteoform.modifications[0].source[0].controlled_vocabulary == "UNIMOD"
+    )
+    assert proteoform.modifications[0].source[0].accession == "UNIMOD:35"
+    assert proteoform.modifications[0].source[0].name == "Oxidation"
+    assert proteoform.modifications[0].label is None
+    assert proteoform.modifications[1].mass == 79.966331
+    assert proteoform.modifications[1].position == 6
+    assert (
+        proteoform.modifications[1].source[0].controlled_vocabulary == "UNIMOD"
+    )
+    assert proteoform.modifications[1].source[0].accession == "UNIMOD:21"
+    assert proteoform.modifications[1].source[0].name == "Phospho"
+    assert proteoform.modifications[1].label is None
+    assert not os.path.isfile(os.path.join(cache_dir, "UNIMOD.pkl"))
+    # All controlled vocabularies (and monosaccharides) from scratch
+    # (without cache).
+    # UNIMOD
+    proteoform = proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK")[0]
+    assert proteoform.sequence == "EMEVEESPEK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 2
+    )
+    assert proteoform.modifications[0].mass == 15.994915
+    assert proteoform.modifications[0].position == 1
+    assert (
+        proteoform.modifications[0].source[0].controlled_vocabulary == "UNIMOD"
+    )
+    assert proteoform.modifications[0].source[0].accession == "UNIMOD:35"
+    assert proteoform.modifications[0].source[0].name == "Oxidation"
+    assert proteoform.modifications[0].label is None
+    assert proteoform.modifications[1].mass == 79.966331
+    assert proteoform.modifications[1].position == 6
+    assert (
+        proteoform.modifications[1].source[0].controlled_vocabulary == "UNIMOD"
+    )
+    assert proteoform.modifications[1].source[0].accession == "UNIMOD:21"
+    assert proteoform.modifications[1].source[0].name == "Phospho"
+    assert proteoform.modifications[1].label is None
+    # MOD
+    proteoform = proforma.parse(
+        "EM[M:L-methionine sulfoxide]EVEES[M:O-phospho-L-serine]PEK"
+    )[0]
+    assert proteoform.sequence == "EMEVEESPEK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 2
+    )
+    assert proteoform.modifications[0].mass == 15.994915
+    assert proteoform.modifications[0].position == 1
+    assert proteoform.modifications[0].source[0].controlled_vocabulary == "MOD"
+    assert proteoform.modifications[0].source[0].accession == "MOD:00719"
+    assert (
+        proteoform.modifications[0].source[0].name == "L-methionine sulfoxide"
+    )
+    assert proteoform.modifications[0].label is None
+    assert proteoform.modifications[1].mass == 79.966331
+    assert proteoform.modifications[1].position == 6
+    assert proteoform.modifications[1].source[0].controlled_vocabulary == "MOD"
+    assert proteoform.modifications[1].source[0].accession == "MOD:00046"
+    assert proteoform.modifications[1].source[0].name == "O-phospho-L-serine"
+    assert proteoform.modifications[1].label is None
+    # RESID
+    proteoform = proforma.parse(
+        "EM[R:L-methionine sulfone]EVEES[R:O-phospho-L-serine]PEK"
+    )[0]
+    assert proteoform.sequence == "EMEVEESPEK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 2
+    )
+    assert proteoform.modifications[0].mass == 31.989829
+    assert proteoform.modifications[0].position == 1
+    assert (
+        proteoform.modifications[0].source[0].controlled_vocabulary == "RESID"
+    )
+    assert proteoform.modifications[0].source[0].accession == "RESID:AA0251"
+    assert proteoform.modifications[0].source[0].name == "L-methionine sulfone"
+    assert proteoform.modifications[0].label is None
+    assert proteoform.modifications[1].mass == 79.966331
+    assert proteoform.modifications[1].position == 6
+    assert (
+        proteoform.modifications[1].source[0].controlled_vocabulary == "RESID"
+    )
+    assert proteoform.modifications[1].source[0].accession == "RESID:AA0037"
+    assert proteoform.modifications[1].source[0].name == "O-phospho-L-serine"
+    assert proteoform.modifications[1].label is None
+    # XLMOD
+    proteoform = proforma.parse("EMEVTK[X:DSS#XL1]SESPEK")[0]
+    assert proteoform.sequence == "EMEVTKSESPEK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 1
+    )
+    assert proteoform.modifications[0].mass == 138.06807961
+    assert proteoform.modifications[0].position == 5
+    assert (
+        proteoform.modifications[0].source[0].controlled_vocabulary == "XLMOD"
+    )
+    assert proteoform.modifications[0].source[0].accession == "XLMOD:02001"
+    assert proteoform.modifications[0].source[0].name == "DSS"
+    assert proteoform.modifications[0].label.type == proforma.LabelType.XL
+    assert proteoform.modifications[0].label.label == "XL1"
+    # GNO
+    proteoform = proforma.parse("NEEYN[G:G59626AS]K")[0]
+    assert proteoform.sequence == "NEEYNK"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 1
+    )
+    assert proteoform.modifications[0].mass == 1931.69
+    assert proteoform.modifications[0].position == 4
+    assert proteoform.modifications[0].source[0].controlled_vocabulary == "GNO"
+    assert proteoform.modifications[0].source[0].accession == "GNO:G59626AS"
+    assert proteoform.modifications[0].source[0].name == "G59626AS"
+    assert proteoform.modifications[0].label is None
+    # Monosaccharides
+    proteoform = proforma.parse("SEQUEN[Glycan:HexNAc1Hex2]CE")[0]
+    assert proteoform.sequence == "SEQUENCE"
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications) == 1
+    )
+    assert proteoform.modifications[0].mass == 527.185019356
+    assert proteoform.modifications[0].position == 5
+    assert (
+        proteoform.modifications is not None
+        and len(proteoform.modifications[0].source[0].composition) == 2
+    )
+    assert (
+        proteoform.modifications[0].source[0].composition[0].monosaccharide
+        == "HexNAc"
+    )
+    assert proteoform.modifications[0].source[0].composition[0].count == 1
+    assert (
+        proteoform.modifications[0].source[0].composition[1].monosaccharide
+        == "Hex"
+    )
+    assert proteoform.modifications[0].source[0].composition[1].count == 2
+    assert proteoform.modifications[0].label is None
+    # Enable cache.
+    proforma.cache_dir = cache_dir
+    assert not os.path.isfile(os.path.join(cache_dir, "UNIMOD.pkl"))
+    proteoform = proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK")[0]
+    assert proteoform.modifications[0].mass == 15.994915
+    assert os.path.isfile(os.path.join(cache_dir, "UNIMOD.pkl"))
+    # Clear cache.
+    proforma.clear_cache()
+    assert not os.path.isfile(os.path.join(cache_dir, "UNIMOD.pkl"))
+    proteoform = proforma.parse("EM[U:Oxidation]EVEES[U:Phospho]PEK")[0]
+    assert proteoform.modifications[0].mass == 15.994915
+    assert os.path.isfile(os.path.join(cache_dir, "UNIMOD.pkl"))
+    # Clean-up.
+    shutil.rmtree(cache_dir, ignore_errors=True)
+    proforma.cache_dir = cache_dir_original
+
+
+def test_proforma_import_cv():
+    # Existing CVs.
+    for cv_id in ("UNIMOD", "MOD", "RESID", "XLMOD", "GNO"):
+        cv_from_id, cv_from_name = proforma._import_cv(
+            cv_id, proforma.cache_dir
+        )
+        assert len(cv_from_id) > 0
+        assert len(cv_from_name) > 0
+    mono = proforma._import_cv("mono", proforma.cache_dir)
+    assert len(mono) > 0
+    # Non-existing CV.
+    with pytest.raises(ValueError):
+        proforma._import_cv("THUS_IS_NO_CV", proforma.cache_dir)
+    # Connection error.
+    with unittest.mock.patch("http.client.HTTPResponse.getcode") as mocked_req:
+        mocked_req.return_value = 404
+        with pytest.raises(URLError):
+            proforma._import_cv("UNIMOD", None)

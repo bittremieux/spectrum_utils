@@ -652,6 +652,67 @@ class MsmsSpectrum:
         self.retention_time = retention_time
         self.annotation = None
 
+    @classmethod
+    def from_usi(cls, usi: str, backend: str = 'aggregator', **kwargs) \
+            -> 'MsmsSpectrum':
+        """
+        Construct a spectrum from a public resource specified by its Universal
+        Spectrum Identifier (USI).
+
+        See the `Universal Spectrum Identifier (USI)
+        <https://psidev.info/usi>`_ specification by the Proteomics Standards
+        Initiative for more information on how to use USIs to refer to spectra.
+
+        See the `Pyteomics documentation
+        <https://pyteomics.readthedocs.io/en/latest/api/usi.html#pyteomics.usi.proxi>`_
+        for more details on the available PROXI backends.
+
+        Parameters
+        ----------
+        usi : str
+            The USI from which to generate the spectrum.
+        backend : str
+            PROXI host backend (default: 'aggregator').
+        kwargs
+            Extra arguments to construct the spectrum that might be missing
+            from the PROXI response (e.g. `precursor_mz` or `precursor_charge`)
+            and the PROXI backend (see the `pyteomics.usi.proxi`
+            documentation).
+
+        Returns
+        -------
+        MsmsSpectrum
+            The spectrum corresponding to the given USI
+
+        Raises
+        ------
+        ValueError
+            If the PROXI response does not contain information about the
+            precursor m/z or precursor charge. Explicit precursor m/z and
+            precursor charge values can be provided using the `precursor_mz`
+            and `precursor_charge` keyword arguments respectively.
+        """
+        spectrum_dict = pyteomics.usi.proxi(usi, backend, **kwargs)
+        for attr in spectrum_dict['attributes']:
+            if attr['accession'] in ('MS:1000827', 'MS:1000744', 'MS:1002234'):
+                kwargs['precursor_mz'] = float(attr['value'])
+                break
+        else:
+            if 'precursor_mz' not in kwargs:
+                raise ValueError('Unknown precursor m/z from USI. Specify the '
+                                 'precursor m/z directly.')
+        for attr in spectrum_dict['attributes']:
+            if attr['accession'] == 'MS:1000041':
+                kwargs['precursor_charge'] = int(attr['value'])
+                break
+        else:
+            if 'precursor_charge' not in kwargs:
+                raise ValueError('Unknown precursor charge from USI. Specify '
+                                 'the precursor charge directly.')
+        mz = spectrum_dict['m/z array']
+        intensity = spectrum_dict['intensity array']
+        return cls(identifier=usi, mz=mz, intensity=intensity, **kwargs)
+
     @property
     def mz(self) -> np.ndarray:
         """

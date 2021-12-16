@@ -27,13 +27,12 @@ aa_mass = {
 
 
 class FragmentAnnotation:
-
     def __init__(
         self,
         ion_type: str,
         neutral_loss: Optional[str] = None,
         isotope: int = 0,
-        charge: int = 1,
+        charge: int = 0,
         adduct: Optional[str] = None,
         calc_mz: float = None,
     ) -> None:
@@ -43,21 +42,41 @@ class FragmentAnnotation:
         This fragment annotation format is derived from the PSI peak
         interpretation specification:
         https://docs.google.com/document/d/1yEUNG4Ump6vnbMDs4iV4s3XISflmOkRAyqUuutcCG2w/edit?usp=sharing
+        Currently a simplified subset of this specification is supported.
+
+        Ion notations have the following format:
+
+        [ion type](neutral loss)(isotope)(charge)(adduct type)
+
+        Examples:
+
+        - "y4-H2O+2i^2[M+H+Na]" : Fragment annotation for a y4 ion, with a
+          water neutral loss, the second isotopic peak, charge 2, adduct
+          M+H+Na.
 
         Parameters
         ----------
         ion_type : str
-            Specifies the basic type of ion being described. Examples are
-            b ions, y ions, immonium ions, unfragmented precursor ions,
-            internal fragmentation ions, isobaric tag ions, etc.
+            Specifies the basic type of ion being described.
+            Possible prefixes are:
+
+            - "?": unknown ion
+            - "a", "b", "c", "x", "y", "z": corresponding peptide fragments
+            - "I": immonium ion
+            - "m": internal fragment ion
+            - "_": named compound
+            - "p": precursor ion
+            - "r": reporter ion (isobaric label)
+            - "f": chemical formula
         neutral_loss : str, optional
-            A string of 0 to n loss components, described by their molecular
-            formula. The default is no neutral loss.
+            A string of neutral loss(es), described by their molecular formula.
+            The default is no neutral loss.
         isotope : int, optional
             The isotope number above or below the monoisotope. The default is
             the monoisotopic peak (0).
         charge : int, optional
-            The charge of the fragment. The default is charge 1.
+            The charge of the fragment. The default is charge 0 (for unknown
+            ions).
         adduct : str, optional
             The adduct that ionized the fragment.
         calc_mz : float
@@ -71,7 +90,9 @@ class FragmentAnnotation:
             or charge != 0
             or adduct is not None
         ):
-            raise ValueError("Information specified for an unknown ion")
+            raise ValueError(
+                "No information should be specified for unknown ions"
+            )
         self.ion_type = ion_type
         self.neutral_loss = neutral_loss
         self.isotope = isotope
@@ -85,19 +106,18 @@ class FragmentAnnotation:
 
     def __repr__(self) -> str:
         if self.ion_type == "?":
-            ion = "?"
+            fragment_repr = "?"
         else:
-            ion = self.ion_type
+            fragment_repr = self.ion_type
             if self.neutral_loss is not None:
-                ion += f"{self.neutral_loss}"
+                fragment_repr += self.neutral_loss
             if self.isotope != 0:
-                ion += f"{self.isotope:+}i"
+                fragment_repr += f"{self.isotope:+}i"
             if self.charge > 1:
-                ion += f"^{self.charge}"
+                fragment_repr += f"^{self.charge}"
             if self.adduct is not None:
-                ion += self.adduct
-            return ion
-        return f"FragmentAnnotation({ion}, mz={self.calc_mz})"
+                fragment_repr += self.adduct
+        return f"FragmentAnnotation({fragment_repr}, mz={self.calc_mz})"
 
     def __str__(self) -> str:
         if self.ion_type == "?":
@@ -114,10 +134,9 @@ class FragmentAnnotation:
             return annotation
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FragmentAnnotation):
-            return False
-        else:
-            return str(self) == str(other)
+        return isinstance(other, FragmentAnnotation) and repr(self) == repr(
+            other
+        )
 
 
 def _get_theoretical_fragments(

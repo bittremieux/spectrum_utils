@@ -9,7 +9,7 @@ dependencies:
   - fastobo
   - lark-parser
   - matplotlib
-  - numba>=0.41
+  - numba>=0.47
   - numpy
   - pandas
   - pyteomics>=4.5

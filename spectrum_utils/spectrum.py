@@ -3,6 +3,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numba as nb
 import numpy as np
+import numpy.typing as npt
+import pyteomics.usi
 try:
     import pyteomics.cmass as pmass
 except ImportError:
@@ -219,13 +221,12 @@ def _get_theoretical_peptide_fragments(
     return sorted(ions, key=operator.attrgetter('calc_mz'))
 
 
-@nb.njit(nb.types.Tuple((nb.float32[:], nb.float32[:], nb.int64[:]))
-         (nb.float32[::1], nb.float32[::1]), cache=True)
+@nb.njit(cache=True)
 def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
-        -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        -> Tuple[np.ndarray, np.ndarray]:
     mz, intensity = mz.reshape(-1), intensity.reshape(-1)
     order = np.argsort(mz)
-    return mz[order], intensity[order], order
+    return mz[order], intensity[order]
 
 
 @nb.njit(cache=True)
@@ -792,13 +793,12 @@ class MsmsSpectrum:
 
         Returns
         -------
-        self : `MsmsSpectrum`
+        MsmsSpectrum
         """
-        self.mz, self.intensity, annotation_idx = _round(
-            self.mz, self.intensity, decimals, combine)
-        if self.annotation is not None:
-            self.annotation = self.annotation[annotation_idx]
-
+        self._mz, self._intensity, annotation_idx = _round(
+            self._mz, self._intensity, decimals, combine)
+        if self._annotation is not None:
+            self._annotation = self._annotation[annotation_idx]
         return self
 
     def set_mz_range(self, min_mz: Optional[float] = None,
@@ -818,28 +818,26 @@ class MsmsSpectrum:
 
         Returns
         -------
-        self : `MsmsSpectrum`
+        MsmsSpectrum
         """
         if min_mz is None and max_mz is None:
             return self
         else:
             if min_mz is None:
-                min_mz = self.mz[0]
+                min_mz = self._mz[0]
             if max_mz is None:
-                max_mz = self.mz[-1]
+                max_mz = self._mz[-1]
             if max_mz < min_mz:
                 min_mz, max_mz = max_mz, min_mz
-
-        mz_range_mask = _get_mz_range_mask(self.mz, min_mz, max_mz)
-        self.mz = self.mz[mz_range_mask]
-        self.intensity = self.intensity[mz_range_mask]
-        if self.annotation is not None:
-            self.annotation = self.annotation[mz_range_mask]
-
+        mz_range_mask = _get_mz_range_mask(self._mz, min_mz, max_mz)
+        self._mz = self._mz[mz_range_mask]
+        self._intensity = self._intensity[mz_range_mask]
+        if self._annotation is not None:
+            self._annotation = self._annotation[mz_range_mask]
         return self
 
     def remove_precursor_peak(self, fragment_tol_mass: float,
-                              fragment_tol_mode: str, isotope: int = 0)\
+                              fragment_tol_mode: str, isotope: int = 0) \
             -> 'MsmsSpectrum':
         """
         Remove fragment peak(s) close to the precursor mass-to-charge ratio.
@@ -857,21 +855,21 @@ class MsmsSpectrum:
 
         Returns
         -------
-        self : `MsmsSpectrum`
+        MsmsSpectrum
         """
-        pep_mass = (self.precursor_mz - 1.0072766) * self.precursor_charge
+        # FIXME: This assumes M+xH charged ions.
+        neutral_mass = (self.precursor_mz - 1.0072766) * self.precursor_charge
         peak_mask = _get_non_precursor_peak_mask(
-            self.mz, pep_mass, self.precursor_charge, isotope,
+            self._mz, neutral_mass, self.precursor_charge, isotope,
             fragment_tol_mass, fragment_tol_mode)
-        self.mz = self.mz[peak_mask]
-        self.intensity = self.intensity[peak_mask]
-        if self.annotation is not None:
-            self.annotation = self.annotation[peak_mask]
-
+        self._mz = self.mz[peak_mask]
+        self._intensity = self.intensity[peak_mask]
+        if self._annotation is not None:
+            self._annotation = self._annotation[peak_mask]
         return self
 
     def filter_intensity(self, min_intensity: float = 0.0,
-                         max_num_peaks: Optional[int] = None)\
+                         max_num_peaks: Optional[int] = None) \
             -> 'MsmsSpectrum':
         """
         Remove low-intensity fragment peaks.
@@ -892,17 +890,16 @@ class MsmsSpectrum:
 
         Returns
         -------
-        self : `MsmsSpectrum`
+        MsmsSpectrum
         """
         if max_num_peaks is None:
-            max_num_peaks = len(self.intensity)
+            max_num_peaks = len(self._intensity)
         intensity_mask = _get_filter_intensity_mask(
-            self.intensity, min_intensity, max_num_peaks)
-        self.mz = self.mz[intensity_mask]
-        self.intensity = self.intensity[intensity_mask]
-        if self.annotation is not None:
-            self.annotation = self.annotation[intensity_mask]
-
+            self._intensity, min_intensity, max_num_peaks)
+        self._mz = self._mz[intensity_mask]
+        self._intensity = self._intensity[intensity_mask]
+        if self._annotation is not None:
+            self._annotation = self._annotation[intensity_mask]
         return self
 
     def scale_intensity(self, scaling: Optional[str] = None,
@@ -942,28 +939,26 @@ class MsmsSpectrum:
 
         Returns
         -------
-        self : `MsmsSpectrum`
+        MsmsSpectrum
         """
         if scaling == 'root':
-            self.intensity = _get_scaled_intensity_root(
-                self.intensity, kwargs.get('degree', 2))
+            self._intensity = _get_scaled_intensity_root(
+                self._intensity, kwargs.get('degree', 2))
         elif scaling == 'log':
-            self.intensity = _get_scaled_intensity_log(
-                self.intensity, kwargs.get('base', 2))
+            self._intensity = _get_scaled_intensity_log(
+                self._intensity, kwargs.get('base', 2))
         elif scaling == 'rank':
-            max_rank = kwargs.get('max_rank', len(self.intensity))
-            if max_rank < len(self.intensity):
+            max_rank = kwargs.get('max_rank', len(self._intensity))
+            if max_rank < len(self._intensity):
                 raise ValueError('`max_rank` should be greater than or equal '
                                  'to the number of peaks in the spectrum. See '
                                  '`filter_intensity` to reduce the number of '
                                  'peaks in the spectrum.')
-            self.intensity = _get_scaled_intensity_rank(
-                self.intensity, max_rank)
-
+            self._intensity = _get_scaled_intensity_rank(
+                self._intensity, max_rank)
         if max_intensity is not None:
-            self.intensity = _scale_intensity_max(
-                self.intensity, max_intensity)
-
+            self._intensity = _scale_intensity_max(
+                self._intensity, max_intensity)
         return self
 
     def annotate_peaks(self, *args, **kwargs):

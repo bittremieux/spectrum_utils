@@ -616,7 +616,9 @@ class MsmsSpectrum:
                  precursor_charge: int,
                  mz: Union[np.ndarray, Iterable],
                  intensity: Union[np.ndarray, Iterable],
-                 retention_time: Optional[float] = None) -> None:
+                 retention_time: Optional[float] = None,
+                 mz_dtype: npt.DTypeLike = np.float64,
+                 intensity_dtype: npt.DTypeLike = np.float32) -> None:
         """
         Instantiate a new `MsmsSpectrum` consisting of fragment peaks.
 
@@ -624,7 +626,7 @@ class MsmsSpectrum:
         ----------
         identifier : str
             Spectrum identifier. It is recommended to use a unique and
-            interpretable identifier, such as a `universal spectrum identifier
+            interpretable identifier, such as a `Universal Spectrum Identifier
             (USI) <https://psidev.info/usi>`_ as defined by the Proteomics
             Standards Initiative.
         precursor_mz : float
@@ -638,6 +640,10 @@ class MsmsSpectrum:
         retention_time : Optional[float], optional
             Retention time at which the spectrum was acquired (the default is
             None, which indicates that retention time is unspecified/unknown).
+        mz_dtype : npt.DTypeLike
+            The dtype of the m/z values (the default is float64).
+        intensity_dtype : npt.DTypeLike
+            The dtype of the intensity values (the default is float32).
         """
         self.identifier = identifier
         self.precursor_mz = precursor_mz
@@ -646,11 +652,10 @@ class MsmsSpectrum:
             raise ValueError('The mass-to-charge and intensity arrays should '
                              'have equal lengths')
         self._mz, self._intensity = _init_spectrum(
-            np.require(mz, np.float32, 'W'),
-            np.require(intensity, np.float32, 'W'))
+            np.require(mz, mz_dtype, 'W'),
+            np.require(intensity, intensity_dtype, 'W'))
         self._annotation = None
         self.retention_time = retention_time
-        self.annotation = None
 
     @classmethod
     def from_usi(cls, usi: str, backend: str = 'aggregator', **kwargs) \

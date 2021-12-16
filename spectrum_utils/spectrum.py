@@ -317,7 +317,9 @@ def _round(
         for i_unique in range(len(mz_unique)):
             # Check whether subsequent mz values got merged.
             while (
-                abs(mz_unique[i_unique] - mz_round[i_orig + offset]) <= 1e-06
+                i_orig + offset < len(mz_round)
+                and abs(mz_unique[i_unique] - mz_round[i_orig + offset])
+                <= 1e-06
             ):
                 offset += 1
             # Select the annotation of the most intense peak.

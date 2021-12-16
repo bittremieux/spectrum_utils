@@ -140,8 +140,7 @@ class FragmentAnnotation:
 
 
 def _get_theoretical_fragments(
-    sequence: str,
-    modifications: Optional[List[proforma.Modification]] = None,
+    proteoform: proforma.Proteoform,
     fragment_types: str = "by",
     max_charge: int = 1,
     neutral_losses: Optional[Dict[Optional[str], float]] = None,
@@ -151,13 +150,8 @@ def _get_theoretical_fragments(
 
     Parameters
     ----------
-    sequence : str
-        The sequence for which the fragment annotations will be generated.
-    modifications : Optional[List[proforma.Modification]], optional
-        # FIXME
-        Mapping of modification positions and mass differences. Valid positions
-        are any amino acid index in the peptide (0-based), 'N-term', and
-        'C-term'.
+    proteoform : proforma.Proteoform
+        The proteoform for which the fragment annotations will be generated.
     fragment_types : str, optional
         The peptide fragment type. Can be any combination of 'a', 'b', 'c',
         'x', 'y', and 'z' (the default is 'by', which means that b-ions and
@@ -174,28 +168,16 @@ def _get_theoretical_fragments(
     List[FragmentAnnotation]
         A list of all theoretical fragments in ascending m/z order.
     """
-    if "B" in sequence:
+    if "B" in proteoform.sequence:
         raise ValueError(
             "Explicitly specify aspartic acid (D) or asparagine (N) instead of"
             " the ambiguous B to compute the fragment annotations"
         )
-    if "Z" in sequence:
+    if "Z" in proteoform.sequence:
         raise ValueError(
             "Explicitly specify glutamic acid (E) or glutamine (Q) instead of "
             "the ambiguous Z to compute the fragment annotations"
         )
-
-    # FIXME
-    # if modifications is not None:
-    #     mods = modifications.copy()
-    #     if 'N-term' in modifications:
-    #         mods[-1] = mods['N-term']
-    #         del mods['N-term']
-    #     if 'C-term' in modifications:
-    #         mods[len(sequence) + 1] = mods['C-term']
-    #         del mods['C-term']
-    # else:
-    #     mods = {}
 
     neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
     fragments = []
@@ -204,24 +186,38 @@ def _get_theoretical_fragments(
     # if sequence == 'X':
     #     return [FragmentAnnotation('?', calc_mz=modifications[0])]
     # Get all possible peptide fragments.
-    for i in range(1, len(sequence)):
+    for i in range(1, len(proteoform.sequence)):
         for fragment_type in fragment_types:
             # N-terminal fragment.
             if fragment_type in "abc":
                 fragment_index = i
-                fragment_sequence = sequence[:i]
+                fragment_sequence = proteoform.sequence[:i]
                 mod_mass = sum(
-                    [mod.mass for mod in modifications if mod.position < i]
+                    [
+                        mod.mass
+                        for mod in proteoform.modifications
+                        if (isinstance(mod.position, int) and mod.position < i)
+                        or mod.position == "N-term"
+                    ]
                 )
             # C-terminal fragment.
             elif fragment_type in "xyz":
-                fragment_index = len(sequence) - i
-                fragment_sequence = sequence[i:]
+                fragment_index = len(proteoform.sequence) - i
+                fragment_sequence = proteoform.sequence[i:]
                 mod_mass = sum(
-                    [mod.mass for mod in modifications if mod.position >= i]
+                    [
+                        mod.mass
+                        for mod in proteoform.modifications
+                        if (
+                            isinstance(mod.position, int) and mod.position >= i
+                        )
+                        or mod.position == "C-term"
+                    ]
                 )
             else:
-                raise ValueError(f"Unknown ion type: {fragment_type}")
+                raise ValueError(
+                    f"Unknown/unsupported ion type: {fragment_type}"
+                )
             for charge in range(1, max_charge + 1):
                 for nl_name, nl_mass in neutral_losses.items():
                     nl_name = (
@@ -1118,8 +1114,7 @@ class MsmsSpectrum:
         for proteoform in proforma.parse(self.proforma):
             # TODO: Only localized modifications or all of them? Check.
             theoretical_fragments = _get_theoretical_fragments(
-                proteoform.sequence,
-                proteoform.modifications,
+                proteoform,
                 ion_types,
                 max_ion_charge,
                 neutral_losses,

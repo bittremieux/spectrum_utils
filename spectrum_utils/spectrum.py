@@ -19,10 +19,10 @@ aa_mass = {
     **pmass.std_aa_mass,
     # "B": 0,             # aspartic acid / asparagine (ambiguous mass)
     # "Z": 0,             # glutamic acid / glutamine (ambiguous mass)
-    "J": 113.08406,       # leucine / isoleucine
+    "J": 113.08406,  # leucine / isoleucine
     # "U": 150.95363,     # selenocysteine (in Pyteomics)
     # "O": 237.14772,     # pyrrolysine (in Pyteomics)
-    "X": 0,               # any amino acid, gaps (zero mass)
+    "X": 0,  # any amino acid, gaps (zero mass)
 }
 
 
@@ -247,6 +247,22 @@ def _get_theoretical_fragments(
 def _init_spectrum(
     mz: np.ndarray, intensity: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Make sure the mass-to-charge ratios and intensity values are
+    one-dimensional NumPy arrays, sorted by m/z.
+
+    Parameters
+    ----------
+    mz : np.ndarray
+        Mass-to-charge ratios of the fragment peaks.
+    intensity : np.ndarray
+        Intensities of the corresponding fragment peaks in `mz`.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        The processed mass-to-charge ratio and intensity arrays.
+    """
     mz, intensity = mz.reshape(-1), intensity.reshape(-1)
     order = np.argsort(mz)
     return mz[order], intensity[order]
@@ -257,6 +273,8 @@ def _round(
     mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
+    Round the mass-to-charge ratios to the given number of decimals.
+
     JIT helper function for `MsmsSpectrum.round`.
 
     Parameters
@@ -278,14 +296,14 @@ def _round(
     """
     mz_round = np.round_(mz, decimals, np.empty_like(mz, np.float32))
     mz_unique = np.unique(mz_round)
+    if len(mz_unique) == len(mz_round):
+        return mz_unique, intensity, np.arange(len(mz))
     # If peaks got merged by rounding the mass-to-charge ratios we need to
     # combine their intensities and annotations as well.
-    if len(mz_unique) < len(mz_round):
+    else:
         intensity_unique = np.zeros_like(mz_unique, np.float32)
         annotations_unique_idx = np.zeros_like(mz_unique, np.int64)
-        combine_is_sum = combine == "sum"
-        i_orig = 0
-        offset = 0
+        i_orig = offset = 0
         for i_unique in range(len(mz_unique)):
             # Check whether subsequent mz values got merged.
             while (
@@ -293,29 +311,32 @@ def _round(
             ):
                 offset += 1
             # Select the annotation of the most intense peak.
+            # TODO: Combine both annotations instead when `FragmentAnnotation`
+            #       supports multiple annotations.
             annotations_unique_idx[i_unique] = i_orig + np.argmax(
                 intensity[i_orig : i_orig + offset]
             )
             # Combine the corresponding intensities.
             intensity_unique[i_unique] = (
                 intensity[i_orig : i_orig + offset].sum()
-                if combine_is_sum
+                if combine == "sum"
                 else intensity[annotations_unique_idx[i_unique]]
             )
-
             i_orig += offset
             offset = 0
-
         return mz_unique, intensity_unique, annotations_unique_idx
-    else:
-        return mz_unique, intensity, np.arange(len(mz))
 
 
 @nb.njit(cache=True)
 def _get_mz_range_mask(
     mz: np.ndarray, min_mz: float, max_mz: float
-) -> np.ndarray:
+) -> Tuple[int, int]:
     """
+    Get the indexes to include all peaks between the given minimum and maximum
+    m/z values.
+
+    The m/z values must be sorted.
+
     JIT helper function for `MsmsSpectrum.set_mz_range`.
 
     Parameters
@@ -329,19 +350,16 @@ def _get_mz_range_mask(
 
     Returns
     -------
-    np.ndarray
-        Index mask specifying which peaks are inside of the given m/z range.
+    Tuple[int, int]
+        Minimum and maximum indexes to include the peaks that are in of the
+        given m/z range.
     """
-    mask = np.full_like(mz, True, np.bool_)
-    mz_i = 0
-    while mz_i < len(mz) and mz[mz_i] < min_mz:
-        mask[mz_i] = False
-        mz_i += 1
-    mz_i = len(mz) - 1
-    while mz_i > 0 and mz[mz_i] > max_mz:
-        mask[mz_i] = False
-        mz_i -= 1
-    return mask
+    min_i, max_i = 0, len(mz) - 1
+    while min_i < len(mz) and mz[min_i] < min_mz:
+        min_i += 1
+    while max_i > 0 and mz[max_i] > max_mz:
+        max_i -= 1
+    return min_i, max_i
 
 
 @nb.njit(cache=True)
@@ -354,6 +372,9 @@ def _get_non_precursor_peak_mask(
     fragment_tol_mode: str,
 ) -> np.ndarray:
     """
+    Get a mask to remove peaks that are close to the precursor mass peak (at
+    different charges and isotopes).
+
     JIT helper function for `MsmsSpectrum.remove_precursor_peak`.
 
     Parameters
@@ -383,12 +404,11 @@ def _get_non_precursor_peak_mask(
         for iso in range(isotope + 1):
             remove_mz.append((pep_mass + iso) / charge + 1.0072766)
 
-    fragment_tol_mode_is_da = fragment_tol_mode == "Da"
     mask = np.full_like(mz, True, np.bool_)
     mz_i = remove_i = 0
     while mz_i < len(mz) and remove_i < len(remove_mz):
         md = utils.mass_diff(
-            mz[mz_i], remove_mz[remove_i], fragment_tol_mode_is_da
+            mz[mz_i], remove_mz[remove_i], fragment_tol_mode == "Da"
         )
         if md < -fragment_tol_mass:
             mz_i += 1
@@ -406,6 +426,9 @@ def _get_filter_intensity_mask(
     intensity: np.ndarray, min_intensity: float, max_num_peaks: int
 ) -> np.ndarray:
     """
+    Get a mask to remove low-intensity peaks and retain only the given number
+    of most intense peaks.
+
     JIT helper function for `MsmsSpectrum.filter_intensity`.
 
     Parameters
@@ -429,7 +452,8 @@ def _get_filter_intensity_mask(
     min_intensity *= intensity[intensity_idx[-1]]
     # Discard low-intensity noise peaks.
     start_i = 0
-    for start_i, intens in enumerate(intensity[intensity_idx]):
+    for intens in intensity[intensity_idx]:
+        start_i += 1
         if intens > min_intensity:
             break
     # Only retain at most the `max_num_peaks` most intense peaks.
@@ -445,6 +469,8 @@ def _get_scaled_intensity_root(
     intensity: np.ndarray, degree: int
 ) -> np.ndarray:
     """
+    Root-scale the intensities.
+
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
     Parameters
@@ -465,6 +491,8 @@ def _get_scaled_intensity_root(
 @nb.njit(nb.float32[:](nb.float32[:], nb.float64), cache=True)
 def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
     """
+    Log-scale the intensities.
+
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
     Parameters
@@ -487,6 +515,8 @@ def _get_scaled_intensity_rank(
     intensity: np.ndarray, max_rank: int
 ) -> np.ndarray:
     """
+    Rank-scale the intensities.
+
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
     Parameters
@@ -511,6 +541,8 @@ def _scale_intensity_max(
     intensity: np.ndarray, max_intensity: float
 ) -> np.ndarray:
     """
+    Rescale the intensities between 0 and `max_intensity`.
+
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
     Parameters
@@ -530,10 +562,10 @@ def _scale_intensity_max(
 
 
 @nb.njit(cache=True)
-def _get_fragment_annotation_map(
+def _get_peak_annotation_indexes(
     spectrum_mz: np.ndarray,
     spectrum_intensity: np.ndarray,
-    labels_mz: np.ndarray,
+    annotation_mz: np.ndarray,
     fragment_tol_mass: float,
     fragment_tol_mode: str,
     peak_assignment: str = "most_intense",
@@ -547,11 +579,11 @@ def _get_fragment_annotation_map(
     Parameters
     ----------
     spectrum_mz : np.ndarray
-        The mass-to-charge values of the spectrum fragment peaks.
+        The m/z values of the spectrum fragment peaks.
     spectrum_intensity : np.ndarray
         The intensities of the spectrum fragment peaks.
-    labels_mz : np.ndarray
-        The mass-to-charge values of the theoretical fragment labels.
+    annotation_mz : np.ndarray
+        The m/z values of the theoretical fragment labels.
     fragment_tol_mass : float
         Fragment mass tolerance to match spectrum peaks against theoretical
         peaks.
@@ -568,11 +600,10 @@ def _get_fragment_annotation_map(
     Returns
     -------
     List[Tuple[int, int]]
-        A list of (peak index, annotation index) tuples.
+        A list of matching (peak index, annotation index) tuples.
     """
-    annotation_i_map = []
-    peak_i_start = 0
-    for fragment_i, fragment_mz in enumerate(labels_mz):
+    annotation_i_map, peak_i_start = [], 0
+    for fragment_i, fragment_mz in enumerate(annotation_mz):
         while (
             peak_i_start < len(spectrum_mz)
             and utils.mass_diff(
@@ -610,69 +641,6 @@ def _get_fragment_annotation_map(
     return annotation_i_map
 
 
-@nb.njit(cache=True)
-def _get_mz_peak_index(
-    spectrum_mz: np.ndarray,
-    spectrum_intensity: np.ndarray,
-    fragment_mz: float,
-    fragment_tol_mass: float,
-    fragment_tol_mode: str,
-    peak_assignment: str = "most_intense",
-) -> Optional[int]:
-    """
-    Find the best m/z peak in a spectrum relative to the given m/z value.
-
-    Parameters
-    ----------
-    spectrum_mz : np.ndarray
-        The mass-to-charge varlues of the spectrum fragment peaks.
-    spectrum_intensity : np.ndarray
-        The intensities of the spectrum fragment peaks.
-    fragment_mz : float
-        The m/z of the requested peak.
-    fragment_tol_mass : float
-        Fragment mass tolerance to match spectrum peaks against theoretical
-        peaks.
-    fragment_tol_mode : {'Da', 'ppm'}
-        Fragment mass tolerance unit. Either 'Da' or 'ppm'.
-    peak_assignment : {'most_intense', 'nearest_mz'}, optional
-        In case multiple peaks occur within the given mass window around a
-        theoretical peak, only a single peak will be annotated with the
-        fragment type:
-        - 'most_intense': The most intense peak will be annotated (default).
-        - 'nearest_mz':   The peak whose m/z is closest to the theoretical m/z
-                          will be annotated.
-
-    Returns
-    -------
-    int
-        None if no peak was found within the given m/z window, else the index
-        of the best m/z peak relative to the given m/z value.
-    """
-    # Binary search to find the best matching peak.
-    md = (
-        fragment_tol_mass
-        if fragment_tol_mode == "Da"
-        else fragment_tol_mass / 10 ** 6 * fragment_mz
-    )
-    peak_i_start, peak_i_stop = np.searchsorted(
-        spectrum_mz, [fragment_mz - md, fragment_mz + md]
-    )
-    if peak_i_start == peak_i_stop:
-        return None
-    else:
-        peak_annotation_i = 0
-        if peak_assignment == "nearest_mz":
-            peak_annotation_i = np.argmin(
-                np.abs(spectrum_mz[peak_i_start:peak_i_stop] - fragment_mz)
-            )
-        elif peak_assignment == "most_intense":
-            peak_annotation_i = np.argmax(
-                spectrum_intensity[peak_i_start:peak_i_stop]
-            )
-        return peak_i_start + peak_annotation_i
-
-
 class MsmsSpectrum:
     """
     Class representing a tandem mass spectrum.
@@ -700,11 +668,11 @@ class MsmsSpectrum:
             (USI) <https://psidev.info/usi>`_ as defined by the Proteomics
             Standards Initiative.
         precursor_mz : float
-            Precursor ion mass-to-charge ratio.
+            Precursor ion m/z.
         precursor_charge : int
             Precursor ion charge.
         mz : array_like
-            Mass-to-charge ratios of the fragment peaks.
+            M/z values of the fragment peaks.
         intensity : array_like
             Intensities of the corresponding fragment peaks in `mz`.
         retention_time : Optional[float], optional
@@ -799,12 +767,12 @@ class MsmsSpectrum:
     @property
     def mz(self) -> np.ndarray:
         """
-        The mass-to-charge ratios of the fragment peaks.
+        The m/z values of the fragment peaks.
 
         Returns
         -------
         np.ndarray
-            The mass-to-charge ratios of the fragment peaks.
+            The m/z values of the fragment peaks.
         """
         return self._mz
 
@@ -839,11 +807,11 @@ class MsmsSpectrum:
 
     def round(self, decimals: int = 0, combine: str = "sum") -> "MsmsSpectrum":
         """
-        Round the mass-to-charge ratios of the fragment peaks to the given
-        number of decimals.
+        Round the m/z values of the fragment peaks to the given number of
+        decimals.
 
-        Peaks that have the same mass-to-charge ratio after rounding will be
-        combined using the specified strategy.
+        Peaks that have the same m/z value after rounding will be combined
+        using the specified strategy.
         If multiple peaks are merged into a single peak it will be annotated
         with the annotation of the most intense peak.
 
@@ -875,8 +843,7 @@ class MsmsSpectrum:
         self, min_mz: Optional[float] = None, max_mz: Optional[float] = None
     ) -> "MsmsSpectrum":
         """
-        Restrict the mass-to-charge ratios of the fragment peaks to the
-        given range.
+        Restrict the m/z values of the fragment peaks to the given range.
 
         Parameters
         ----------
@@ -900,11 +867,11 @@ class MsmsSpectrum:
                 max_mz = self._mz[-1]
             if max_mz < min_mz:
                 min_mz, max_mz = max_mz, min_mz
-        mz_range_mask = _get_mz_range_mask(self._mz, min_mz, max_mz)
-        self._mz = self._mz[mz_range_mask]
-        self._intensity = self._intensity[mz_range_mask]
+        min_i, max_i = _get_mz_range_mask(self._mz, min_mz, max_mz)
+        self._mz = self._mz[min_i:max_i]
+        self._intensity = self._intensity[min_i:max_i]
         if self._annotation is not None:
-            self._annotation = self._annotation[mz_range_mask]
+            self._annotation = self._annotation[min_i:max_i]
         return self
 
     def remove_precursor_peak(
@@ -914,7 +881,7 @@ class MsmsSpectrum:
         isotope: int = 0,
     ) -> "MsmsSpectrum":
         """
-        Remove fragment peak(s) close to the precursor mass-to-charge ratio.
+        Remove fragment peak(s) close to the precursor m/z.
 
         Parameters
         ----------
@@ -931,7 +898,7 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
-        # FIXME: This assumes M+xH charged ions.
+        # TODO: This assumes [M+H]x charged ions.
         neutral_mass = (self.precursor_mz - 1.0072766) * self.precursor_charge
         peak_mask = _get_non_precursor_peak_mask(
             self._mz,
@@ -1112,24 +1079,22 @@ class MsmsSpectrum:
         # Parse the ProForma string and find peaks that match the theoretical
         # fragments.
         for proteoform in proforma.parse(self.proforma):
-            # TODO: Only localized modifications or all of them? Check.
-            theoretical_fragments = _get_theoretical_fragments(
+            fragments = _get_theoretical_fragments(
                 proteoform,
                 ion_types,
                 max_ion_charge,
                 neutral_losses,
             )
-            for annotation_i, fragment_i in _get_fragment_annotation_map(
+            for annotation_i, fragment_i in _get_peak_annotation_indexes(
                 self.mz,
                 self.intensity,
-                np.asarray(
-                    [fragment.calc_mz for fragment in theoretical_fragments]
-                ),
+                np.asarray([f.calc_mz for f in fragments]),
                 fragment_tol_mass,
                 fragment_tol_mode,
                 peak_assignment,
             ):
-                # FIXME: Duplicate labels for the same peak are overwritten.
-                self._annotation[annotation_i] = theoretical_fragments[fragment_i]
+                # TODO: Support multiple annotations per peak. Currently
+                #       duplicate labels for the same peak are overwritten.
+                self._annotation[annotation_i] = fragments[fragment_i]
 
         return self

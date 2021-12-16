@@ -616,20 +616,17 @@ class MsmsSpectrum:
                  precursor_charge: int,
                  mz: Union[np.ndarray, Iterable],
                  intensity: Union[np.ndarray, Iterable],
-                 annotation: Optional[Union[np.ndarray, Iterable]] = None,
-                 retention_time: Optional[float] = None,
-                 peptide: Optional[str] = None,
-                 modifications: Optional[Dict[Union[int, str], float]] = None,
-                 is_decoy: bool = False) -> None:
+                 retention_time: Optional[float] = None) -> None:
         """
         Instantiate a new `MsmsSpectrum` consisting of fragment peaks.
 
         Parameters
         ----------
         identifier : str
-            (Unique) spectrum identifier. See for example the universal
-            spectrum identifier specification by the Proteomics Standards
-            Initiative.
+            Spectrum identifier. It is recommended to use a unique and
+            interpretable identifier, such as a `universal spectrum identifier
+            (USI) <https://psidev.info/usi>`_ as defined by the Proteomics
+            Standards Initiative.
         precursor_mz : float
             Precursor ion mass-to-charge ratio.
         precursor_charge : int
@@ -638,73 +635,22 @@ class MsmsSpectrum:
             Mass-to-charge ratios of the fragment peaks.
         intensity : array_like
             Intensities of the corresponding fragment peaks in `mz`.
-        annotation : Optional[array_like], optional
-            Annotations of the corresponding fragment peaks in `mz` (the
-            default is None, which indicates that the fragment peaks are not
-            annotated).
         retention_time : Optional[float], optional
             Retention time at which the spectrum was acquired (the default is
             None, which indicates that retention time is unspecified/unknown).
-        peptide : Optional[str], optional
-            The peptide sequence corresponding to the spectrum (the default is
-            None, which means that no peptide-spectrum match is specified).
-            Modifications can be specified using the
-            `ProForma syntax <https://www.psidev.info/proforma>`_.
-        modifications : Optional[Dict[Union[int, str], float]], optional
-            Mapping of modification positions and mass differences. Valid
-            positions are any amino acid index in the peptide (0-based),
-            'N-term', and 'C-term'.
-        is_decoy : bool, optional
-            Flag indicating whether the `peptide` is a target or decoy
-            peptide (the default is False, which implies a target peptide).
         """
         self.identifier = identifier
-
         self.precursor_mz = precursor_mz
         self.precursor_charge = precursor_charge
-
         if len(mz) != len(intensity):
             raise ValueError('The mass-to-charge and intensity arrays should '
-                             'have equal length')
-
-        self._mz, self._intensity, order = _init_spectrum(
+                             'have equal lengths')
+        self._mz, self._intensity = _init_spectrum(
             np.require(mz, np.float32, 'W'),
             np.require(intensity, np.float32, 'W'))
-
-        if annotation is not None:
-            self._annotation = np.asarray(annotation).reshape(-1)
-            if len(self.mz) != len(self.annotation):
-                raise ValueError('The mass-to-charge and annotation arrays '
-                                 'should have equal length')
-            else:
-                self._annotation = self.annotation[order]
-        else:
-            self._annotation = None
-
+        self._annotation = None
         self.retention_time = retention_time
-        if peptide is not None:
-            # Parse ProForma peptide.
-            self.peptide, self.modifications = _parse_proforma(peptide)
-
-            self.peptide = peptide.upper()
-            for aa in self.peptide:
-                if aa not in aa_mass:
-                    raise ValueError(f'Unknown amino acid: {aa}')
-        else:
-            self.peptide = None
-        if peptide is not None and modifications is not None:
-            for mod_pos in modifications.keys():
-                if mod_pos not in ('N-term', 'C-term'):
-                    if not isinstance(mod_pos, int):
-                        raise ValueError(f'Unknown modification position: '
-                                         f'{mod_pos}')
-                    elif mod_pos < 0 or mod_pos > len(peptide):
-                        raise ValueError(f'Modification position exceeds '
-                                         f'peptide bounds: {mod_pos}')
-        else:
-            modifications = None
-        self.modifications = modifications
-        self.is_decoy = is_decoy
+        self.annotation = None
 
     @property
     def mz(self) -> np.ndarray:

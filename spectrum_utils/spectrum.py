@@ -729,13 +729,6 @@ class MsmsSpectrum:
         """
         return self._mz
 
-    @mz.setter
-    def mz(self, mz: Union[np.ndarray, Iterable]) -> None:
-        if np.asarray(mz).ndim > 0:
-            self._mz = np.asarray(mz)
-        else:
-            raise ValueError('Invalid m/z values')
-
     @property
     def intensity(self) -> np.ndarray:
         """
@@ -751,13 +744,6 @@ class MsmsSpectrum:
             The intensity values of the fragment peaks.
         """
         return self._intensity
-
-    @intensity.setter
-    def intensity(self, intensity: Union[np.ndarray, Iterable]) -> None:
-        if np.asarray(intensity).ndim > 0:
-            self._intensity = np.asarray(intensity)
-        else:
-            raise ValueError('Invalid intensity values')
 
     @property
     def annotation(self) -> Optional[np.ndarray]:
@@ -775,17 +761,6 @@ class MsmsSpectrum:
             have been specified.
         """
         return self._annotation
-
-    @annotation.setter
-    def annotation(
-            self, annotation: Optional[Union[np.ndarray, Iterable]] = None)\
-            -> None:
-        if annotation is None:
-            self._annotation = None
-        elif np.asarray(annotation).ndim > 0:
-            self._annotation = np.asarray(annotation)
-        else:
-            raise ValueError('Invalid annotation values')
 
     def round(self, decimals: int = 0, combine: str = 'sum') -> 'MsmsSpectrum':
         """

@@ -12,5 +12,5 @@ dependencies:
   - numba>=0.41
   - numpy
   - pandas
-  - pyteomics
+  - pyteomics>=4.5
   - python>=3.8

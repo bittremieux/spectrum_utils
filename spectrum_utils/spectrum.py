@@ -10,10 +10,10 @@ try:
 except ImportError:
     import pyteomics.mass as pmass
 
-from spectrum_utils import utils
+from spectrum_utils import proforma, utils
 
 
-_aa_mass = {
+aa_mass = {
     **pmass.std_aa_mass,
     # 'B': 0,             # aspartic acid / asparagine (ambiguous mass)
     # 'Z': 0,             # glutamic acid / glutamine (ambiguous mass)
@@ -22,33 +22,6 @@ _aa_mass = {
     # 'O': 237.14772,     # pyrrolysine (in Pyteomics)
     'X': 0                # any amino acid, gaps (zero mass)
 }
-aa_mass = _aa_mass.copy()
-
-
-def static_modification(amino_acid: str, mass_diff: float) -> None:
-    """
-    Globally modify the monoisotopic mass of an amino acid to set a static
-    modification.
-
-    Parameters
-    ----------
-    amino_acid : str
-        The amino acid whose monoisotopic mass is modified.
-    mass_diff : float
-        The *mass difference* to be added to the amino acid's original
-        monoisotopic mass.
-    """
-    global aa_mass
-    aa_mass[amino_acid] += mass_diff
-
-
-def reset_modifications() -> None:
-    """
-    Undo all static modifications and reset to the standard amino acid
-    monoisotopic masses.
-    """
-    global aa_mass
-    aa_mass = _aa_mass.copy()
 
 
 class FragmentAnnotation:
@@ -141,84 +114,101 @@ class FragmentAnnotation:
             return str(self) == str(other)
 
 
-def _get_theoretical_peptide_fragments(
-        peptide: str,
-        modifications: Optional[Dict[Union[float, str], float]] = None,
-        types: str = 'by', max_charge: int = 1,
-        neutral_losses: Optional[Dict[str, float]] = None) \
+def _get_theoretical_fragments(
+        sequence: str,
+        modifications: Optional[List[proforma.Modification]] = None,
+        fragment_types: str = 'by', max_charge: int = 1,
+        neutral_losses: Optional[Dict[Optional[str], float]] = None) \
         -> List[FragmentAnnotation]:
     """
-    Get theoretical peptide fragments for the given peptide.
+    Get theoretical fragment annotations for the given sequence.
 
     Parameters
     ----------
-    peptide : str
-        The peptide sequence for which the fragments will be generated.
-    modifications : Optional[Dict[Union[float, str], float]], optional
+    sequence : str
+        The sequence for which the fragment annotations will be generated.
+    modifications : Optional[List[proforma.Modification]], optional
+        # FIXME
         Mapping of modification positions and mass differences. Valid positions
         are any amino acid index in the peptide (0-based), 'N-term', and
         'C-term'.
-    types : str, optional
-        The fragment type. Can be any combination of 'a', 'b', 'c', 'x', 'y',
-        and 'z' (the default is 'by', which means that b-ions and y-ions will
-        be generated).
+    fragment_types : str, optional
+        The peptide fragment type. Can be any combination of 'a', 'b', 'c',
+        'x', 'y', and 'z' (the default is 'by', which means that b-ions and
+        y-ions will be generated).
     max_charge : int, optional
         All fragments up to and including the given charge will be generated
         (the default is 1 to only generate singly-charged fragments).
-    neutral_losses : Optional[Dict[str, float]]
+    neutral_losses : Optional[Dict[Optional[str], float]]
         A dictionary with neutral loss names and (negative) mass differences to
         be considered.
 
     Returns
     -------
-    List[Tuple[PeptideFragmentAnnotation, float]]
-        A list of all fragments as (`PeptideFragmentAnnotation`, m/z) tuples
-        sorted in ascending m/z order.
+    List[FragmentAnnotation]
+        A list of all theoretical fragments in ascending m/z order.
     """
-    if 'B' in peptide:
-        raise ValueError('Explicitly specify aspartic acid (D) or asparagine '
-                         '(N) to compute the peptide fragments')
-    if 'Z' in peptide:
-        raise ValueError('Explicitly specify glutamic acid (E) or glutamine '
-                         '(Q) to compute the peptide fragments')
-    if modifications is not None:
-        mods = modifications.copy()
-        if 'N-term' in modifications:
-            mods[-1] = mods['N-term']
-            del mods['N-term']
-        if 'C-term' in modifications:
-            mods[len(peptide) + 1] = mods['C-term']
-            del mods['C-term']
-    else:
-        mods = {}
-    if neutral_losses is None:
-        neutral_losses = {None: 0}
-    ions = []
-    for i in range(1, len(peptide)):
-        for ion_type in types:
-            if ion_type in 'abc':   # N-terminal fragment.
-                ion_index = i
-                sequence = peptide[:i]
-                mod_mass = sum([md for pos, md in mods.items() if pos < i])
-            else:   # C-terminal fragment.
-                ion_index = len(peptide) - i
-                sequence = peptide[i:]
-                mod_mass = sum([md for pos, md in mods.items() if pos >= i])
+    if 'B' in sequence:
+        raise ValueError(
+            'Explicitly specify aspartic acid (D) or asparagine (N) instead of'
+            ' the ambiguous B to compute the fragment annotations'
+        )
+    if 'Z' in sequence:
+        raise ValueError(
+            'Explicitly specify glutamic acid (E) or glutamine (Q) instead of '
+            'the ambiguous Z to compute the fragment annotations'
+        )
+
+    # FIXME
+    # if modifications is not None:
+    #     mods = modifications.copy()
+    #     if 'N-term' in modifications:
+    #         mods[-1] = mods['N-term']
+    #         del mods['N-term']
+    #     if 'C-term' in modifications:
+    #         mods[len(sequence) + 1] = mods['C-term']
+    #         del mods['C-term']
+    # else:
+    #     mods = {}
+
+    neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
+    fragments = []
+    # FIXME
+    # # Single peak annotation.
+    # if sequence == 'X':
+    #     return [FragmentAnnotation('?', calc_mz=modifications[0])]
+    # Get all possible peptide fragments.
+    for i in range(1, len(sequence)):
+        for fragment_type in fragment_types:
+            # N-terminal fragment.
+            if fragment_type in 'abc':
+                fragment_index = i
+                fragment_sequence = sequence[:i]
+                mod_mass = sum([mod.mass for mod in modifications
+                                if mod.position < i])
+            # C-terminal fragment.
+            elif fragment_type in 'xyz':
+                fragment_index = len(sequence) - i
+                fragment_sequence = sequence[i:]
+                mod_mass = sum([mod.mass for mod in modifications
+                                if mod.position >= i])
+            else:
+                raise ValueError(f'Unknown ion type: {fragment_type}')
             for charge in range(1, max_charge + 1):
                 for nl_name, nl_mass in neutral_losses.items():
                     nl_name = (None if nl_name is None else
                                f'{"-" if nl_mass < 0 else "+"}{nl_name}')
-                    ions.append(FragmentAnnotation(
-                        ion_type=f'{ion_type}{ion_index}',
+                    fragments.append(FragmentAnnotation(
+                        ion_type=f'{fragment_type}{fragment_index}',
                         neutral_loss=nl_name,
                         isotope=0,
                         charge=charge,
-                        calc_mz=pmass.fast_mass(sequence=sequence,
-                                                ion_type=ion_type,
+                        calc_mz=pmass.fast_mass(sequence=fragment_sequence,
+                                                ion_type=fragment_type,
                                                 charge=charge,
                                                 aa_mass=aa_mass)
                                 + (mod_mass + nl_mass) / charge))
-    return sorted(ions, key=operator.attrgetter('calc_mz'))
+    return sorted(fragments, key=operator.attrgetter('calc_mz'))
 
 
 @nb.njit(cache=True)
@@ -491,22 +481,25 @@ def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
 
 
 @nb.njit(cache=True)
-def _get_peptide_fragment_annotation_map(
+def _get_fragment_annotation_map(
         spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
-        annotation_mz: nb.typed.List, fragment_tol_mass: float,
+        labels_mz: np.ndarray, fragment_tol_mass: float,
         fragment_tol_mode: str, peak_assignment: str = 'most_intense')\
         -> List[Tuple[int, int]]:
     """
+    Find matching indexes between observed m/z values and theoretical fragment
+    labels.
+
     JIT helper function for `MsmsSpectrum.annotate_peaks`.
 
     Parameters
     ----------
     spectrum_mz : np.ndarray
-        The mass-to-charge varlues of the spectrum fragment peaks.
+        The mass-to-charge values of the spectrum fragment peaks.
     spectrum_intensity : np.ndarray
         The intensities of the spectrum fragment peaks.
-    annotation_mz : nb.typed.List[float]
-        A list of mass-to-charge values of the peptide fragment annotations.
+    labels_mz : np.ndarray
+        The mass-to-charge values of the theoretical fragment labels.
     fragment_tol_mass : float
         Fragment mass tolerance to match spectrum peaks against theoretical
         peaks.
@@ -522,11 +515,12 @@ def _get_peptide_fragment_annotation_map(
 
     Returns
     -------
-    A list of (peak index, annotation index) tuples.
+    List[Tuple[int, int]]
+        A list of (peak index, annotation index) tuples.
     """
     annotation_i_map = []
     peak_i_start = 0
-    for fragment_i, fragment_mz in enumerate(annotation_mz):
+    for fragment_i, fragment_mz in enumerate(labels_mz):
         while (peak_i_start < len(spectrum_mz) and
                utils.mass_diff(spectrum_mz[peak_i_start], fragment_mz,
                                fragment_tol_mode == 'Da')
@@ -548,7 +542,6 @@ def _get_peptide_fragment_annotation_map(
                     spectrum_intensity[peak_i_start: peak_i_stop])
             annotation_i_map.append((peak_i_start + peak_annotation_i,
                                      fragment_i))
-
     return annotation_i_map
 
 
@@ -655,7 +648,7 @@ class MsmsSpectrum:
         self._mz, self._intensity = _init_spectrum(
             np.require(mz, mz_dtype, 'W'),
             np.require(intensity, intensity_dtype, 'W'))
-        self._annotation = None
+        self.annotation, self._labels = None, None
         self.retention_time = retention_time
 
     @classmethod
@@ -722,11 +715,7 @@ class MsmsSpectrum:
     @property
     def mz(self) -> np.ndarray:
         """
-        Get or set the mass-to-charge ratios of the fragment peaks.
-
-        When setting new m/z values it should be possible to convert the given
-        values to a NumPy array and the number of m/z values should be equal to
-        the number of intensity (and annotation) values.
+        The mass-to-charge ratios of the fragment peaks.
 
         Returns
         -------
@@ -738,7 +727,7 @@ class MsmsSpectrum:
     @property
     def intensity(self) -> np.ndarray:
         """
-        Get or set the intensities of the fragment peaks.
+        TGet or set the intensities of the fragment peaks.
 
         When setting new intensity values it should be possible to convert the
         given values to a NumPy array and the number of intensity values should
@@ -752,21 +741,17 @@ class MsmsSpectrum:
         return self._intensity
 
     @property
-    def annotation(self) -> Optional[np.ndarray]:
+    def labels(self) -> Optional[np.ndarray]:
         """
-        Get or set the annotations of the fragment peaks.
-
-        When setting new annotations it should be possible to convert the given
-        values to a NumPy array (or None) and the number of annotations should
-        be equal to the number of m/z and intensity values.
+        The annotated labels of the fragment peaks.
 
         Returns
         -------
         Optional[np.ndarray]
-            The annotations of the fragment peaks or None if no annotations
-            have been specified.
+            The labels of the fragment peaks, or None if the spectrum has not
+            been annotated.
         """
-        return self._annotation
+        return self._labels
 
     def round(self, decimals: int = 0, combine: str = 'sum') -> 'MsmsSpectrum':
         """
@@ -797,8 +782,8 @@ class MsmsSpectrum:
         """
         self._mz, self._intensity, annotation_idx = _round(
             self._mz, self._intensity, decimals, combine)
-        if self._annotation is not None:
-            self._annotation = self._annotation[annotation_idx]
+        if self._labels is not None:
+            self._labels = self._labels[annotation_idx]
         return self
 
     def set_mz_range(self, min_mz: Optional[float] = None,
@@ -832,8 +817,8 @@ class MsmsSpectrum:
         mz_range_mask = _get_mz_range_mask(self._mz, min_mz, max_mz)
         self._mz = self._mz[mz_range_mask]
         self._intensity = self._intensity[mz_range_mask]
-        if self._annotation is not None:
-            self._annotation = self._annotation[mz_range_mask]
+        if self._labels is not None:
+            self._labels = self._labels[mz_range_mask]
         return self
 
     def remove_precursor_peak(self, fragment_tol_mass: float,
@@ -864,8 +849,8 @@ class MsmsSpectrum:
             fragment_tol_mass, fragment_tol_mode)
         self._mz = self.mz[peak_mask]
         self._intensity = self.intensity[peak_mask]
-        if self._annotation is not None:
-            self._annotation = self._annotation[peak_mask]
+        if self._labels is not None:
+            self._labels = self._labels[peak_mask]
         return self
 
     def filter_intensity(self, min_intensity: float = 0.0,
@@ -898,8 +883,8 @@ class MsmsSpectrum:
             self._intensity, min_intensity, max_num_peaks)
         self._mz = self._mz[intensity_mask]
         self._intensity = self._intensity[intensity_mask]
-        if self._annotation is not None:
-            self._annotation = self._annotation[intensity_mask]
+        if self._labels is not None:
+            self._labels = self._labels[intensity_mask]
         return self
 
     def scale_intensity(self, scaling: Optional[str] = None,
@@ -961,33 +946,29 @@ class MsmsSpectrum:
                 self._intensity, max_intensity)
         return self
 
-    def annotate_peaks(self, *args, **kwargs):
-        raise DeprecationWarning('Renamed to annotate_peptide_fragments')
-
-    def annotate_peptide_fragments(
-            self, fragment_tol_mass: float, fragment_tol_mode: str,
-            ion_types: str = 'by', max_ion_charge: Optional[int] = None,
+    def annotate_proforma(
+            self, proforma_str: str, fragment_tol_mass: float,
+            fragment_tol_mode: str, ion_types: str = 'by',
+            max_ion_charge: Optional[int] = None,
             peak_assignment: str = 'most_intense',
-            neutral_losses: Optional[Dict[str, float]] = None) \
+            neutral_losses: Optional[Dict[Optional[str], float]] = None) \
             -> 'MsmsSpectrum':
         """
-        Annotate peaks with their corresponding peptide fragment ion
-        annotations.
-
-        `self.annotation` will be overwritten and include
-        `PeptideFragmentAnnotation` objects for matching peaks.
+        Assign fragment ion labels to the peaks from a ProForma annotation.
 
         Parameters
         ----------
+        proforma_str : str
+            The ProForma spectrum annotation.
         fragment_tol_mass : float
             Fragment mass tolerance to match spectrum peaks against theoretical
             peaks.
         fragment_tol_mode : {'Da', 'ppm'}
             Fragment mass tolerance unit. Either 'Da' or 'ppm'.
         ion_types : str, optional
-            Fragment type to annotate. Can be any combination of 'a', 'b', 'c',
-            'x', 'y', and 'z' (the default is 'by', which means that b-ions and
-            y-ions will be annotated).
+            Peptide fragment types to annotate. Can be any combination of 'a',
+            'b', 'c', 'x', 'y', and 'z' (the default is 'by', which means that
+            b-ions and y-ions will be annotated).
         max_ion_charge : Optional[int], optional
             All fragments up to and including the given charge will be
             annotated (by default all fragments with a charge up to the
@@ -1001,135 +982,40 @@ class MsmsSpectrum:
               (default).
             - 'nearest_mz': The peak whose m/z is closest to the theoretical
               m/z will be annotated.
-        neutral_losses : Dict[str, float], optional
+        neutral_losses : Dict[Optional[str], float], optional
             Neutral losses to consider, specified as a dictionary with as keys
             the description (molecular formula) and as value the neutral loss.
             Note that the value should typically be negative.
 
         Returns
         -------
-        self : `MsmsSpectrum`
+        MsmsSpectrum
         """
-        if self.peptide is None:
-            raise ValueError('No peptide sequence available for the spectrum')
+        self.annotation = proforma_str
+        self._labels = np.full_like(self.mz, None, object)
+        # Be default, peak charges are assumed to be smaller than the precursor
+        # charge.
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
         # Make sure the standard peaks (without a neutral loss) are always
         # considered.
         if neutral_losses is not None and None not in neutral_losses:
             neutral_losses[None] = 0
-        theoretical_fragments = _get_theoretical_peptide_fragments(
-            self.peptide, self.modifications, ion_types, max_ion_charge,
-            neutral_losses)
-        self.annotation = np.full_like(self.mz, None, object)
-        for annotation_i, fragment_i in \
-                _get_peptide_fragment_annotation_map(
-                    self.mz, self.intensity,
-                    nb.typed.List([fragment.calc_mz
-                                   for fragment in theoretical_fragments]),
-                    fragment_tol_mass, fragment_tol_mode, peak_assignment):
-            self.annotation[annotation_i] = theoretical_fragments[fragment_i]
 
-        return self
-
-    def annotate_molecule_fragment(self, smiles: str, fragment_mz: float,
-                                   fragment_charge: int,
-                                   fragment_tol_mass: float,
-                                   fragment_tol_mode: str,
-                                   peak_assignment: str = 'most_intense')\
-            -> 'MsmsSpectrum':
-        """
-        Annotate a peak (if present) with its corresponding molecule.
-
-        The matching position in `self.annotation` will be overwritten by the
-        provided molecule.
-
-        Parameters
-        ----------
-        smiles : str
-            The fragment molecule that will be annotated in SMILES format. Note
-            that the SMILES string is not tested for validity.
-        fragment_mz : float
-            The expected m/z of the molecule.
-        fragment_charge : int
-            The charge of the molecule.
-        fragment_tol_mass : float
-            Fragment mass tolerance to match spectrum peaks against the
-            theoretical molecule mass.
-        fragment_tol_mode : {'Da', 'ppm'}
-            Fragment mass tolerance unit. Either 'Da' or 'ppm'.
-        peak_assignment : {'most_intense', 'nearest_mz'}, optional
-            In case multiple peaks occur within the given mass window around
-            the molecule's given mass, only a single peak will be annotated:
-
-            - 'most_intense': The most intense peak will be annotated
-              (default).
-            - 'nearest_mz': The peak whose m/z is closest to the theoretical
-              m/z will be annotated.
-
-        Returns
-        -------
-        self : `MsmsSpectrum`
-        """
-        # Find the matching m/z value.
-        peak_index = _get_mz_peak_index(self.mz, self.intensity, fragment_mz,
-                                        fragment_tol_mass, fragment_tol_mode,
-                                        peak_assignment)
-        if peak_index is None:
-            raise ValueError(f'No matching peak found for molecule "{smiles}"')
-        else:
-            # Initialize the annotations if they don't exist yet.
-            if self.annotation is None:
-                self.annotation = np.full_like(self.mz, None, object)
-            # Set the molecule's annotation.
-            self.annotation[peak_index] = FragmentAnnotation(
-                f'f{{{smiles}}}', charge=fragment_charge, calc_mz=fragment_mz)
-
-        return self
-
-    def annotate_mz_fragment(self, fragment_mz: float,
-                             fragment_tol_mass: float, fragment_tol_mode: str,
-                             peak_assignment: str = 'most_intense') \
-            -> 'MsmsSpectrum':
-        """
-        Annotate a peak (if present) with its m/z value.
-
-        The matching position in `self.annotation` will be overwritten.
-
-        Parameters
-        ----------
-        fragment_mz : float
-            The expected m/z to annotate.
-        fragment_tol_mass : float
-            Fragment mass tolerance to match spectrum peaks against the given
-            m/z.
-        fragment_tol_mode : {'Da', 'ppm'}
-            Fragment mass tolerance unit. Either 'Da' or 'ppm'.
-        peak_assignment : {'most_intense', 'nearest_mz'}, optional
-            In case multiple peaks occur within the given mass window around
-            the given m/z, only a single peak will be annotated:
-
-            - 'most_intense': The most intense peak will be annotated
-              (default).
-            - 'nearest_mz': The peak whose m/z is closest to the given m/z will
-              be annotated.
-
-        Returns
-        -------
-        self : `MsmsSpectrum`
-        """
-        # Find the matching m/z value.
-        peak_index = _get_mz_peak_index(self.mz, self.intensity, fragment_mz,
-                                        fragment_tol_mass, fragment_tol_mode,
-                                        peak_assignment)
-        if peak_index is None:
-            raise ValueError(f'No matching peak found for {fragment_mz} m/z')
-        else:
-            # Initialize the annotations if they don't exist yet.
-            if self.annotation is None:
-                self.annotation = np.full_like(self.mz, None, object)
-            # Set the peak annotation.
-            self.annotation[peak_index] = FragmentAnnotation(
-                '?', calc_mz=fragment_mz)
+        # Parse the ProForma string and find peaks that match the theoretical
+        # fragments.
+        for proteoform in proforma.parse(self.annotation):
+            # TODO: Only localized modifications or all of them? Check.
+            theoretical_fragments = _get_theoretical_fragments(
+                proteoform.sequence, proteoform.modifications,
+                ion_types, max_ion_charge, neutral_losses)
+            for annotation_i, fragment_i in \
+                    _get_fragment_annotation_map(
+                        self.mz, self.intensity,
+                        np.asarray([fragment.calc_mz
+                                    for fragment in theoretical_fragments]),
+                        fragment_tol_mass, fragment_tol_mode, peak_assignment):
+                # FIXME: Duplicate labels for the same peak are overwritten.
+                self._labels[annotation_i] = theoretical_fragments[fragment_i]
 
         return self

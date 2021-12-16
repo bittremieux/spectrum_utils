@@ -5,6 +5,7 @@ import numba as nb
 import numpy as np
 import numpy.typing as npt
 import pyteomics.usi
+
 try:
     import pyteomics.cmass as pmass
 except ImportError:
@@ -13,28 +14,31 @@ except ImportError:
 from spectrum_utils import proforma, utils
 
 
+# Amino acid and special amino acid masses.
 aa_mass = {
     **pmass.std_aa_mass,
-    # 'B': 0,             # aspartic acid / asparagine (ambiguous mass)
-    # 'Z': 0,             # glutamic acid / glutamine (ambiguous mass)
-    'J': 113.08406,       # leucine / isoleucine
-    # 'U': 150.95363,     # selenocysteine (in Pyteomics)
-    # 'O': 237.14772,     # pyrrolysine (in Pyteomics)
-    'X': 0                # any amino acid, gaps (zero mass)
+    # "B": 0,             # aspartic acid / asparagine (ambiguous mass)
+    # "Z": 0,             # glutamic acid / glutamine (ambiguous mass)
+    "J": 113.08406,       # leucine / isoleucine
+    # "U": 150.95363,     # selenocysteine (in Pyteomics)
+    # "O": 237.14772,     # pyrrolysine (in Pyteomics)
+    "X": 0,               # any amino acid, gaps (zero mass)
 }
 
 
 class FragmentAnnotation:
-    """
-    Class representing a general fragment ion annotation.
-    """
 
-    def __init__(self, ion_type: str, neutral_loss: Optional[str] = None,
-                 isotope: int = 0, charge: int = 0,
-                 adduct: Optional[str] = None, calc_mz: float = None) \
-            -> None:
+    def __init__(
+        self,
+        ion_type: str,
+        neutral_loss: Optional[str] = None,
+        isotope: int = 0,
+        charge: int = 1,
+        adduct: Optional[str] = None,
+        calc_mz: float = None,
+    ) -> None:
         """
-        Interpretation of a single fragment peak.
+        Interpretation of a single fragment ion.
 
         This fragment annotation format is derived from the PSI peak
         interpretation specification:
@@ -51,7 +55,7 @@ class FragmentAnnotation:
             formula. The default is no neutral loss.
         isotope : int, optional
             The isotope number above or below the monoisotope. The default is
-            the monoisotopic peak.
+            the monoisotopic peak (0).
         charge : int, optional
             The charge of the fragment. The default is charge 1.
         adduct : str, optional
@@ -59,50 +63,52 @@ class FragmentAnnotation:
         calc_mz : float
             The theoretical m/z value of the fragment.
         """
-        if ion_type[0] not in '?abcxyzIm_prf':
-            raise ValueError('Unsupported ion type')
-        if ion_type == '?' and (neutral_loss is not None or
-                                isotope != 0 or
-                                charge != 0 or
-                                adduct is not None):
-            raise ValueError('Information specified for an unknown ion')
+        if ion_type[0] not in "?abcxyzIm_prf":
+            raise ValueError("Unsupported ion type")
+        if ion_type == "?" and (
+            neutral_loss is not None
+            or isotope != 0
+            or charge != 0
+            or adduct is not None
+        ):
+            raise ValueError("Information specified for an unknown ion")
         self.ion_type = ion_type
         self.neutral_loss = neutral_loss
         self.isotope = isotope
-        if charge == 0 and ion_type != '?':
-            raise ValueError('Invalid charge 0 for annotated fragment')
+        if charge == 0 and ion_type != "?":
+            raise ValueError("Invalid charge 0 for annotated fragment")
         elif charge < 0:
-            raise ValueError('Invalid negative charge')
+            raise ValueError("Invalid negative charge")
         self.charge = charge
         self.adduct = adduct
         self.calc_mz = calc_mz
 
     def __repr__(self) -> str:
-        if self.ion_type == '?':
-            ion = '?'
+        if self.ion_type == "?":
+            ion = "?"
         else:
             ion = self.ion_type
             if self.neutral_loss is not None:
-                ion += f'{self.neutral_loss}'
+                ion += f"{self.neutral_loss}"
             if self.isotope != 0:
-                ion += f'{self.isotope:+}i'
+                ion += f"{self.isotope:+}i"
             if self.charge > 1:
-                ion += f'^{self.charge}'
+                ion += f"^{self.charge}"
             if self.adduct is not None:
                 ion += self.adduct
             return ion
-        return f'FragmentAnnotation({ion}, mz={self.calc_mz})'
+        return f"FragmentAnnotation({ion}, mz={self.calc_mz})"
 
     def __str__(self) -> str:
-        if self.ion_type == '?':
+        if self.ion_type == "?":
             return str(self.calc_mz)
         else:
             annotation = self.ion_type
             if self.neutral_loss is not None:
-                annotation += f'{self.neutral_loss}'
+                annotation += f"{self.neutral_loss}"
             if self.isotope != 0:
-                annotation += f'{self.isotope:+}i'
-            annotation += '+' * self.charge
+                annotation += f"{self.isotope:+}i"
+            annotation += "+" * self.charge
             if self.adduct is not None:
                 annotation += self.adduct
             return annotation
@@ -115,11 +121,12 @@ class FragmentAnnotation:
 
 
 def _get_theoretical_fragments(
-        sequence: str,
-        modifications: Optional[List[proforma.Modification]] = None,
-        fragment_types: str = 'by', max_charge: int = 1,
-        neutral_losses: Optional[Dict[Optional[str], float]] = None) \
-        -> List[FragmentAnnotation]:
+    sequence: str,
+    modifications: Optional[List[proforma.Modification]] = None,
+    fragment_types: str = "by",
+    max_charge: int = 1,
+    neutral_losses: Optional[Dict[Optional[str], float]] = None,
+) -> List[FragmentAnnotation]:
     """
     Get theoretical fragment annotations for the given sequence.
 
@@ -148,15 +155,15 @@ def _get_theoretical_fragments(
     List[FragmentAnnotation]
         A list of all theoretical fragments in ascending m/z order.
     """
-    if 'B' in sequence:
+    if "B" in sequence:
         raise ValueError(
-            'Explicitly specify aspartic acid (D) or asparagine (N) instead of'
-            ' the ambiguous B to compute the fragment annotations'
+            "Explicitly specify aspartic acid (D) or asparagine (N) instead of"
+            " the ambiguous B to compute the fragment annotations"
         )
-    if 'Z' in sequence:
+    if "Z" in sequence:
         raise ValueError(
-            'Explicitly specify glutamic acid (E) or glutamine (Q) instead of '
-            'the ambiguous Z to compute the fragment annotations'
+            "Explicitly specify glutamic acid (E) or glutamine (Q) instead of "
+            "the ambiguous Z to compute the fragment annotations"
         )
 
     # FIXME
@@ -181,47 +188,59 @@ def _get_theoretical_fragments(
     for i in range(1, len(sequence)):
         for fragment_type in fragment_types:
             # N-terminal fragment.
-            if fragment_type in 'abc':
+            if fragment_type in "abc":
                 fragment_index = i
                 fragment_sequence = sequence[:i]
-                mod_mass = sum([mod.mass for mod in modifications
-                                if mod.position < i])
+                mod_mass = sum(
+                    [mod.mass for mod in modifications if mod.position < i]
+                )
             # C-terminal fragment.
-            elif fragment_type in 'xyz':
+            elif fragment_type in "xyz":
                 fragment_index = len(sequence) - i
                 fragment_sequence = sequence[i:]
-                mod_mass = sum([mod.mass for mod in modifications
-                                if mod.position >= i])
+                mod_mass = sum(
+                    [mod.mass for mod in modifications if mod.position >= i]
+                )
             else:
-                raise ValueError(f'Unknown ion type: {fragment_type}')
+                raise ValueError(f"Unknown ion type: {fragment_type}")
             for charge in range(1, max_charge + 1):
                 for nl_name, nl_mass in neutral_losses.items():
-                    nl_name = (None if nl_name is None else
-                               f'{"-" if nl_mass < 0 else "+"}{nl_name}')
-                    fragments.append(FragmentAnnotation(
-                        ion_type=f'{fragment_type}{fragment_index}',
-                        neutral_loss=nl_name,
-                        isotope=0,
-                        charge=charge,
-                        calc_mz=pmass.fast_mass(sequence=fragment_sequence,
-                                                ion_type=fragment_type,
-                                                charge=charge,
-                                                aa_mass=aa_mass)
-                                + (mod_mass + nl_mass) / charge))
-    return sorted(fragments, key=operator.attrgetter('calc_mz'))
+                    nl_name = (
+                        None
+                        if nl_name is None
+                        else f'{"-" if nl_mass < 0 else "+"}{nl_name}'
+                    )
+                    fragments.append(
+                        FragmentAnnotation(
+                            ion_type=f"{fragment_type}{fragment_index}",
+                            neutral_loss=nl_name,
+                            isotope=0,
+                            charge=charge,
+                            calc_mz=pmass.fast_mass(
+                                sequence=fragment_sequence,
+                                ion_type=fragment_type,
+                                charge=charge,
+                                aa_mass=aa_mass,
+                            )
+                            + (mod_mass + nl_mass) / charge,
+                        )
+                    )
+    return sorted(fragments, key=operator.attrgetter("calc_mz"))
 
 
 @nb.njit(cache=True)
-def _init_spectrum(mz: np.ndarray, intensity: np.ndarray)\
-        -> Tuple[np.ndarray, np.ndarray]:
+def _init_spectrum(
+    mz: np.ndarray, intensity: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
     mz, intensity = mz.reshape(-1), intensity.reshape(-1)
     order = np.argsort(mz)
     return mz[order], intensity[order]
 
 
 @nb.njit(cache=True)
-def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
-        -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _round(
+    mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     JIT helper function for `MsmsSpectrum.round`.
 
@@ -249,21 +268,25 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
     if len(mz_unique) < len(mz_round):
         intensity_unique = np.zeros_like(mz_unique, np.float32)
         annotations_unique_idx = np.zeros_like(mz_unique, np.int64)
-        combine_is_sum = combine == 'sum'
+        combine_is_sum = combine == "sum"
         i_orig = 0
         offset = 0
         for i_unique in range(len(mz_unique)):
             # Check whether subsequent mz values got merged.
-            while (abs(mz_unique[i_unique] - mz_round[i_orig + offset])
-                   <= 1e-06):
+            while (
+                abs(mz_unique[i_unique] - mz_round[i_orig + offset]) <= 1e-06
+            ):
                 offset += 1
             # Select the annotation of the most intense peak.
             annotations_unique_idx[i_unique] = i_orig + np.argmax(
-                intensity[i_orig: i_orig + offset])
+                intensity[i_orig : i_orig + offset]
+            )
             # Combine the corresponding intensities.
             intensity_unique[i_unique] = (
-                intensity[i_orig: i_orig + offset].sum() if combine_is_sum else
-                intensity[annotations_unique_idx[i_unique]])
+                intensity[i_orig : i_orig + offset].sum()
+                if combine_is_sum
+                else intensity[annotations_unique_idx[i_unique]]
+            )
 
             i_orig += offset
             offset = 0
@@ -274,8 +297,9 @@ def _round(mz: np.ndarray, intensity: np.ndarray, decimals: int, combine: str)\
 
 
 @nb.njit(cache=True)
-def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
-        -> np.ndarray:
+def _get_mz_range_mask(
+    mz: np.ndarray, min_mz: float, max_mz: float
+) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.set_mz_range`.
 
@@ -306,11 +330,14 @@ def _get_mz_range_mask(mz: np.ndarray, min_mz: float, max_mz: float)\
 
 
 @nb.njit(cache=True)
-def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
-                                 max_charge: int, isotope: int,
-                                 fragment_tol_mass: float,
-                                 fragment_tol_mode: str)\
-        -> np.ndarray:
+def _get_non_precursor_peak_mask(
+    mz: np.ndarray,
+    pep_mass: float,
+    max_charge: int,
+    isotope: int,
+    fragment_tol_mass: float,
+    fragment_tol_mode: str,
+) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.remove_precursor_peak`.
 
@@ -341,12 +368,13 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
         for iso in range(isotope + 1):
             remove_mz.append((pep_mass + iso) / charge + 1.0072766)
 
-    fragment_tol_mode_is_da = fragment_tol_mode == 'Da'
+    fragment_tol_mode_is_da = fragment_tol_mode == "Da"
     mask = np.full_like(mz, True, np.bool_)
     mz_i = remove_i = 0
     while mz_i < len(mz) and remove_i < len(remove_mz):
-        md = utils.mass_diff(mz[mz_i], remove_mz[remove_i],
-                             fragment_tol_mode_is_da)
+        md = utils.mass_diff(
+            mz[mz_i], remove_mz[remove_i], fragment_tol_mode_is_da
+        )
         if md < -fragment_tol_mass:
             mz_i += 1
         elif md > fragment_tol_mass:
@@ -359,8 +387,9 @@ def _get_non_precursor_peak_mask(mz: np.ndarray, pep_mass: float,
 
 
 @nb.njit(cache=True)
-def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
-                               max_num_peaks: int) -> np.ndarray:
+def _get_filter_intensity_mask(
+    intensity: np.ndarray, min_intensity: float, max_num_peaks: int
+) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.filter_intensity`.
 
@@ -390,14 +419,16 @@ def _get_filter_intensity_mask(intensity: np.ndarray, min_intensity: float,
             break
     # Only retain at most the `max_num_peaks` most intense peaks.
     mask = np.full_like(intensity, False, np.bool_)
-    mask[intensity_idx[max(start_i, len(intensity_idx) - max_num_peaks):]] =\
-        True
+    mask[
+        intensity_idx[max(start_i, len(intensity_idx) - max_num_peaks) :]
+    ] = True
     return mask
 
 
 @nb.njit(nb.float32[:](nb.float32[:], nb.int64), cache=True)
-def _get_scaled_intensity_root(intensity: np.ndarray, degree: int)\
-        -> np.ndarray:
+def _get_scaled_intensity_root(
+    intensity: np.ndarray, degree: int
+) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
@@ -437,8 +468,9 @@ def _get_scaled_intensity_log(intensity: np.ndarray, base: int) -> np.ndarray:
 
 
 @nb.njit(nb.float32[:](nb.float32[:], nb.int64), cache=True)
-def _get_scaled_intensity_rank(intensity: np.ndarray, max_rank: int)\
-        -> np.ndarray:
+def _get_scaled_intensity_rank(
+    intensity: np.ndarray, max_rank: int
+) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
@@ -454,13 +486,15 @@ def _get_scaled_intensity_rank(intensity: np.ndarray, max_rank: int)\
     np.ndarray
         The rank-scaled intensities.
     """
-    return ((max_rank - np.argsort(np.argsort(intensity)[::-1]))
-            .astype(np.float32))
+    return (max_rank - np.argsort(np.argsort(intensity)[::-1])).astype(
+        np.float32
+    )
 
 
 @nb.njit(nb.float32[:](nb.float32[:], nb.float32), fastmath=True, cache=True)
-def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
-        -> np.ndarray:
+def _scale_intensity_max(
+    intensity: np.ndarray, max_intensity: float
+) -> np.ndarray:
     """
     JIT helper function for `MsmsSpectrum.scale_intensity`.
 
@@ -482,10 +516,13 @@ def _scale_intensity_max(intensity: np.ndarray, max_intensity: float)\
 
 @nb.njit(cache=True)
 def _get_fragment_annotation_map(
-        spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
-        labels_mz: np.ndarray, fragment_tol_mass: float,
-        fragment_tol_mode: str, peak_assignment: str = 'most_intense')\
-        -> List[Tuple[int, int]]:
+    spectrum_mz: np.ndarray,
+    spectrum_intensity: np.ndarray,
+    labels_mz: np.ndarray,
+    fragment_tol_mass: float,
+    fragment_tol_mode: str,
+    peak_assignment: str = "most_intense",
+) -> List[Tuple[int, int]]:
     """
     Find matching indexes between observed m/z values and theoretical fragment
     labels.
@@ -521,36 +558,52 @@ def _get_fragment_annotation_map(
     annotation_i_map = []
     peak_i_start = 0
     for fragment_i, fragment_mz in enumerate(labels_mz):
-        while (peak_i_start < len(spectrum_mz) and
-               utils.mass_diff(spectrum_mz[peak_i_start], fragment_mz,
-                               fragment_tol_mode == 'Da')
-               < -fragment_tol_mass):
+        while (
+            peak_i_start < len(spectrum_mz)
+            and utils.mass_diff(
+                spectrum_mz[peak_i_start],
+                fragment_mz,
+                fragment_tol_mode == "Da",
+            )
+            < -fragment_tol_mass
+        ):
             peak_i_start += 1
         peak_i_stop = peak_i_start
-        while (peak_i_stop < len(spectrum_mz) and
-               utils.mass_diff(spectrum_mz[peak_i_stop], fragment_mz,
-                               fragment_tol_mode == 'Da')
-               <= fragment_tol_mass):
+        while (
+            peak_i_stop < len(spectrum_mz)
+            and utils.mass_diff(
+                spectrum_mz[peak_i_stop],
+                fragment_mz,
+                fragment_tol_mode == "Da",
+            )
+            <= fragment_tol_mass
+        ):
             peak_i_stop += 1
         if peak_i_start != peak_i_stop:
             peak_annotation_i = 0
-            if peak_assignment == 'nearest_mz':
-                peak_annotation_i = np.argmin(np.abs(
-                    spectrum_mz[peak_i_start: peak_i_stop] - fragment_mz))
-            elif peak_assignment == 'most_intense':
+            if peak_assignment == "nearest_mz":
+                peak_annotation_i = np.argmin(
+                    np.abs(spectrum_mz[peak_i_start:peak_i_stop] - fragment_mz)
+                )
+            elif peak_assignment == "most_intense":
                 peak_annotation_i = np.argmax(
-                    spectrum_intensity[peak_i_start: peak_i_stop])
-            annotation_i_map.append((peak_i_start + peak_annotation_i,
-                                     fragment_i))
+                    spectrum_intensity[peak_i_start:peak_i_stop]
+                )
+            annotation_i_map.append(
+                (peak_i_start + peak_annotation_i, fragment_i)
+            )
     return annotation_i_map
 
 
 @nb.njit(cache=True)
 def _get_mz_peak_index(
-        spectrum_mz: np.ndarray, spectrum_intensity: np.ndarray,
-        fragment_mz: float, fragment_tol_mass: float,
-        fragment_tol_mode: str, peak_assignment: str = 'most_intense')\
-        -> Optional[int]:
+    spectrum_mz: np.ndarray,
+    spectrum_intensity: np.ndarray,
+    fragment_mz: float,
+    fragment_tol_mass: float,
+    fragment_tol_mode: str,
+    peak_assignment: str = "most_intense",
+) -> Optional[int]:
     """
     Find the best m/z peak in a spectrum relative to the given m/z value.
 
@@ -582,20 +635,26 @@ def _get_mz_peak_index(
         of the best m/z peak relative to the given m/z value.
     """
     # Binary search to find the best matching peak.
-    md = (fragment_tol_mass if fragment_tol_mode == 'Da' else
-          fragment_tol_mass / 10**6 * fragment_mz)
+    md = (
+        fragment_tol_mass
+        if fragment_tol_mode == "Da"
+        else fragment_tol_mass / 10 ** 6 * fragment_mz
+    )
     peak_i_start, peak_i_stop = np.searchsorted(
-        spectrum_mz, [fragment_mz - md, fragment_mz + md])
+        spectrum_mz, [fragment_mz - md, fragment_mz + md]
+    )
     if peak_i_start == peak_i_stop:
         return None
     else:
         peak_annotation_i = 0
-        if peak_assignment == 'nearest_mz':
-            peak_annotation_i = np.argmin(np.abs(
-                spectrum_mz[peak_i_start:peak_i_stop] - fragment_mz))
-        elif peak_assignment == 'most_intense':
+        if peak_assignment == "nearest_mz":
+            peak_annotation_i = np.argmin(
+                np.abs(spectrum_mz[peak_i_start:peak_i_stop] - fragment_mz)
+            )
+        elif peak_assignment == "most_intense":
             peak_annotation_i = np.argmax(
-                spectrum_intensity[peak_i_start:peak_i_stop])
+                spectrum_intensity[peak_i_start:peak_i_stop]
+            )
         return peak_i_start + peak_annotation_i
 
 
@@ -604,15 +663,17 @@ class MsmsSpectrum:
     Class representing a tandem mass spectrum.
     """
 
-    def __init__(self,
-                 identifier: str,
-                 precursor_mz: float,
-                 precursor_charge: int,
-                 mz: Union[np.ndarray, Iterable],
-                 intensity: Union[np.ndarray, Iterable],
-                 retention_time: Optional[float] = None,
-                 mz_dtype: npt.DTypeLike = np.float64,
-                 intensity_dtype: npt.DTypeLike = np.float32) -> None:
+    def __init__(
+        self,
+        identifier: str,
+        precursor_mz: float,
+        precursor_charge: int,
+        mz: Union[np.ndarray, Iterable],
+        intensity: Union[np.ndarray, Iterable],
+        retention_time: Optional[float] = None,
+        mz_dtype: npt.DTypeLike = np.float64,
+        intensity_dtype: npt.DTypeLike = np.float32,
+    ) -> None:
         """
         Instantiate a new `MsmsSpectrum` consisting of fragment peaks.
 
@@ -643,17 +704,21 @@ class MsmsSpectrum:
         self.precursor_mz = precursor_mz
         self.precursor_charge = precursor_charge
         if len(mz) != len(intensity):
-            raise ValueError('The mass-to-charge and intensity arrays should '
-                             'have equal lengths')
+            raise ValueError(
+                "The mass-to-charge and intensity arrays should "
+                "have equal lengths"
+            )
         self._mz, self._intensity = _init_spectrum(
-            np.require(mz, mz_dtype, 'W'),
-            np.require(intensity, intensity_dtype, 'W'))
-        self.annotation, self._labels = None, None
+            np.require(mz, mz_dtype, "W"),
+            np.require(intensity, intensity_dtype, "W"),
+        )
+        self.proforma, self._annotation = None, None
         self.retention_time = retention_time
 
     @classmethod
-    def from_usi(cls, usi: str, backend: str = 'aggregator', **kwargs) \
-            -> 'MsmsSpectrum':
+    def from_usi(
+        cls, usi: str, backend: str = "aggregator", **kwargs
+    ) -> "MsmsSpectrum":
         """
         Construct a spectrum from a public resource specified by its Universal
         Spectrum Identifier (USI).
@@ -692,24 +757,28 @@ class MsmsSpectrum:
             and `precursor_charge` keyword arguments respectively.
         """
         spectrum_dict = pyteomics.usi.proxi(usi, backend, **kwargs)
-        for attr in spectrum_dict['attributes']:
-            if attr['accession'] in ('MS:1000827', 'MS:1000744', 'MS:1002234'):
-                kwargs['precursor_mz'] = float(attr['value'])
+        for attr in spectrum_dict["attributes"]:
+            if attr["accession"] in ("MS:1000827", "MS:1000744", "MS:1002234"):
+                kwargs["precursor_mz"] = float(attr["value"])
                 break
         else:
-            if 'precursor_mz' not in kwargs:
-                raise ValueError('Unknown precursor m/z from USI. Specify the '
-                                 'precursor m/z directly.')
-        for attr in spectrum_dict['attributes']:
-            if attr['accession'] == 'MS:1000041':
-                kwargs['precursor_charge'] = int(attr['value'])
+            if "precursor_mz" not in kwargs:
+                raise ValueError(
+                    "Unknown precursor m/z from USI. Specify the "
+                    "precursor m/z directly."
+                )
+        for attr in spectrum_dict["attributes"]:
+            if attr["accession"] == "MS:1000041":
+                kwargs["precursor_charge"] = int(attr["value"])
                 break
         else:
-            if 'precursor_charge' not in kwargs:
-                raise ValueError('Unknown precursor charge from USI. Specify '
-                                 'the precursor charge directly.')
-        mz = spectrum_dict['m/z array']
-        intensity = spectrum_dict['intensity array']
+            if "precursor_charge" not in kwargs:
+                raise ValueError(
+                    "Unknown precursor charge from USI. Specify "
+                    "the precursor charge directly."
+                )
+        mz = spectrum_dict["m/z array"]
+        intensity = spectrum_dict["intensity array"]
         return cls(identifier=usi, mz=mz, intensity=intensity, **kwargs)
 
     @property
@@ -741,7 +810,7 @@ class MsmsSpectrum:
         return self._intensity
 
     @property
-    def labels(self) -> Optional[np.ndarray]:
+    def annotation(self) -> Optional[np.ndarray]:
         """
         The annotated labels of the fragment peaks.
 
@@ -751,9 +820,9 @@ class MsmsSpectrum:
             The labels of the fragment peaks, or None if the spectrum has not
             been annotated.
         """
-        return self._labels
+        return self._annotation
 
-    def round(self, decimals: int = 0, combine: str = 'sum') -> 'MsmsSpectrum':
+    def round(self, decimals: int = 0, combine: str = "sum") -> "MsmsSpectrum":
         """
         Round the mass-to-charge ratios of the fragment peaks to the given
         number of decimals.
@@ -781,13 +850,15 @@ class MsmsSpectrum:
         MsmsSpectrum
         """
         self._mz, self._intensity, annotation_idx = _round(
-            self._mz, self._intensity, decimals, combine)
-        if self._labels is not None:
-            self._labels = self._labels[annotation_idx]
+            self._mz, self._intensity, decimals, combine
+        )
+        if self._annotation is not None:
+            self._annotation = self._annotation[annotation_idx]
         return self
 
-    def set_mz_range(self, min_mz: Optional[float] = None,
-                     max_mz: Optional[float] = None) -> 'MsmsSpectrum':
+    def set_mz_range(
+        self, min_mz: Optional[float] = None, max_mz: Optional[float] = None
+    ) -> "MsmsSpectrum":
         """
         Restrict the mass-to-charge ratios of the fragment peaks to the
         given range.
@@ -817,13 +888,16 @@ class MsmsSpectrum:
         mz_range_mask = _get_mz_range_mask(self._mz, min_mz, max_mz)
         self._mz = self._mz[mz_range_mask]
         self._intensity = self._intensity[mz_range_mask]
-        if self._labels is not None:
-            self._labels = self._labels[mz_range_mask]
+        if self._annotation is not None:
+            self._annotation = self._annotation[mz_range_mask]
         return self
 
-    def remove_precursor_peak(self, fragment_tol_mass: float,
-                              fragment_tol_mode: str, isotope: int = 0) \
-            -> 'MsmsSpectrum':
+    def remove_precursor_peak(
+        self,
+        fragment_tol_mass: float,
+        fragment_tol_mode: str,
+        isotope: int = 0,
+    ) -> "MsmsSpectrum":
         """
         Remove fragment peak(s) close to the precursor mass-to-charge ratio.
 
@@ -845,17 +919,22 @@ class MsmsSpectrum:
         # FIXME: This assumes M+xH charged ions.
         neutral_mass = (self.precursor_mz - 1.0072766) * self.precursor_charge
         peak_mask = _get_non_precursor_peak_mask(
-            self._mz, neutral_mass, self.precursor_charge, isotope,
-            fragment_tol_mass, fragment_tol_mode)
+            self._mz,
+            neutral_mass,
+            self.precursor_charge,
+            isotope,
+            fragment_tol_mass,
+            fragment_tol_mode,
+        )
         self._mz = self.mz[peak_mask]
         self._intensity = self.intensity[peak_mask]
-        if self._labels is not None:
-            self._labels = self._labels[peak_mask]
+        if self._annotation is not None:
+            self._annotation = self._annotation[peak_mask]
         return self
 
-    def filter_intensity(self, min_intensity: float = 0.0,
-                         max_num_peaks: Optional[int] = None) \
-            -> 'MsmsSpectrum':
+    def filter_intensity(
+        self, min_intensity: float = 0.0, max_num_peaks: Optional[int] = None
+    ) -> "MsmsSpectrum":
         """
         Remove low-intensity fragment peaks.
 
@@ -880,16 +959,20 @@ class MsmsSpectrum:
         if max_num_peaks is None:
             max_num_peaks = len(self._intensity)
         intensity_mask = _get_filter_intensity_mask(
-            self._intensity, min_intensity, max_num_peaks)
+            self._intensity, min_intensity, max_num_peaks
+        )
         self._mz = self._mz[intensity_mask]
         self._intensity = self._intensity[intensity_mask]
-        if self._labels is not None:
-            self._labels = self._labels[intensity_mask]
+        if self._annotation is not None:
+            self._annotation = self._annotation[intensity_mask]
         return self
 
-    def scale_intensity(self, scaling: Optional[str] = None,
-                        max_intensity: Optional[float] = None,
-                        **kwargs) -> 'MsmsSpectrum':
+    def scale_intensity(
+        self,
+        scaling: Optional[str] = None,
+        max_intensity: Optional[float] = None,
+        **kwargs,
+    ) -> "MsmsSpectrum":
         """
         Scale the intensity of the fragment peaks.
 
@@ -926,33 +1009,42 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
-        if scaling == 'root':
+        if scaling == "root":
             self._intensity = _get_scaled_intensity_root(
-                self._intensity, kwargs.get('degree', 2))
-        elif scaling == 'log':
+                self._intensity, kwargs.get("degree", 2)
+            )
+        elif scaling == "log":
             self._intensity = _get_scaled_intensity_log(
-                self._intensity, kwargs.get('base', 2))
-        elif scaling == 'rank':
-            max_rank = kwargs.get('max_rank', len(self._intensity))
+                self._intensity, kwargs.get("base", 2)
+            )
+        elif scaling == "rank":
+            max_rank = kwargs.get("max_rank", len(self._intensity))
             if max_rank < len(self._intensity):
-                raise ValueError('`max_rank` should be greater than or equal '
-                                 'to the number of peaks in the spectrum. See '
-                                 '`filter_intensity` to reduce the number of '
-                                 'peaks in the spectrum.')
+                raise ValueError(
+                    "`max_rank` should be greater than or equal "
+                    "to the number of peaks in the spectrum. See "
+                    "`filter_intensity` to reduce the number of "
+                    "peaks in the spectrum."
+                )
             self._intensity = _get_scaled_intensity_rank(
-                self._intensity, max_rank)
+                self._intensity, max_rank
+            )
         if max_intensity is not None:
             self._intensity = _scale_intensity_max(
-                self._intensity, max_intensity)
+                self._intensity, max_intensity
+            )
         return self
 
     def annotate_proforma(
-            self, proforma_str: str, fragment_tol_mass: float,
-            fragment_tol_mode: str, ion_types: str = 'by',
-            max_ion_charge: Optional[int] = None,
-            peak_assignment: str = 'most_intense',
-            neutral_losses: Optional[Dict[Optional[str], float]] = None) \
-            -> 'MsmsSpectrum':
+        self,
+        proforma_str: str,
+        fragment_tol_mass: float,
+        fragment_tol_mode: str,
+        ion_types: str = "by",
+        max_ion_charge: Optional[int] = None,
+        peak_assignment: str = "most_intense",
+        neutral_losses: Optional[Dict[Optional[str], float]] = None,
+    ) -> "MsmsSpectrum":
         """
         Assign fragment ion labels to the peaks from a ProForma annotation.
 
@@ -991,8 +1083,8 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
-        self.annotation = proforma_str
-        self._labels = np.full_like(self.mz, None, object)
+        self.proforma = proforma_str
+        self._annotation = np.full_like(self.mz, None, object)
         # Be default, peak charges are assumed to be smaller than the precursor
         # charge.
         if max_ion_charge is None:
@@ -1004,18 +1096,26 @@ class MsmsSpectrum:
 
         # Parse the ProForma string and find peaks that match the theoretical
         # fragments.
-        for proteoform in proforma.parse(self.annotation):
+        for proteoform in proforma.parse(self.proforma):
             # TODO: Only localized modifications or all of them? Check.
             theoretical_fragments = _get_theoretical_fragments(
-                proteoform.sequence, proteoform.modifications,
-                ion_types, max_ion_charge, neutral_losses)
-            for annotation_i, fragment_i in \
-                    _get_fragment_annotation_map(
-                        self.mz, self.intensity,
-                        np.asarray([fragment.calc_mz
-                                    for fragment in theoretical_fragments]),
-                        fragment_tol_mass, fragment_tol_mode, peak_assignment):
+                proteoform.sequence,
+                proteoform.modifications,
+                ion_types,
+                max_ion_charge,
+                neutral_losses,
+            )
+            for annotation_i, fragment_i in _get_fragment_annotation_map(
+                self.mz,
+                self.intensity,
+                np.asarray(
+                    [fragment.calc_mz for fragment in theoretical_fragments]
+                ),
+                fragment_tol_mass,
+                fragment_tol_mode,
+                peak_assignment,
+            ):
                 # FIXME: Duplicate labels for the same peak are overwritten.
-                self._labels[annotation_i] = theoretical_fragments[fragment_i]
+                self._annotation[annotation_i] = theoretical_fragments[fragment_i]
 
         return self

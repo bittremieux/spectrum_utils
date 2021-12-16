@@ -192,28 +192,38 @@ def _get_theoretical_fragments(
             if fragment_type in "abc":
                 fragment_index = i
                 fragment_sequence = proteoform.sequence[:i]
-                mod_mass = sum(
-                    [
-                        mod.mass
-                        for mod in proteoform.modifications
-                        if (isinstance(mod.position, int) and mod.position < i)
-                        or mod.position == "N-term"
-                    ]
-                )
+                if proteoform.modifications is not None:
+                    mod_mass = sum(
+                        [
+                            mod.mass
+                            for mod in proteoform.modifications
+                            if (
+                                isinstance(mod.position, int)
+                                and mod.position < i
+                            )
+                            or mod.position == "N-term"
+                        ]
+                    )
+                else:
+                    mod_mass = 0
             # C-terminal fragment.
             elif fragment_type in "xyz":
                 fragment_index = len(proteoform.sequence) - i
                 fragment_sequence = proteoform.sequence[i:]
-                mod_mass = sum(
-                    [
-                        mod.mass
-                        for mod in proteoform.modifications
-                        if (
-                            isinstance(mod.position, int) and mod.position >= i
-                        )
-                        or mod.position == "C-term"
-                    ]
-                )
+                if proteoform.modifications is not None:
+                    mod_mass = sum(
+                        [
+                            mod.mass
+                            for mod in proteoform.modifications
+                            if (
+                                isinstance(mod.position, int)
+                                and mod.position >= i
+                            )
+                            or mod.position == "C-term"
+                        ]
+                    )
+                else:
+                    mod_mass = 0
             else:
                 raise ValueError(
                     f"Unknown/unsupported ion type: {fragment_type}"
@@ -359,7 +369,7 @@ def _get_mz_range_mask(
         min_i += 1
     while max_i > 0 and mz[max_i] > max_mz:
         max_i -= 1
-    return min_i, max_i
+    return min_i, max_i + 1
 
 
 @nb.njit(cache=True)
@@ -453,9 +463,9 @@ def _get_filter_intensity_mask(
     # Discard low-intensity noise peaks.
     start_i = 0
     for intens in intensity[intensity_idx]:
-        start_i += 1
         if intens > min_intensity:
             break
+        start_i += 1
     # Only retain at most the `max_num_peaks` most intense peaks.
     mask = np.full_like(intensity, False, np.bool_)
     mask[

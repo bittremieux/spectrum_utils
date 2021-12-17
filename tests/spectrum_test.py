@@ -391,6 +391,35 @@ def test_intensity_array():
         spec.intensity = np.random.lognormal(0, 1, num_peaks)
 
 
+def test_from_usi():
+    usi = ("mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555:"
+           "VLHPLEGAVVIIFK/2")
+    spec = spectrum.MsmsSpectrum.from_usi(usi)
+    assert spec.identifier == usi
+    assert spec.precursor_mz == 767.9700
+    assert spec.precursor_charge == 2
+    assert len(spec.mz) == len(spec.intensity)
+    usi = "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555"
+    spec = spectrum.MsmsSpectrum.from_usi(usi, precursor_charge=2)
+    assert spec.identifier == usi
+    assert spec.precursor_mz == 767.9700
+    assert spec.precursor_charge == 2
+    assert len(spec.mz) == len(spec.intensity)
+    usi = "mzspec:PXD003534:DY_HS_Exp7-Ad1:scan:30372"
+    precursor_mz, precursor_charge = 507.7484, 2
+    spec = spectrum.MsmsSpectrum.from_usi(
+        usi, precursor_mz=precursor_mz, precursor_charge=precursor_charge
+    )
+    assert spec.identifier == usi
+    assert spec.precursor_mz == precursor_mz
+    assert spec.precursor_charge == precursor_charge
+    assert len(spec.mz) == len(spec.intensity)
+    with pytest.raises(ValueError):
+        spectrum.MsmsSpectrum.from_usi(usi, precursor_mz=precursor_mz)
+    with pytest.raises(ValueError):
+        spectrum.MsmsSpectrum.from_usi(usi, precursor_charge=precursor_charge)
+
+
 def test_round_no_merge():
     num_peaks = 150
     mz = np.arange(1, num_peaks + 1) + np.random.uniform(-0.49, 0.5, num_peaks)

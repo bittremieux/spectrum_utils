@@ -333,6 +333,19 @@ def _get_peak_annotation_indexes(
     return annotation_i_map
 
 
+class GnpsBackend(pyteomics.usi._PROXIBackend):
+
+    _url_template = ("https://metabolomics-usi.ucsd.edu/proxi/v{version}/"
+                     "spectra?usi1={usi}")
+
+    def __init__(self, **kwargs):
+        super(GnpsBackend, self).__init__("GNPS", self._url_template, **kwargs)
+
+
+pyteomics.usi._proxies["GNPS"] = GnpsBackend
+pyteomics.usi.AGGREGATOR = pyteomics.usi.PROXIAggregator()
+
+
 @nb.experimental.jitclass
 class MsmsSpectrumJit:
     """

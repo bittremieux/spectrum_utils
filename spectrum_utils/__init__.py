@@ -14,4 +14,4 @@ except ImportError:
         pass
 
 
-__all__ = ['iplot', 'plot', 'spectrum', 'utils']
+__all__ = ["iplot", "plot", "spectrum", "utils"]

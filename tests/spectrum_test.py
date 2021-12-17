@@ -329,6 +329,18 @@ def test_get_theoretical_fragments_mod_neutral_loss():
         assert fragment_mz == pytest.approx(fragment.calc_mz), repr(fragment)
 
 
+def test_get_theoretical_fragments_ambiguous():
+    with pytest.raises(ValueError):
+        spectrum._get_theoretical_fragments(proforma.parse("HPYLEBDR")[0])
+    with pytest.raises(ValueError):
+        spectrum._get_theoretical_fragments(proforma.parse("HPZYLEDR")[0])
+
+
+def test_get_theoretical_fragments_unsupported_fragment_type():
+    with pytest.raises(ValueError):
+        spectrum._get_theoretical_fragments(proforma.parse("HPYLEDR")[0], "l")
+
+
 def test_mz_intensity_len():
     mz = np.random.uniform(100, 1400, 150)
     intensity = np.random.exponential(1, 100)

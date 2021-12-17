@@ -374,7 +374,7 @@ class ProFormaTransformer(lark.Transformer):
                     mod = copy.copy(mod)
                     mod.position = i
                     self._modifications.append(mod)
-        charge = tree[-1] if len(tree) > 1 else None
+        charge = tree[-1]
         self._modifications.sort(key=_modification_sort_key)
         proteoform = Proteoform(
             sequence=sequence,
@@ -398,15 +398,14 @@ class ProFormaTransformer(lark.Transformer):
         self._sequence.append(tree[0])
         # An amino acid token can be followed by (i) a modification on that
         # residue, or (ii) a label (linking it to another modified residue).
-        if len(tree) == 2:
-            if isinstance(tree[1], Label):
-                # noinspection PyArgumentList
-                self._modifications.append(
-                    Modification(position=position, label=tree[1])
-                )
-            else:
-                tree[1].position = position
-                self._modifications.append(tree[1])
+        if isinstance(tree[1], Label):
+            # noinspection PyArgumentList
+            self._modifications.append(
+                Modification(position=position, label=tree[1])
+            )
+        elif isinstance(tree[1], Modification):
+            tree[1].position = position
+            self._modifications.append(tree[1])
 
     def AA(self, token) -> str:
         return token.value.upper()
@@ -430,7 +429,9 @@ class ProFormaTransformer(lark.Transformer):
 
     def mod_unknown_pos(self, mods) -> None:
         for mod in mods:
-            if isinstance(mod, Modification):
+            if mod is None:
+                continue
+            elif isinstance(mod, Modification):
                 mod.position = "unknown"
                 self._modifications.append(mod)
             else:
@@ -518,12 +519,13 @@ class ProFormaTransformer(lark.Transformer):
         return token.value
 
     def mod_mass(self, tree) -> Mass:
-        if len(tree) == 1:
-            return Mass(mass=tree[0])
-        elif tree[0] == "Obs":
-            return Mass(mass=tree[1])
+        if len(tree) == 2:
+            if tree[0] == "Obs":
+                return Mass(mass=tree[1])
+            else:
+                return Mass(mass=tree[1], controlled_vocabulary=tree[0])
         else:
-            return Mass(mass=tree[1], controlled_vocabulary=tree[0])
+            return Mass(mass=tree[-1])
 
     def MOD_MASS_OBS(self, _) -> str:
         return "Obs"
@@ -532,7 +534,7 @@ class ProFormaTransformer(lark.Transformer):
         return float(token.value)
 
     def mod_formula(self, tree) -> Formula:
-        *isotopes, formula = tree if len(tree) > 1 else (tree[0],)
+        *isotopes, formula = tree
         return Formula(
             formula=formula, isotopes=isotopes if isotopes else None
         )
@@ -579,7 +581,7 @@ class ProFormaTransformer(lark.Transformer):
         )
 
     def ion(self, tree) -> List[Ion]:
-        return [Ion(ion) for ion in tree]
+        return [Ion(ion) for ion in tree if ion is not None]
 
     def TEXT(self, token) -> str:
         return token.value

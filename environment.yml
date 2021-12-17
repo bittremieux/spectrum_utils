@@ -7,7 +7,7 @@ dependencies:
   - altair
   - appdirs
   - fastobo
-  - lark-parser
+  - lark>=1.0
   - matplotlib
   - numba>=0.47
   - numpy

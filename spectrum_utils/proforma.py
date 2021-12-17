@@ -743,17 +743,20 @@ def _import_cv(
         )
         if match is not None:
             owner_name, repo_name, filename = match.group(1, 2, 3)
-            with urllib.request.urlopen(
-                f"https://api.github.com/repos/{owner_name}/{repo_name}/"
-                f"commits?path={filename}&per_page=1&page=1"
-            ) as response:
-                if response.getcode() < 400:
-                    date_url = datetime.datetime.strptime(
-                        json.load(response)[0]["commit"]["author"]["date"],
-                        "%Y-%m-%dT%H:%M:%SZ",
-                    )
-                    if date_cache >= date_url:
-                        return cv
+            try:
+                with urllib.request.urlopen(
+                    f"https://api.github.com/repos/{owner_name}/{repo_name}/"
+                    f"commits?path={filename}&per_page=1&page=1"
+                ) as response:
+                    if response.getcode() < 400:
+                        date_url = datetime.datetime.strptime(
+                            json.load(response)[0]["commit"]["author"]["date"],
+                            "%Y-%m-%dT%H:%M:%SZ",
+                        )
+                        if date_cache >= date_url:
+                            return cv
+            except urllib.error.HTTPError:
+                pass
         else:
             # Just use the cached CV if we can't compare timestamps.
             return cv

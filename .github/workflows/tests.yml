@@ -26,21 +26,26 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flake8 pytest pytest-cov wheel
         pip install -e .
-    - name: Lint with flake8
+    - name: Lint with black
+      uses: psf/black@stable
+      with:
+        options: "--check --diff --line-length 79"
+        src: "./spectrum_utils"
+    - name: Check for debugging print statements
       run: |
-        # Stop the build if there are Python syntax errors or undefined names.
-        flake8 . --count --extend-exclude ./docs/conf.py --show-source --statistics
-        # exit-zero treats all errors as warnings.
-        flake8 . --count --extend-exclude ./docs/conf.py --exit-zero --max-complexity=10 --statistics
+        if grep -rq "^\s*print(" spectrum_utils; then
+            echo "Found the following print statements:"
+            grep -r "^\s*print(" spectrum_utils
+            exit 1
+        fi
     - name: Run unit and system tests
       run: |
-        pytest --cov=spectrum_utils ./tests/
+        pytest --cov=. tests/
     - name: Upload coverage to codecov
       uses: codecov/codecov-action@v1
       with:

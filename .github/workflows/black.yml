@@ -1,0 +1,29 @@
+# This workflow will install Python dependencies, run tests, and lint with a
+# single version of Python. For more information see:
+# https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Lint
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.8"
+    - name: Lint with black
+      uses: psf/black@stable
+      with:
+        options: "--check --diff --line-length 79"
+        src: "./spectrum_utils"
+    - name: Check for debugging print statements
+      run: |
+        if grep -rq "^\s*print(" spectrum_utils; then
+            echo "Found the following print statements:"
+            grep -r "^\s*print(" spectrum_utils
+            exit 1
+        fi

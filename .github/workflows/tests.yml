@@ -31,18 +31,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-cov wheel
         pip install -e .
-    - name: Lint with black
-      uses: psf/black@stable
-      with:
-        options: "--check --diff --line-length 79"
-        src: "./spectrum_utils"
-    - name: Check for debugging print statements
-      run: |
-        if grep -rq "^\s*print(" spectrum_utils; then
-            echo "Found the following print statements:"
-            grep -r "^\s*print(" spectrum_utils
-            exit 1
-        fi
     - name: Run unit and system tests
       run: |
         pytest --cov=. tests/

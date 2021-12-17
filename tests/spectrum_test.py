@@ -451,7 +451,7 @@ def test_round_merge_len():
     spec.round(1)
     assert len(spec.mz) == len(mz) - 3
     assert len(spec.mz) == len(spec.intensity)
-    assert len(spec.mz) == len(spec.annotation)
+    assert spec.annotation is None
 
 
 def test_round_merge_sum():
@@ -501,7 +501,7 @@ def test_set_mz_range_truncate():
     spec.set_mz_range(min_mz, max_mz)
     assert len(spec.mz) < num_peaks
     assert len(spec.intensity) < num_peaks
-    assert len(spec.annotation) < num_peaks
+    assert spec.annotation is None
     assert spec.mz.min() >= min_mz
     assert spec.mz.max() <= max_mz
 
@@ -578,7 +578,7 @@ def test_remove_precursor_peak():
     assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
     assert len(spec.mz) <= num_peaks - 1
     assert len(spec.intensity) <= num_peaks - 1
-    assert len(spec.annotation) <= num_peaks - 1
+    assert spec.annotation is None
 
 
 def test_remove_precursor_peak_none():
@@ -657,7 +657,7 @@ def test_filter_intensity_remove_low_intensity():
     spec.filter_intensity(min_intensity=min_intensity)
     assert len(spec.mz) < num_peaks
     assert len(spec.intensity) < num_peaks
-    assert len(spec.annotation) < num_peaks
+    assert spec.annotation is None
     assert spec.intensity.max() == pytest.approx(max_intensity)
     assert spec.intensity.min() >= min_intensity * max_intensity
 

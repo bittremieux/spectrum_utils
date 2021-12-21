@@ -5,7 +5,8 @@ from typing import Dict, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
-from spectrum_utils.spectrum import MsmsSpectrum, FragmentAnnotation
+from spectrum_utils.fragment_annotation import FragmentAnnotation
+from spectrum_utils.spectrum import MsmsSpectrum
 
 
 colors = {

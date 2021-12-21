@@ -63,32 +63,39 @@ def test_intensity_array():
 
 
 def test_from_usi():
-    usi = ("mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555:"
-           "VLHPLEGAVVIIFK/2")
-    spec = spectrum.MsmsSpectrum.from_usi(usi)
-    assert spec.identifier == usi
-    assert spec.precursor_mz == 767.9700
-    assert spec.precursor_charge == 2
-    assert len(spec.mz) == len(spec.intensity)
-    usi = "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555"
-    spec = spectrum.MsmsSpectrum.from_usi(usi, precursor_charge=2)
-    assert spec.identifier == usi
-    assert spec.precursor_mz == 767.9700
-    assert spec.precursor_charge == 2
-    assert len(spec.mz) == len(spec.intensity)
-    usi = "mzspec:PXD003534:DY_HS_Exp7-Ad1:scan:30372"
-    precursor_mz, precursor_charge = 507.7484, 2
-    spec = spectrum.MsmsSpectrum.from_usi(
-        usi, precursor_mz=precursor_mz, precursor_charge=precursor_charge
-    )
-    assert spec.identifier == usi
-    assert spec.precursor_mz == precursor_mz
-    assert spec.precursor_charge == precursor_charge
-    assert len(spec.mz) == len(spec.intensity)
+    for usi in [
+        "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555",
+        "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555:"
+        "VLHPLEGAVVIIFK/2",
+        "mzspec:PXD000966:CPTAC_CompRef_00_iTRAQ_05_2Feb12_Cougar_11-10-09:"
+        "scan:12298",
+        "mzspec:PXD000966:CPTAC_CompRef_00_iTRAQ_05_2Feb12_Cougar_11-10-09:"
+        "scan:12298:[iTRAQ4plex]-LHFFM[Oxidation]PGFAPLTSR/3",
+        "mzspec:PXD022531:j12541_C5orf38:scan:12368",
+        "mzspec:PXD022531:j12541_C5orf38:scan:12368:VAATLEILTLK/2",
+        "mzspec:PXD022531:b11156_PRAMEF17:scan:22140",
+        "mzspec:PXD022531:b11156_PRAMEF17:scan:22140:VAATLEILTLK/2",
+        "mzspec:PXD000394:20130504_EXQ3_MiBa_SA_Fib-2:scan:4234",
+        "mzspec:PXD000394:20130504_EXQ3_MiBa_SA_Fib-2:scan:4234:SGVSRKPAPG/2",
+        "mzspec:PXD010793:20170817_QEh1_LC1_HuPa_SplicingPep_10pmol_G2_R01:"
+        "scan:8296",
+        "mzspec:PXD010793:20170817_QEh1_LC1_HuPa_SplicingPep_10pmol_G2_R01:"
+        "scan:8296:SGVSRKPAPG/2",
+        "mzspec:PXD010154:01284_E04_P013188_B00_N29_R1.mzML:scan:31291",
+        "mzspec:PXD010154:01284_E04_P013188_B00_N29_R1.mzML:scan:31291:"
+        "DQNGTWEM[Oxidation]ESNENFEGYM[Oxidation]K/2",
+        "mzspec:GNPS:TASK-c95481f0c53d42e78a61bf899e9f9adb-spectra/"
+        "specs_ms.mgf:scan:1943",
+        "mzspec:GNPS:GNPS-LIBRARY:accession:CCMSLIB00005436077",
+        "mzspec:MSV000078547:120228_nbut_3610_it_it_take2:scan:389",
+    ]:
+        spec = spectrum.MsmsSpectrum.from_usi(usi)
+        assert spec.identifier == usi
     with pytest.raises(ValueError):
-        spectrum.MsmsSpectrum.from_usi(usi, precursor_mz=precursor_mz)
-    with pytest.raises(ValueError):
-        spectrum.MsmsSpectrum.from_usi(usi, precursor_charge=precursor_charge)
+        spectrum.MsmsSpectrum.from_usi(
+            "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555",
+            "massive",
+        )
 
 
 def test_round_no_merge():

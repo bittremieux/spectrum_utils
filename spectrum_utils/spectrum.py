@@ -17,7 +17,7 @@ class GnpsBackend(pyteomics.usi._PROXIBackend):
 
 
 # Reload the Pyteomics PROXI aggregator to also include GNPS.
-pyteomics.usi._proxies["GNPS"] = GnpsBackend
+pyteomics.usi._proxies["gnps"] = GnpsBackend
 pyteomics.usi.AGGREGATOR = pyteomics.usi.PROXIAggregator()
 
 
@@ -262,9 +262,15 @@ class MsmsSpectrum:
         <https://psidev.info/usi>`_ specification by the Proteomics Standards
         Initiative for more information on how to use USIs to refer to spectra.
 
+        Besides official USIs, the USI extension to refer to MS/MS spectra from
+        various metabolomics resources is also supported. This behavior can be
+        explicitly requested by specifying the `"gnps"` backend.
+        See `the corresponding preprint
+        <https://doi.org/10.1101/2020.05.09.086066>`_ for more information.
+
         See the `Pyteomics documentation
         <https://pyteomics.readthedocs.io/en/latest/api/usi.html#pyteomics.usi.proxi>`_
-        for more details on the available PROXI backends.
+        for details on how to use specific PROXI backends.
 
         Parameters
         ----------

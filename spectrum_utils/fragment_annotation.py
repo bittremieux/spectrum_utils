@@ -319,7 +319,26 @@ def get_theoretical_fragments(
                     + mod_mass / charge,
                 )
             )
-    # Generate all fragments with a neutral loss from the peptide fragments.
+    # Unfragmented precursor ion(s).
+    if "p" in ion_types:
+        if proteoform.modifications is not None:
+            mod_mass = sum([mod.mass for mod in proteoform.modifications])
+        else:
+            mod_mass = 0
+        for charge in range(1, max_charge + 1):
+            fragments_masses.extend(
+                (
+                    FragmentAnnotation(ion_type="p", charge=charge),
+                    pmass.fast_mass(
+                        sequence=proteoform.sequence,
+                        charge=charge,
+                        aa_mass=_aa_mass,
+                    )
+                    + mod_mass / charge,
+                )
+            )
+    # Generate all fragments that differ by a neutral loss from the base
+    # fragments.
     neutral_loss_fragments = []
     for neutral_loss, mass_diff in neutral_losses.items():
         if neutral_loss is None:

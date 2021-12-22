@@ -1,4 +1,5 @@
 import operator
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import numba as nb
@@ -13,15 +14,66 @@ from spectrum_utils import proforma, utils
 
 
 # Amino acid and special amino acid masses.
-aa_mass = {
+_aa_mass = {
     **pmass.std_aa_mass,
-    # "B": 0,             # aspartic acid / asparagine (ambiguous mass)
-    # "Z": 0,             # glutamic acid / glutamine (ambiguous mass)
-    "J": 113.08406,       # leucine / isoleucine
-    # "U": 150.95363,     # selenocysteine (in Pyteomics)
-    # "O": 237.14772,     # pyrrolysine (in Pyteomics)
-    "X": 0,               # any amino acid, gaps (zero mass)
+    # Aspartic acid / asparagine (ambiguous mass).
+    # "B": 0,
+    # Glutamic acid / glutamine (ambiguous mass).
+    # "Z": 0,
+    # Leucine / isoleucine.
+    "J": 113.08406,
+    # Selenocysteine (in Pyteomics).
+    # "U": 150.95363,
+    # Pyrrolysine (in Pyteomics).
+    # "O": 237.14772,
+    # Any amino acid, gaps (zero mass).
+    "X": 0,
 }
+
+# Common neutral losses.
+_neutral_loss = {
+    # No neutral loss.
+    None: 0,
+    # Hydrogen.
+    "H": -1.007825,
+    # Ammonia.
+    "NH3": -17.026549,
+    # Water.
+    "H2O": -18.010565,
+    # Carbon monoxide.
+    "CO": -27.994915,
+    # Carbon dioxide.
+    "CO2": -43.989829,
+    # Formamide.
+    "HCONH2": -45.021464,
+    # Formic acid.
+    "HCOOH": -46.005479,
+    # Methanesulfenic acid.
+    "CH4OS": -63.998301,
+    # Sulfur trioxide.
+    "SO3": -79.956818,
+    # Metaphosphoric acid.
+    "HPO3": -79.966331,
+    # Mercaptoacetamide.
+    "C2H5NOS": -91.009195,
+    # Mercaptoacetic acid.
+    "C2H4O2S": -91.993211,
+    # Phosphoric acid.
+    "H3PO4": -97.976896,
+}
+
+
+class PeakInterpretation:
+    def __init__(self):
+        """
+        Fragment annotation(s) to interpret a specific peak.
+        """
+        self.annotations = []
+
+    def __str__(self):
+        # If no fragment annotations have been specified, interpret as an
+        # unknown ion.
+        return ",".join(self.annotations) if len(self.annotations) > 0 else "?"
 
 
 class FragmentAnnotation:
@@ -30,27 +82,27 @@ class FragmentAnnotation:
         ion_type: str,
         neutral_loss: Optional[str] = None,
         isotope: int = 0,
-        charge: int = 0,
+        charge: Optional[int] = None,
         adduct: Optional[str] = None,
-        calc_mz: float = None,
+        analyte_number: Optional[int] = None,
+        mz_delta: Optional[Tuple[float, str]] = None,
     ) -> None:
         """
-        Interpretation of a single fragment ion.
+        Individual fragment ion annotation.
 
         This fragment annotation format is derived from the PSI peak
         interpretation specification:
         https://docs.google.com/document/d/1yEUNG4Ump6vnbMDs4iV4s3XISflmOkRAyqUuutcCG2w/edit?usp=sharing
-        Currently a simplified subset of this specification is supported.
 
-        Ion notations have the following format:
+        Fragment notations have the following format:
 
-        [ion type](neutral loss)(isotope)(charge)(adduct type)
+        (analyte_number)[ion_type](neutral_loss)(isotope)(charge)(adduct)(mz_delta)
 
         Examples:
 
         - "y4-H2O+2i^2[M+H+Na]" : Fragment annotation for a y4 ion, with a
           water neutral loss, the second isotopic peak, charge 2, adduct
-          M+H+Na.
+          [M+H+Na].
 
         Parameters
         ----------
@@ -66,266 +118,101 @@ class FragmentAnnotation:
             - "p": precursor ion
             - "r": reporter ion (isobaric label)
             - "f": chemical formula
-        neutral_loss : str, optional
+        neutral_loss : Optional[str]
             A string of neutral loss(es), described by their molecular formula.
-            The default is no neutral loss.
-        isotope : int, optional
+            The default is no neutral loss. Note that the neutral loss string
+            must include the sign (typically "-" for a neutral loss).
+        isotope : int
             The isotope number above or below the monoisotope. The default is
             the monoisotopic peak (0).
-        charge : int, optional
-            The charge of the fragment. The default is charge 0 (for unknown
-            ions).
-        adduct : str, optional
-            The adduct that ionized the fragment.
-        calc_mz : float
-            The theoretical m/z value of the fragment.
+        charge : Optional[int]
+            The charge of the fragment. The default is an unknown charge (only
+            valid for unknown ions).
+        adduct : Optional[str]
+            The adduct that ionized the fragment. The default is a hydrogen
+            adduct matching the charge ([M+xH]).
+        mz_delta : Optional[Tuple[float, str]]
+            The m/z delta representing the observed m/z minus the theoretical
+            m/z and its unit ("Da" or "ppm").
         """
-        if ion_type[0] not in "?abcxyzIm_prf":
-            raise ValueError("Unsupported ion type")
+        if ion_type[0] in "GLXS":
+            raise NotImplementedError(
+                "Advanced ion types are not yet supported"
+            )
+        elif ion_type[0] not in "?abcxyzIm_prf":
+            raise ValueError("Unknown ion type")
         if ion_type == "?" and (
             neutral_loss is not None
             or isotope != 0
-            or charge != 0
+            or charge is not None
             or adduct is not None
+            or analyte_number is not None
+            or mz_delta is not None
         ):
             raise ValueError(
-                "No information should be specified for unknown ions"
+                "Unknown ions should not contain additional information"
             )
         self.ion_type = ion_type
         self.neutral_loss = neutral_loss
         self.isotope = isotope
-        if charge == 0 and ion_type != "?":
-            raise ValueError("Invalid charge 0 for annotated fragment")
-        elif charge < 0:
-            raise ValueError("Invalid negative charge")
         self.charge = charge
-        self.adduct = adduct
-        self.calc_mz = calc_mz
+        self.adduct = f"[M+{self.charge}H]" if adduct is None else adduct
+        self.analyte_number = analyte_number
+        self.mz_delta = mz_delta
 
-    def __repr__(self) -> str:
-        if self.ion_type == "?":
-            fragment_repr = "?"
-        else:
-            fragment_repr = self.ion_type
-            if self.neutral_loss is not None:
-                fragment_repr += self.neutral_loss
-            if self.isotope != 0:
-                fragment_repr += f"{self.isotope:+}i"
-            if self.charge > 1:
-                fragment_repr += f"^{self.charge}"
-            if self.adduct is not None:
-                fragment_repr += self.adduct
-        return f"FragmentAnnotation({fragment_repr}, mz={self.calc_mz})"
+    @property
+    def mz_delta(self) -> Optional[Tuple[float, str]]:
+        return self._mz_delta
+
+    @mz_delta.setter
+    def mz_delta(self, mz_delta: Optional[Tuple[float, str]]):
+        if mz_delta is not None and mz_delta[1] not in ("Da", "ppm"):
+            raise ValueError(
+                "The m/z delta must be specified in Dalton or ppm units"
+            )
+        self._mz_delta = mz_delta
+
+    @property
+    def charge(self) -> Optional[int]:
+        return self._charge
+
+    @charge.setter
+    def charge(self, charge: Optional[int]):
+        if self.ion_type == "?" and charge is not None:
+            raise ValueError("Invalid charge for unknown ions")
+        elif self.ion_type != "?" and (charge is None or charge <= 0):
+            raise ValueError(
+                "The charge must be specified and strictly positive for known "
+                "ion types"
+            )
+        self._charge = charge
 
     def __str__(self) -> str:
         if self.ion_type == "?":
-            return str(self.calc_mz)
+            return "?"
         else:
-            annotation = self.ion_type
+            annot_str = []
+            if self.analyte_number is not None:
+                annot_str.append(f"{self.analyte_number}@")
+            annot_str.append(self.ion_type)
             if self.neutral_loss is not None:
-                annotation += f"{self.neutral_loss}"
-            if self.isotope != 0:
-                annotation += f"{self.isotope:+}i"
-            annotation += "+" * self.charge
-            if self.adduct is not None:
-                annotation += self.adduct
-            return annotation
+                annot_str.append(self.neutral_loss)
+            if abs(self.isotope) == 1:
+                annot_str.append("+i" if self.isotope > 0 else "-i")
+            elif self.isotope != 0:
+                annot_str.append(f"{self.isotope:+}i")
+            if self.charge is not None and self.charge > 1:
+                annot_str.append(f"^{self.charge}")
+            if re.match(r"\[M\+\d+H\]", self.adduct) is not None:
+                annot_str.append(self.adduct)
+            if self.mz_delta is not None:
+                annot_str.append(
+                    f"/{self.mz_delta[0]}"
+                    f"{'ppm' if self.mz_delta[1] == 'ppm' else ''}"
+                )
+            return "".join(annot_str)
 
     def __eq__(self, other: Any) -> bool:
-        return isinstance(other, FragmentAnnotation) and repr(self) == repr(
+        return isinstance(other, FragmentAnnotation) and str(self) == str(
             other
         )
-
-
-def get_theoretical_fragments(
-    proteoform: proforma.Proteoform,
-    fragment_types: str = "by",
-    max_charge: int = 1,
-    neutral_losses: Optional[Dict[Optional[str], float]] = None,
-) -> List[FragmentAnnotation]:
-    """
-    Get theoretical fragment annotations for the given sequence.
-
-    Parameters
-    ----------
-    proteoform : proforma.Proteoform
-        The proteoform for which the fragment annotations will be generated.
-    fragment_types : str, optional
-        The peptide fragment type. Can be any combination of 'a', 'b', 'c',
-        'x', 'y', and 'z' (the default is 'by', which means that b-ions and
-        y-ions will be generated).
-    max_charge : int, optional
-        All fragments up to and including the given charge will be generated
-        (the default is 1 to only generate singly-charged fragments).
-    neutral_losses : Optional[Dict[Optional[str], float]]
-        A dictionary with neutral loss names and (negative) mass differences to
-        be considered.
-
-    Returns
-    -------
-    List[FragmentAnnotation]
-        A list of all theoretical fragments in ascending m/z order.
-    """
-    if "B" in proteoform.sequence:
-        raise ValueError(
-            "Explicitly specify aspartic acid (D) or asparagine (N) instead of"
-            " the ambiguous B to compute the fragment annotations"
-        )
-    if "Z" in proteoform.sequence:
-        raise ValueError(
-            "Explicitly specify glutamic acid (E) or glutamine (Q) instead of "
-            "the ambiguous Z to compute the fragment annotations"
-        )
-
-    neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
-    fragments = []
-    # FIXME
-    # # Single peak annotation.
-    # if sequence == 'X':
-    #     return [FragmentAnnotation('?', calc_mz=modifications[0])]
-    # Get all possible peptide fragments.
-    for i in range(1, len(proteoform.sequence)):
-        for fragment_type in fragment_types:
-            # N-terminal fragment.
-            if fragment_type in "abc":
-                fragment_index = i
-                fragment_sequence = proteoform.sequence[:i]
-                if proteoform.modifications is not None:
-                    mod_mass = sum(
-                        [
-                            mod.mass
-                            for mod in proteoform.modifications
-                            if (
-                                isinstance(mod.position, int)
-                                and mod.position < i
-                            )
-                            or mod.position == "N-term"
-                        ]
-                    )
-                else:
-                    mod_mass = 0
-            # C-terminal fragment.
-            elif fragment_type in "xyz":
-                fragment_index = len(proteoform.sequence) - i
-                fragment_sequence = proteoform.sequence[i:]
-                if proteoform.modifications is not None:
-                    mod_mass = sum(
-                        [
-                            mod.mass
-                            for mod in proteoform.modifications
-                            if (
-                                isinstance(mod.position, int)
-                                and mod.position >= i
-                            )
-                            or mod.position == "C-term"
-                        ]
-                    )
-                else:
-                    mod_mass = 0
-            else:
-                raise ValueError(
-                    f"Unknown/unsupported ion type: {fragment_type}"
-                )
-            for charge in range(1, max_charge + 1):
-                for nl_name, nl_mass in neutral_losses.items():
-                    nl_name = (
-                        None
-                        if nl_name is None
-                        else f'{"-" if nl_mass < 0 else "+"}{nl_name}'
-                    )
-                    fragments.append(
-                        FragmentAnnotation(
-                            ion_type=f"{fragment_type}{fragment_index}",
-                            neutral_loss=nl_name,
-                            isotope=0,
-                            charge=charge,
-                            calc_mz=pmass.fast_mass(
-                                sequence=fragment_sequence,
-                                ion_type=fragment_type,
-                                charge=charge,
-                                aa_mass=aa_mass,
-                            )
-                            + (mod_mass + nl_mass) / charge,
-                        )
-                    )
-    return sorted(fragments, key=operator.attrgetter("calc_mz"))
-
-
-@nb.njit(cache=True)
-def get_peak_annotation_indexes(
-    spectrum_mz: np.ndarray,
-    spectrum_intensity: np.ndarray,
-    annotation_mz: np.ndarray,
-    fragment_tol_mass: float,
-    fragment_tol_mode: str,
-    peak_assignment: str = "most_intense",
-) -> List[Tuple[int, int]]:
-    """
-    Find matching indexes between observed m/z values and theoretical fragment
-    labels.
-
-    JIT helper function for `MsmsSpectrum.annotate_peaks`.
-
-    Parameters
-    ----------
-    spectrum_mz : np.ndarray
-        The m/z values of the spectrum fragment peaks.
-    spectrum_intensity : np.ndarray
-        The intensities of the spectrum fragment peaks.
-    annotation_mz : np.ndarray
-        The m/z values of the theoretical fragment labels.
-    fragment_tol_mass : float
-        Fragment mass tolerance to match spectrum peaks against theoretical
-        peaks.
-    fragment_tol_mode : {'Da', 'ppm'}
-        Fragment mass tolerance unit. Either 'Da' or 'ppm'.
-    peak_assignment : {'most_intense', 'nearest_mz'}, optional
-        In case multiple peaks occur within the given mass window around a
-        theoretical peak, only a single peak will be annotated with the
-        fragment type:
-        - 'most_intense': The most intense peak will be annotated (default).
-        - 'nearest_mz':   The peak whose m/z is closest to the theoretical m/z
-                          will be annotated.
-
-    Returns
-    -------
-    List[Tuple[int, int]]
-        A list of matching (peak index, annotation index) tuples.
-    """
-    annotation_i_map, peak_i_start = [], 0
-    for fragment_i, fragment_mz in enumerate(annotation_mz):
-        while (
-            peak_i_start < len(spectrum_mz)
-            and utils.mass_diff(
-                spectrum_mz[peak_i_start],
-                fragment_mz,
-                fragment_tol_mode == "Da",
-            )
-            < -fragment_tol_mass
-        ):
-            peak_i_start += 1
-        peak_i_stop = peak_i_start
-        while (
-            peak_i_stop < len(spectrum_mz)
-            and utils.mass_diff(
-                spectrum_mz[peak_i_stop],
-                fragment_mz,
-                fragment_tol_mode == "Da",
-            )
-            <= fragment_tol_mass
-        ):
-            peak_i_stop += 1
-        if peak_i_start != peak_i_stop:
-            peak_annotation_i = 0
-            if peak_assignment == "nearest_mz":
-                peak_annotation_i = np.argmin(
-                    np.abs(spectrum_mz[peak_i_start:peak_i_stop] - fragment_mz)
-                )
-            elif peak_assignment == "most_intense":
-                peak_annotation_i = np.argmax(
-                    spectrum_intensity[peak_i_start:peak_i_stop]
-                )
-            annotation_i_map.append(
-                (peak_i_start + peak_annotation_i, fragment_i)
-            )
-    return annotation_i_map

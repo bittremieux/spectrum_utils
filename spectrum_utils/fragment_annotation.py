@@ -216,3 +216,126 @@ class FragmentAnnotation:
         return isinstance(other, FragmentAnnotation) and str(self) == str(
             other
         )
+
+
+def get_theoretical_fragments(
+    proteoform: proforma.Proteoform,
+    ion_types: str = "by",
+    max_charge: int = 1,
+    neutral_losses: Optional[Dict[Optional[str], float]] = None,
+) -> List[Tuple[FragmentAnnotation, float]]:
+    """
+    Get fragment annotations with their theoretical masses for the given
+    sequence.
+
+    Parameters
+    ----------
+    proteoform : proforma.Proteoform
+        The proteoform for which the fragment annotations will be generated.
+    ion_types : str
+        The ion types to generate. Can be any combination of 'a', 'b', 'c',
+        'x', 'y', and 'z' for peptide fragments, 'I' for immonium ions, 'm' for
+        internal fragment ions, 'p' for the precursor ion, and 'r' for reporter
+        ions. The default is 'by', which means that b and y peptide ions will
+        be generated.
+    max_charge : int
+        All fragments up to and including the given charge will be generated
+        (the default is 1 to only generate singly-charged fragments).
+    neutral_losses : Optional[Dict[Optional[str], float]]
+        A dictionary with neutral loss names and (negative) mass differences to
+        be considered.
+
+    Returns
+    -------
+    List[Tuple[FragmentAnnotation, float]]
+        All possible fragments annotations and their theoretical m/z in
+        ascending m/z order.
+    """
+    if "B" in proteoform.sequence:
+        raise ValueError(
+            "Explicitly specify aspartic acid (D) or asparagine (N) instead of"
+            " the ambiguous B to compute the fragment annotations"
+        )
+    if "Z" in proteoform.sequence:
+        raise ValueError(
+            "Explicitly specify glutamic acid (E) or glutamine (Q) instead of "
+            "the ambiguous Z to compute the fragment annotations"
+        )
+
+    neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
+
+    fragments_masses = []
+    # Generate all peptide fragments ('a', 'b', 'c', 'x', 'y', 'z') and
+    # calculate their theoretical masses.
+    peptide_fragments = []
+    # Generate all N-terminal peptide fragments.
+    mod_i, mod_mass = 0, 0
+    for ion_type in set("abc") | set(ion_types):
+        for fragment_i in range(1, len(proteoform.sequence)):
+            fragment_sequence = proteoform.sequence[:fragment_i]
+            # Include prefix modifications.
+            while proteoform.modifications is not None and (
+                proteoform.modifications[mod_i].position == "N-term"
+                or proteoform.modifications[mod_i].position < fragment_i
+            ):
+                mod_mass += proteoform.modifications[mod_i].mass
+                mod_i += 1
+            peptide_fragments.append(
+                (fragment_sequence, ion_type, fragment_i, mod_mass)
+            )
+    # Generate all C-terminal peptide fragments.
+    if proteoform.modifications is not None:
+        mod_i, mod_mass = len(proteoform.modifications) - 1, 0
+    else:
+        mod_i, mod_mas = None, 0
+    for ion_type in set("xyz") | set(ion_types):
+        for fragment_i in range(len(proteoform.sequence) - 1, 0, -1):
+            fragment_sequence = proteoform.sequence[fragment_i:]
+            # Include suffix modifications.
+            while proteoform.modifications is not None and (
+                proteoform.modifications[mod_i].position == "C-term"
+                or proteoform.modifications[mod_i].position >= fragment_i
+            ):
+                mod_mass += proteoform.modifications[mod_i].mass
+                mod_i -= 1
+            peptide_fragments.append(
+                (fragment_sequence, ion_type, fragment_i, mod_mass)
+            )
+    # Compute the theoretical peptide fragment masses (using Pyteomics)
+    for fragment_sequence, ion_type, fragment_i, mod_mass in peptide_fragments:
+        for charge in range(1, max_charge + 1):
+            fragments_masses.append(
+                (
+                    FragmentAnnotation(
+                        ion_type=f"{ion_type}{fragment_i}",
+                        charge=charge,
+                    ),
+                    pmass.fast_mass(
+                        sequence=fragment_sequence,
+                        ion_type=ion_type,
+                        charge=charge,
+                        aa_mass=_aa_mass,
+                    )
+                    + mod_mass / charge,
+                )
+            )
+    # Generate all fragments with a neutral loss from the peptide fragments.
+    neutral_loss_fragments = []
+    for neutral_loss, mass_diff in neutral_losses.items():
+        if neutral_loss is None:
+            continue
+        neutral_loss = f"{'-' if mass_diff < 0 else '+'}{neutral_loss}"
+        for fragment, mass in fragments_masses:
+            neutral_loss_fragments.append(
+                (
+                    FragmentAnnotation(
+                        ion_type=fragment.ion_type,
+                        neutral_loss=neutral_loss,
+                        charge=fragment.charge,
+                    ),
+                    mass + mass_diff / fragment.charge,
+                )
+            )
+    fragments_masses.extend(neutral_loss_fragments)
+    # Sort the fragment annotations by their theoretical masses.
+    return sorted(fragments_masses, key=operator.itemgetter(1))

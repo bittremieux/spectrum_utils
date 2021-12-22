@@ -126,6 +126,7 @@ def test_round_merge_len():
     intensity = np.random.exponential(1, num_peaks)
     spec = spectrum.MsmsSpectrum("test_spectrum", 500, 2, mz, intensity)
     spec.annotate_proforma(f"X[+{mz[3]}]", 10, "ppm")
+    assert spec.annotation is not None
     spec.round(1)
     assert len(spec.mz) == len(mz) - 3
     assert len(spec.mz) == len(spec.intensity)
@@ -174,6 +175,7 @@ def test_set_mz_range_truncate():
     spec = spectrum.MsmsSpectrum("test_spectrum", 500, 2, mz, intensity)
     spec.annotate_proforma(f"X[+{mz[75]}]", 10, "ppm")
     min_mz, max_mz = 400, 1200
+    assert spec.annotation is not None
     assert spec.mz.min() < min_mz
     assert spec.mz.max() > max_mz
     spec.set_mz_range(min_mz, max_mz)
@@ -211,19 +213,33 @@ def test_set_mz_range_truncate_right():
 
 
 def test_set_mz_range_none():
-    num_peaks = 150
+    num_peaks, min_mz, max_mz = 150, 400, 1200
     mz = np.random.uniform(100, 1400, num_peaks)
     intensity = np.random.lognormal(0, 1, num_peaks)
-    spec = spectrum.MsmsSpectrum("test_spectrum", 500, 2, mz, intensity)
+    spec = spectrum.MsmsSpectrum(
+        "test_spectrum", 500, 2, mz.copy(), intensity.copy()
+    )
     spec.set_mz_range(None, None)
     assert len(spec.mz) == num_peaks
     assert len(spec.intensity) == num_peaks
-    spec.set_mz_range(None, 1500)
-    assert len(spec.mz) == num_peaks
-    assert len(spec.intensity) == num_peaks
-    spec.set_mz_range(0, None)
-    assert len(spec.mz) == num_peaks
-    assert len(spec.intensity) == num_peaks
+    assert spec.mz.min() == mz.min()
+    assert spec.mz.max() == mz.max()
+    spec = spectrum.MsmsSpectrum(
+        "test_spectrum", 500, 2, mz.copy(), intensity.copy()
+    )
+    spec.set_mz_range(None, max_mz)
+    assert len(spec.mz) < num_peaks
+    assert len(spec.intensity) < num_peaks
+    assert spec.mz.max() <= max_mz
+    assert spec.mz.min() == mz.min()
+    spec = spectrum.MsmsSpectrum(
+        "test_spectrum", 500, 2, mz.copy(), intensity.copy()
+    )
+    spec.set_mz_range(min_mz, None)
+    assert len(spec.mz) < num_peaks
+    assert len(spec.intensity) < num_peaks
+    assert spec.mz.min() >= min_mz
+    assert spec.mz.max() == mz.max()
 
 
 def test_set_mz_range_reversed():
@@ -252,6 +268,7 @@ def test_remove_precursor_peak():
         "test_spectrum", precursor_mz, 2, mz, intensity
     )
     spec.annotate_proforma(f"X[+{mz[75]}]", 10, "ppm")
+    assert spec.annotation is not None
     spec.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
     assert np.abs(precursor_mz - spec.mz).all() > fragment_tol_mass
     assert len(spec.mz) <= num_peaks - 1
@@ -332,6 +349,7 @@ def test_filter_intensity_remove_low_intensity():
     spec.annotate_proforma(f"X[+{mz[75]}]", 10, "ppm")
     min_intensity = 0.05
     assert spec.intensity.min() < min_intensity * spec.intensity.max()
+    assert spec.annotation is not None
     spec.filter_intensity(min_intensity=min_intensity)
     assert len(spec.mz) < num_peaks
     assert len(spec.intensity) < num_peaks
@@ -444,171 +462,3 @@ def test_scale_intensity_max():
     np.testing.assert_allclose(
         spec.intensity * max_intensity, intensity_copy, rtol=1e-5
     )
-
-
-def test_annotate_proforma():
-    fragment_tol_mass, fragment_tol_mode = 0.02, "Da"
-    peptides = [
-        "SYELPDGQVITIGNER",
-        "MFLSFPTTK",
-        "DLYANTVLSGGTTMYPGIADR",
-        "YLYEIAR",
-        "VAPEEHPVLLTEAPLNPK",
-    ]
-    for charge, peptide in enumerate(peptides, 1):
-        fragment_mz = np.asarray(
-            [
-                fragment.calc_mz
-                for fragment in spectrum._get_theoretical_fragments(
-                    proforma.parse(peptide)[0], max_charge=charge - 1
-                )
-            ]
-        )
-        fragment_mz += np.random.uniform(
-            -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass, len(fragment_mz)
-        )
-        num_peaks = 150
-        mz = np.random.uniform(100, 1400, num_peaks)
-        mz[: len(fragment_mz)] = fragment_mz
-        intensity = np.random.lognormal(0, 1, num_peaks)
-        spec = spectrum.MsmsSpectrum(
-            "test_spectrum",
-            mass.calculate_mass(sequence=peptide, charge=charge),
-            charge,
-            mz,
-            intensity,
-        )
-        spec.annotate_proforma(peptide, fragment_tol_mass, fragment_tol_mode)
-        assert np.count_nonzero(spec.annotation) >= len(fragment_mz)
-
-
-def test_annotate_proforma_nearest_mz():
-    fragment_tol_mass = 0.02
-    fragment_tol_mode = "Da"
-    peptide = "YLYEIAR"
-    fragment_mz = np.asarray(
-        [
-            fragment.calc_mz
-            for fragment in spectrum._get_theoretical_fragments(
-                proforma.parse(peptide)[0]
-            )
-        ]
-    )
-    mz = np.asarray([fragment_mz[0] - 0.005, fragment_mz[0] + 0.015])
-    intensity = np.asarray([10, 20])
-    charge = 2
-    spec = spectrum.MsmsSpectrum(
-        "test_spectrum",
-        mass.calculate_mass(sequence=peptide, charge=charge),
-        charge,
-        mz,
-        intensity,
-    )
-    spec.annotate_proforma(
-        peptide,
-        fragment_tol_mass,
-        fragment_tol_mode,
-        peak_assignment="nearest_mz",
-    )
-    assert spec.annotation[0] == spectrum.FragmentAnnotation(
-        "b1", charge=1, calc_mz=fragment_mz[0]
-    )
-    assert spec.annotation[1] is None
-
-
-def test_annotate_proforma_most_intense():
-    fragment_tol_mass = 0.02
-    fragment_tol_mode = "Da"
-    peptide = "YLYEIAR"
-    fragment_mz = np.asarray(
-        [
-            fragment.calc_mz
-            for fragment in spectrum._get_theoretical_fragments(
-                proforma.parse(peptide)[0]
-            )
-        ]
-    )
-    mz = np.asarray([fragment_mz[0] - 0.01, fragment_mz[0] + 0.01])
-    intensity = np.asarray([10, 20])
-    charge = 2
-    spec = spectrum.MsmsSpectrum(
-        "test_spectrum",
-        mass.calculate_mass(sequence=peptide, charge=charge),
-        charge,
-        mz,
-        intensity,
-    )
-    spec.annotate_proforma(
-        peptide,
-        fragment_tol_mass,
-        fragment_tol_mode,
-        peak_assignment="most_intense",
-    )
-    assert spec.annotation[0] is None
-    assert spec.annotation[1] == spectrum.FragmentAnnotation(
-        "b1", charge=1, calc_mz=fragment_mz[0]
-    )
-
-
-def test_annotate_proforma_neutral_loss():
-    fragment_tol_mass, fragment_tol_mode = 0.02, "Da"
-    neutral_loss = "H2O", 18.010565  # water
-    n_peaks = 150
-    peptides = [
-        "SYELPDGQVITIGNER",
-        "MFLSFPTTK",
-        "DLYANTVLSGGTTMYPGIADR",
-        "YLYEIAR",
-        "VAPEEHPVLLTEAPLNPK",
-    ]
-    for charge, peptide in enumerate(peptides, 2):
-        fragment_mz = np.asarray(
-            [
-                fragment.calc_mz
-                for fragment in spectrum._get_theoretical_fragments(
-                    proforma.parse(peptide)[0],
-                    neutral_losses={
-                        None: 0,
-                        neutral_loss[0]: -neutral_loss[1],
-                    },
-                )
-            ]
-        )
-        fragment_mz += np.random.uniform(
-            -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass, len(fragment_mz)
-        )
-        mz = np.random.uniform(100, 1400, n_peaks)
-        mz[: len(fragment_mz)] = fragment_mz
-        intensity = np.random.lognormal(0, 1, n_peaks)
-        spec = spectrum.MsmsSpectrum(
-            "test_spectrum",
-            mass.calculate_mass(sequence=peptide, charge=charge),
-            charge,
-            mz,
-            intensity,
-        )
-        spec.annotate_proforma(
-            peptide,
-            fragment_tol_mass,
-            fragment_tol_mode,
-            neutral_losses={neutral_loss[0]: -neutral_loss[1]},
-        )
-        n_fragments = (
-            len(fragment_mz)
-            - (
-                len(fragment_mz)
-                - (
-                    np.partition(
-                        np.abs(
-                            fragment_mz.reshape(-1, 1)
-                            - fragment_mz.reshape(1, -1)
-                        ),
-                        1,
-                        axis=1,
-                    )[:, 1]
-                    >= fragment_tol_mass
-                ).sum()
-            )
-            // 2
-        )
-        assert np.count_nonzero(spec.annotation) >= n_fragments

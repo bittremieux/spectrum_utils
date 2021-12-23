@@ -187,6 +187,9 @@ class FragmentAnnotation:
             )
         self._charge = charge
 
+    def __repr__(self):
+        return str(self)
+
     def __str__(self) -> str:
         if self.ion_type == "?":
             return "?"

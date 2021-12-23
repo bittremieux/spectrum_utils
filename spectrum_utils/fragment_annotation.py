@@ -276,6 +276,14 @@ def get_theoretical_fragments(
     for ion_type in set("abc") & set(ion_types):
         for fragment_i in range(1, len(proteoform.sequence)):
             fragment_sequence = proteoform.sequence[:fragment_i]
+            # Ignore unlocalized modifications.
+            while (
+                proteoform.modifications is not None
+                and mod_i < len(proteoform.modifications)
+                and isinstance(proteoform.modifications[mod_i].position, str)
+                and proteoform.modifications[mod_i].position != "N-term"
+            ):
+                mod_i += 1
             # Include prefix modifications.
             while proteoform.modifications is not None and (
                 proteoform.modifications[mod_i].position == "N-term"

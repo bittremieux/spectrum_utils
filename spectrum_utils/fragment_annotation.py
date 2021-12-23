@@ -330,7 +330,12 @@ def get_theoretical_fragments(
                 mod_mass += proteoform.modifications[mod_i].mass
                 mod_i -= 1
             peptide_fragments.append(
-                (fragment_sequence, ion_type, fragment_i, mod_mass)
+                (
+                    fragment_sequence,
+                    ion_type,
+                    len(proteoform.sequence) - fragment_i,
+                    mod_mass,
+                )
             )
     # Compute the theoretical peptide fragment masses (using Pyteomics)
     for fragment_sequence, ion_type, fragment_i, mod_mass in peptide_fragments:

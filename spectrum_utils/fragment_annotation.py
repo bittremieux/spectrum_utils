@@ -267,11 +267,10 @@ def get_theoretical_fragments(
 
     neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
 
-    fragments_masses = []
+    base_fragments = []
 
     # Generate all peptide fragments ('a', 'b', 'c', 'x', 'y', 'z') and
     # calculate their theoretical masses.
-    peptide_fragments = []
     # Generate all N-terminal peptide fragments.
     mod_i, mod_mass = 0, 0
     for ion_type in set("abc") & set(ion_types):
@@ -302,7 +301,7 @@ def get_theoretical_fragments(
             ):
                 mod_mass += proteoform.modifications[mod_i].mass
                 mod_i += 1
-            peptide_fragments.append(
+            base_fragments.append(
                 (fragment_sequence, ion_type, fragment_i, mod_mass)
             )
     # Generate all C-terminal peptide fragments.
@@ -330,7 +329,7 @@ def get_theoretical_fragments(
             ):
                 mod_mass += proteoform.modifications[mod_i].mass
                 mod_i -= 1
-            peptide_fragments.append(
+            base_fragments.append(
                 (
                     fragment_sequence,
                     ion_type,
@@ -372,7 +371,7 @@ def get_theoretical_fragments(
                     mod_i_stop += 1
                 # Internal fragment mass calculation is equivalent to b ion
                 # mass calculation.
-                peptide_fragments.append(
+                base_fragments.append(
                     (
                         fragment_sequence,
                         "b",
@@ -381,11 +380,24 @@ def get_theoretical_fragments(
                     )
                 )
 
-    # Compute the theoretical peptide fragment masses (using Pyteomics)
-    for fragment_sequence, ion_type, fragment_i, mod_mass in peptide_fragments:
+    # Generate unfragmented precursor ion(s).
+    if "p" in ion_types:
+        if proteoform.modifications is not None:
+            mod_mass = sum([mod.mass for mod in proteoform.modifications])
+        else:
+            mod_mass = 0
+        base_fragments.append((proteoform.sequence, "M", "p", mod_mass))
+
+    fragments_masses = []
+    # Compute the theoretical fragment masses (using Pyteomics)
+    for fragment_sequence, ion_type, fragment_i, mod_mass in base_fragments:
         for charge in range(1, max_charge + 1):
-            if isinstance(fragment_i, str) and ":" in fragment_i:
-                annot_type = f"m{fragment_i}"
+            annot_type = "?"
+            if isinstance(fragment_i, str):
+                if ":" in fragment_i:
+                    annot_type = f"m{fragment_i}"
+                elif fragment_i == "p":
+                    annot_type = "p"
             else:
                 annot_type = f"{ion_type}{fragment_i}"
             fragments_masses.append(
@@ -394,26 +406,6 @@ def get_theoretical_fragments(
                     pmass.fast_mass(
                         sequence=fragment_sequence,
                         ion_type=ion_type,
-                        charge=charge,
-                        aa_mass=_aa_mass,
-                    )
-                    + mod_mass / charge,
-                )
-            )
-
-    # Generate unfragmented precursor ion(s).
-    if "p" in ion_types:
-        if proteoform.modifications is not None:
-            mod_mass = sum([mod.mass for mod in proteoform.modifications])
-        else:
-            mod_mass = 0
-        for charge in range(1, max_charge + 1):
-            fragments_masses.append(
-                (
-                    FragmentAnnotation(ion_type="p", charge=charge),
-                    pmass.fast_mass(
-                        sequence=proteoform.sequence,
-                        ion_type="M",
                         charge=charge,
                         aa_mass=_aa_mass,
                     )

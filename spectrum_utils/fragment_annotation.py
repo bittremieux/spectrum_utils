@@ -203,7 +203,7 @@ class FragmentAnnotation:
                 annot_str.append(f"{self.isotope:+}i")
             if self.charge is not None and self.charge > 1:
                 annot_str.append(f"^{self.charge}")
-            if re.match(r"\[M\+\d+H\]", self.adduct) is not None:
+            if re.match(r"\[M\+\d+H\]", self.adduct) is None:
                 annot_str.append(self.adduct)
             if self.mz_delta is not None:
                 annot_str.append(

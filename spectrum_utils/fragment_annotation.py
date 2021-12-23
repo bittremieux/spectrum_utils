@@ -285,9 +285,19 @@ def get_theoretical_fragments(
             ):
                 mod_i += 1
             # Include prefix modifications.
-            while proteoform.modifications is not None and (
-                proteoform.modifications[mod_i].position == "N-term"
-                or proteoform.modifications[mod_i].position < fragment_i
+            while (
+                proteoform.modifications is not None
+                and mod_i < len(proteoform.modifications)
+                and (
+                    proteoform.modifications[mod_i].position == "N-term"
+                    or (
+                        isinstance(
+                            proteoform.modifications[mod_i].position, int
+                        )
+                        and proteoform.modifications[mod_i].position
+                        < fragment_i
+                    )
+                )
             ):
                 mod_mass += proteoform.modifications[mod_i].mass
                 mod_i += 1
@@ -303,9 +313,19 @@ def get_theoretical_fragments(
         for fragment_i in range(len(proteoform.sequence) - 1, 0, -1):
             fragment_sequence = proteoform.sequence[fragment_i:]
             # Include suffix modifications.
-            while proteoform.modifications is not None and (
-                proteoform.modifications[mod_i].position == "C-term"
-                or proteoform.modifications[mod_i].position >= fragment_i
+            while (
+                proteoform.modifications is not None
+                and mod_i >= 0
+                and (
+                    proteoform.modifications[mod_i].position == "C-term"
+                    or (
+                        isinstance(
+                            proteoform.modifications[mod_i].position, int
+                        )
+                        and proteoform.modifications[mod_i].position
+                        >= fragment_i
+                    )
+                )
             ):
                 mod_mass += proteoform.modifications[mod_i].mass
                 mod_i -= 1

@@ -273,7 +273,7 @@ def get_theoretical_fragments(
     peptide_fragments = []
     # Generate all N-terminal peptide fragments.
     mod_i, mod_mass = 0, 0
-    for ion_type in set("abc") | set(ion_types):
+    for ion_type in set("abc") & set(ion_types):
         for fragment_i in range(1, len(proteoform.sequence)):
             fragment_sequence = proteoform.sequence[:fragment_i]
             # Include prefix modifications.
@@ -291,7 +291,7 @@ def get_theoretical_fragments(
         mod_i, mod_mass = len(proteoform.modifications) - 1, 0
     else:
         mod_i, mod_mas = None, 0
-    for ion_type in set("xyz") | set(ion_types):
+    for ion_type in set("xyz") & set(ion_types):
         for fragment_i in range(len(proteoform.sequence) - 1, 0, -1):
             fragment_sequence = proteoform.sequence[fragment_i:]
             # Include suffix modifications.

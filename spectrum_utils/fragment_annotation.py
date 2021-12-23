@@ -413,6 +413,22 @@ def get_theoretical_fragments(
                 )
             )
 
+    # Generate all immonium ions (internal single amino acid from the
+    # combination of a type and y type cleavage.
+    if "I" in ion_types:
+        # Amino acid mass minus CO plus charge 1.
+        mass_diff = pmass.calculate_mass(formula="CO") - pmass.calculate_mass(
+            formula="H"
+        )
+        for aa, mass in _aa_mass.items():
+            if aa != "X":
+                fragments_masses.append(
+                    (
+                        FragmentAnnotation(ion_type=f"I{aa}", charge=1),
+                        mass - mass_diff,
+                    )
+                )
+
     # Generate all fragments that differ by a neutral loss from the base
     # fragments.
     neutral_loss_fragments = []

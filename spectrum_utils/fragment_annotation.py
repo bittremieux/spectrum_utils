@@ -268,6 +268,7 @@ def get_theoretical_fragments(
     neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
 
     fragments_masses = []
+
     # Generate all peptide fragments ('a', 'b', 'c', 'x', 'y', 'z') and
     # calculate their theoretical masses.
     peptide_fragments = []
@@ -337,15 +338,59 @@ def get_theoretical_fragments(
                     mod_mass,
                 )
             )
+
+    # Generate all internal fragment ions.
+    if "m" in ion_types:
+        # Skip internal fragments with start position 1, which are actually
+        # b ions.
+        for start_i in range(1, len(proteoform.sequence)):
+            mod_i_start, mod_mass = 0, 0
+            # Skip unlocalized and prefix modifications.
+            while (
+                proteoform.modifications is not None
+                and mod_i_start < len(proteoform.modifications)
+                and (
+                    isinstance(
+                        proteoform.modifications[mod_i_start].position, str
+                    )
+                    or proteoform.modifications[mod_i_start].position < start_i
+                )
+            ):
+                mod_i_start += 1
+            mod_i_stop = mod_i_start
+            # Internal fragments of only one residue are encoded as immonium
+            # ions.
+            for stop_i in range(start_i + 2, len(proteoform.sequence)):
+                fragment_sequence = proteoform.sequence[start_i:stop_i]
+                # Include internal modifications.
+                while (
+                    proteoform.modifications is not None
+                    and mod_i_stop < len(proteoform.modifications)
+                    and proteoform.modifications[mod_i_stop].position < stop_i
+                ):
+                    mod_mass += proteoform.modifications[mod_i_stop]
+                    mod_i_stop += 1
+                # Internal fragment mass calculation is equivalent to b ion
+                # mass calculation.
+                peptide_fragments.append(
+                    (
+                        fragment_sequence,
+                        "b",
+                        f"{start_i+1}:{stop_i+1}",
+                        mod_mass,
+                    )
+                )
+
     # Compute the theoretical peptide fragment masses (using Pyteomics)
     for fragment_sequence, ion_type, fragment_i, mod_mass in peptide_fragments:
         for charge in range(1, max_charge + 1):
+            if isinstance(fragment_i, str) and ":" in fragment_i:
+                annot_type = f"m{fragment_i}"
+            else:
+                annot_type = f"{ion_type}{fragment_i}"
             fragments_masses.append(
                 (
-                    FragmentAnnotation(
-                        ion_type=f"{ion_type}{fragment_i}",
-                        charge=charge,
-                    ),
+                    FragmentAnnotation(ion_type=annot_type, charge=charge),
                     pmass.fast_mass(
                         sequence=fragment_sequence,
                         ion_type=ion_type,
@@ -395,5 +440,6 @@ def get_theoretical_fragments(
                 )
             )
     fragments_masses.extend(neutral_loss_fragments)
+
     # Sort the fragment annotations by their theoretical masses.
     return sorted(fragments_masses, key=operator.itemgetter(1))

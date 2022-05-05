@@ -367,7 +367,7 @@ def get_theoretical_fragments(
                     and mod_i_stop < len(proteoform.modifications)
                     and proteoform.modifications[mod_i_stop].position < stop_i
                 ):
-                    mod_mass += proteoform.modifications[mod_i_stop]
+                    mod_mass += proteoform.modifications[mod_i_stop].mass
                     mod_i_stop += 1
                 # Internal fragment mass calculation is equivalent to b ion
                 # mass calculation.

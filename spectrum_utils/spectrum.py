@@ -1,3 +1,4 @@
+import copy
 from typing import Dict, Iterable, Optional, Union
 
 import numba as nb
@@ -588,7 +589,6 @@ class MsmsSpectrum:
         fragment_tol_mode: str,
         ion_types: str = "by",
         max_ion_charge: Optional[int] = None,
-        peak_assignment: str = "most_intense",
         neutral_losses: Optional[Dict[Optional[str], float]] = None,
     ) -> "MsmsSpectrum":
         """
@@ -604,22 +604,15 @@ class MsmsSpectrum:
         fragment_tol_mode : {'Da', 'ppm'}
             Fragment mass tolerance unit. Either 'Da' or 'ppm'.
         ion_types : str, optional
-            Peptide fragment types to annotate. Can be any combination of 'a',
-            'b', 'c', 'x', 'y', and 'z' (the default is 'by', which means that
-            b-ions and y-ions will be annotated).
+            The ion types to generate. Can be any combination of 'a', 'b', 'c',
+            'x', 'y', and 'z' for peptide fragments, 'I' for immonium ions, 'm'
+            for internal fragment ions, 'p' for the precursor ion, and 'r' for
+            reporter ions. The default is 'by', which means that b and y
+            peptide ions will be generated.
         max_ion_charge : Optional[int], optional
             All fragments up to and including the given charge will be
             annotated (by default all fragments with a charge up to the
-            precursor minus, or minimum charge one, one will be annotated).
-        peak_assignment : {'most_intense', 'nearest_mz'}, optional
-            In case multiple peaks occur within the given mass window around a
-            theoretical peak, only a single peak will be annotated with the
-            fragment type:
-
-            - 'most_intense': The most intense peak will be annotated
-              (default).
-            - 'nearest_mz': The peak whose m/z is closest to the theoretical
-              m/z will be annotated.
+            precursor minus one (minimum charge one) will be annotated).
         neutral_losses : Dict[Optional[str], float], optional
             Neutral losses to consider, specified as a dictionary with as keys
             the description (molecular formula) and as value the neutral loss.
@@ -631,7 +624,7 @@ class MsmsSpectrum:
         """
         self.proforma = proforma_str
         self._annotation = np.full_like(self.mz, None, object)
-        # Be default, peak charges are assumed to be smaller than the precursor
+        # By default, peak charges are assumed to be smaller than the precursor
         # charge.
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
@@ -639,26 +632,64 @@ class MsmsSpectrum:
         # considered.
         if neutral_losses is not None and None not in neutral_losses:
             neutral_losses[None] = 0
-
         # Parse the ProForma string and find peaks that match the theoretical
         # fragments.
-        for proteoform in proforma.parse(self.proforma):
+        for analyte_number, proteoform in enumerate(
+            proforma.parse(self.proforma), 1
+        ):
             fragments = fragment_annotation.get_theoretical_fragments(
                 proteoform,
                 ion_types,
                 max_ion_charge,
                 neutral_losses,
             )
-            for annotation_i, fragment_i in fragment_annotation.get_peak_annotation_indexes(
-                self.mz,
-                self.intensity,
-                np.asarray([f.calc_mz for f in fragments]),
-                fragment_tol_mass,
-                fragment_tol_mode,
-                peak_assignment,
-            ):
-                # TODO: Support multiple annotations per peak. Currently
-                #       duplicate labels for the same peak are overwritten.
-                self._annotation[annotation_i] = fragments[fragment_i]
-
+            fragment_i = 0
+            for peak_i in range(len(self.mz)):
+                self.annotation[peak_i] = []
+                while (
+                    fragment_i < len(fragments)
+                    and utils.mass_diff(
+                        self.mz[peak_i],
+                        fragments[fragment_i][1],
+                        fragment_tol_mode == "Da",
+                    )
+                    > fragment_tol_mass
+                ):
+                    fragment_i += 1
+                i = 0
+                while (
+                    fragment_i + i < len(fragments)
+                    and -fragment_tol_mass
+                    <= utils.mass_diff(
+                        self.mz[peak_i],
+                        fragments[fragment_i + i][1],
+                        fragment_tol_mode == "Da",
+                    )
+                    <= fragment_tol_mass
+                ):
+                    fragment = copy.copy(fragments[fragment_i + i][0])
+                    fragment.analyte_number = analyte_number
+                    if fragment_tol_mode == "ppm":
+                        fragment.mz_delta = (
+                            round(
+                                (
+                                    self.mz[peak_i]
+                                    - fragments[fragment_i + i][1]
+                                )
+                                / fragments[fragment_i + i][1]
+                                * 10 ** 6,
+                                1,
+                            ),
+                            "ppm",
+                        )
+                    else:
+                        fragment.mz_delta = (
+                            round(
+                                self.mz[peak_i] - fragments[fragment_i + i][1],
+                                5,
+                            ),
+                            "Da",
+                        )
+                    self.annotation[peak_i].append(fragment)
+                    i += 1
         return self

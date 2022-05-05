@@ -10,8 +10,9 @@ from spectrum_utils import fragment_annotation, proforma, utils
 
 class GnpsBackend(pyteomics.usi._PROXIBackend):
 
-    _url_template = ("https://metabolomics-usi.ucsd.edu/proxi/v{version}/"
-                     "spectra?usi1={usi}")
+    _url_template = (
+        "https://metabolomics-usi.ucsd.edu/proxi/v{version}/spectra?usi1={usi}"
+    )
 
     def __init__(self, **kwargs):
         super(GnpsBackend, self).__init__("GNPS", self._url_template, **kwargs)
@@ -184,9 +185,9 @@ class MsmsSpectrumJit:
         max_rank: Optional[int] = None,
     ) -> "MsmsSpectrumJit":
         if scaling == "root":
-            self._intensity = np.power(
-                self._intensity, 1 / degree
-            ).astype(np.float32)
+            self._intensity = np.power(self._intensity, 1 / degree).astype(
+                np.float32
+            )
         elif scaling == "log":
             self._intensity = (
                 np.log1p(self._intensity) / np.log(base)

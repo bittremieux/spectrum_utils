@@ -124,9 +124,13 @@ class MsmsSpectrumJit:
         isotope: int = 0,
     ) -> "MsmsSpectrumJit":
         # TODO: This assumes [M+H]x charged ions.
-        neutral_mass = (self.precursor_mz - 1.0072766) * self.precursor_charge
+        adduct_mass = 1.007825
+        neutral_mass = (
+            self.precursor_mz - adduct_mass * self.precursor_charge
+        ) * self.precursor_charge
+        c_mass_diff = 1.003355
         remove_mz = [
-            (neutral_mass + iso) / charge + 1.0072766
+            (neutral_mass + adduct_mass * charge + iso * c_mass_diff) / charge
             for charge in range(self.precursor_charge, 0, -1)
             for iso in range(isotope + 1)
         ]

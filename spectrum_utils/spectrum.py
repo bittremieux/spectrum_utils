@@ -303,22 +303,26 @@ class MsmsSpectrum:
             and `precursor_charge` keyword arguments respectively.
         """
         spectrum_dict = pyteomics.usi.proxi(usi, backend, **kwargs)
-        for attr in spectrum_dict["attributes"]:
-            if attr["accession"] in ("MS:1000827", "MS:1000744", "MS:1002234"):
-                kwargs["precursor_mz"] = float(attr["value"])
-                break
-        else:
-            if "precursor_mz" not in kwargs:
+        if "precursor_mz" not in kwargs:
+            for attr in spectrum_dict["attributes"]:
+                if attr["accession"] in (
+                    "MS:1000827",
+                    "MS:1000744",
+                    "MS:1002234",
+                ):
+                    kwargs["precursor_mz"] = float(attr["value"])
+                    break
+            else:
                 raise ValueError(
                     "Unknown precursor m/z from USI. Specify the precursor m/z"
                     " directly."
                 )
-        for attr in spectrum_dict["attributes"]:
-            if attr["accession"] == "MS:1000041":
-                kwargs["precursor_charge"] = int(attr["value"])
-                break
-        else:
-            if "precursor_charge" not in kwargs:
+        if "precursor_charge" not in kwargs:
+            for attr in spectrum_dict["attributes"]:
+                if attr["accession"] == "MS:1000041":
+                    kwargs["precursor_charge"] = int(attr["value"])
+                    break
+            else:
                 raise ValueError(
                     "Unknown precursor charge from USI. Specify the precursor "
                     "charge directly."

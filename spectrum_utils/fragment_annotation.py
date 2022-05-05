@@ -2,15 +2,12 @@ import operator
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-import numba as nb
-import numpy as np
-
 try:
     import pyteomics.cmass as pmass
 except ImportError:
     import pyteomics.mass as pmass
 
-from spectrum_utils import proforma, utils
+from spectrum_utils import proforma
 
 
 # Amino acid and special amino acid masses.
@@ -61,19 +58,6 @@ _neutral_loss = {
     # Phosphoric acid.
     "H3PO4": -97.976896,
 }
-
-
-class PeakInterpretation:
-    def __init__(self):
-        """
-        Fragment annotation(s) to interpret a specific peak.
-        """
-        self.annotations = []
-
-    def __str__(self):
-        # If no fragment annotations have been specified, interpret as an
-        # unknown ion.
-        return ",".join(self.annotations) if len(self.annotations) > 0 else "?"
 
 
 class FragmentAnnotation:
@@ -221,6 +205,32 @@ class FragmentAnnotation:
         )
 
 __SUPPORTED_IONS = "abcxyzImpr"
+
+class PeakInterpretation:
+    _unknown = FragmentAnnotation("?")
+
+    def __init__(self):
+        """
+        Fragment annotation(s) to interpret a specific peak.
+        """
+        self.fragment_annotations = []
+
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        # If no fragment annotations have been specified, interpret as an
+        # unknown ion.
+        if len(self.fragment_annotations) > 0:
+            return ",".join([str(a) for a in self.fragment_annotations])
+        else:
+            return str(self._unknown)
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, PeakInterpretation) and str(self) == str(
+            other
+        )
+
 
 def get_theoretical_fragments(
     proteoform: proforma.Proteoform,

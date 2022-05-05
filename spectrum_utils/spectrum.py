@@ -677,7 +677,9 @@ class MsmsSpectrum:
             )
             fragment_i = 0
             for peak_i in range(len(self.mz)):
-                self.annotation[peak_i] = []
+                self.annotation[
+                    peak_i
+                ] = fragment_annotation.PeakInterpretation()
                 while (
                     fragment_i < len(fragments)
                     and utils.mass_diff(
@@ -722,6 +724,8 @@ class MsmsSpectrum:
                             ),
                             "Da",
                         )
-                    self.annotation[peak_i].append(fragment)
+                    self.annotation[peak_i].fragment_annotations.append(
+                        fragment
+                    )
                     i += 1
         return self

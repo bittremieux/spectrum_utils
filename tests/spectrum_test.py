@@ -1,4 +1,6 @@
 import operator
+import os
+import pickle
 
 import numpy as np
 import pytest
@@ -462,3 +464,24 @@ def test_scale_intensity_max():
     np.testing.assert_allclose(
         spec.intensity * max_intensity, intensity_copy, rtol=1e-5
     )
+
+
+def test_pickle():
+    num_peaks = 150
+    mz = np.random.uniform(100, 1400, num_peaks)
+    intensity = np.random.lognormal(0, 1, num_peaks)
+    spec = spectrum.MsmsSpectrum("test_spectrum", 500, 2, mz, intensity)
+    spec.annotate_proforma(f"X[+{mz[75]}]", 10, "ppm")
+    with open("temp.pkl", "wb") as f:
+        pickle.dump(spec, f)
+    with open("temp.pkl", "rb") as f:
+        spec_pickled = pickle.load(f)
+    assert spec.identifier == spec_pickled.identifier
+    assert spec.precursor_mz == spec_pickled.precursor_mz
+    assert spec.precursor_charge == spec_pickled.precursor_charge
+    np.testing.assert_array_equal(spec.mz, spec_pickled.mz)
+    np.testing.assert_array_equal(spec.intensity, spec_pickled.intensity)
+    np.testing.assert_equal(spec.retention_time, spec_pickled.retention_time)
+    assert spec.proforma == spec_pickled.proforma
+    np.testing.assert_equal(spec.annotation, spec_pickled.annotation)
+    os.remove("temp.pkl")

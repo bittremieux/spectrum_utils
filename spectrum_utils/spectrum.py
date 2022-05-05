@@ -43,19 +43,21 @@ class MsmsSpectrumJit:
         mz: np.ndarray,
         intensity: np.ndarray,
         retention_time: float,
+        _skip_checks: bool = False,
     ) -> None:
         self.identifier = identifier
         self.precursor_mz = precursor_mz
         self.precursor_charge = precursor_charge
-        if len(mz) != len(intensity):
+        if not _skip_checks and len(mz) != len(intensity):
             raise ValueError(
                 "The m/z and intensity arrays should have equal lengths"
             )
-        mz = np.asarray(mz, np.float64).reshape(-1)
+        self._mz = np.asarray(mz, np.float64).reshape(-1)
         # Make sure the peaks are sorted by m/z.
-        intensity = np.asarray(intensity, np.float32).reshape(-1)
-        order = np.argsort(mz)
-        self._mz, self._intensity = mz[order], intensity[order]
+        self._intensity = np.asarray(intensity, np.float32).reshape(-1)
+        if not _skip_checks:
+            order = np.argsort(mz)
+            self._mz, self._intensity = self._mz[order], self._intensity[order]
         self.retention_time = retention_time
 
     @property
@@ -254,6 +256,31 @@ class MsmsSpectrum:
             retention_time if retention_time is not None else np.nan,
         )
         self.proforma, self._annotation = None, None
+
+    def __getstate__(self):
+        return {
+            "identifier": self.identifier,
+            "precursor_mz": self.precursor_mz,
+            "precursor_charge": self.precursor_charge,
+            "mz": self.mz,
+            "intensity": self.intensity,
+            "retention_time": self.retention_time,
+            "proforma": self.proforma,
+            "annotation": self.annotation,
+        }
+
+    def __setstate__(self, state):
+        self._inner = MsmsSpectrumJit(
+            state["identifier"],
+            state["precursor_mz"],
+            state["precursor_charge"],
+            state["mz"],
+            state["intensity"],
+            state["retention_time"],
+            True,
+        )
+        self.proforma = state["proforma"]
+        self._annotation = state["annotation"]
 
     @classmethod
     def from_usi(

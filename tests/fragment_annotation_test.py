@@ -1,34 +1,34 @@
 import numpy as np
 import pytest
 
-from spectrum_utils import proforma, spectrum
-from spectrum_utils.fragment_annotation import FragmentAnnotation, get_theoretical_fragments
+from spectrum_utils import fragment_annotation, proforma
+
 
 @pytest.fixture(autouse=True)
 def set_random_seed():
     np.random.seed(13)
 
 
-def test_fragmentannotation_unknown():
-    FragmentAnnotation("?")
+def test_fragment_annotation_unknown():
+    fragment_annotation.FragmentAnnotation("?")
     with pytest.raises(ValueError):
-        FragmentAnnotation("?", neutral_loss="-H2O")
+        fragment_annotation.FragmentAnnotation("?", neutral_loss="-H2O")
     with pytest.raises(ValueError):
-        FragmentAnnotation("?", isotope=1)
+        fragment_annotation.FragmentAnnotation("?", isotope=1)
     with pytest.raises(ValueError):
-        FragmentAnnotation("?", charge=1)
+        fragment_annotation.FragmentAnnotation("?", charge=1)
     with pytest.raises(ValueError):
-        FragmentAnnotation("?", adduct="[M+H]")
+        fragment_annotation.FragmentAnnotation("?", adduct="[M+H]")
 
 
 def test_fragment_annotation_primary():
-    FragmentAnnotation(
+    fragment_annotation.FragmentAnnotation(
         "b5", neutral_loss="-H2O", isotope=1, charge=1, adduct="[M+H]"
     )
     with pytest.raises(ValueError):
-        FragmentAnnotation("b5", charge=0)
+        fragment_annotation.FragmentAnnotation("b5", charge=0)
     with pytest.raises(ValueError):
-        FragmentAnnotation("b5", charge=-2)
+        fragment_annotation.FragmentAnnotation("b5", charge=-2)
 
 
 def test_get_theoretical_fragments():
@@ -71,9 +71,13 @@ def test_get_theoretical_fragments():
         "y5^3": 232.450141,
         "y6^3": 264.801061,
     }
-    for fragment, calc_mass in get_theoretical_fragments(peptide, max_charge=3):
-        fragment_mz = fragments[f"{fragment.ion_type}^{fragment.charge}"]
-        assert calc_mass == pytest.approx(fragment_mz)
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(peptide, max_charge=3):
+        assert fragment_mz == pytest.approx(
+            fragments[f"{annotation.ion_type}^{annotation.charge}"]
+        )
 
 
 def test_get_theoretical_fragments_static_mod():
@@ -116,9 +120,13 @@ def test_get_theoretical_fragments_static_mod():
         "y5^3": 259.105585,
         "y6^3": 291.456505,
     }
-    for fragment, calc_mass in get_theoretical_fragments(peptide, max_charge=3):
-        fragment_mz = fragments[f"{fragment.ion_type}^{fragment.charge}"]
-        assert calc_mass == pytest.approx(fragment_mz)
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(peptide, max_charge=3):
+        assert fragment_mz == pytest.approx(
+            fragments[f"{annotation.ion_type}^{annotation.charge}"]
+        )
 
 
 def test_get_theoretical_fragments_mod():
@@ -161,9 +169,13 @@ def test_get_theoretical_fragments_mod():
         "y5^3": 259.105585,
         "y6^3": 291.456505,
     }
-    for fragment, calc_mass in get_theoretical_fragments(peptide, max_charge=3):
-        fragment_mz = fragments[f"{fragment.ion_type}^{fragment.charge}"]
-        assert calc_mass == pytest.approx(fragment_mz)
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(peptide, max_charge=3):
+        assert fragment_mz == pytest.approx(
+            fragments[f"{annotation.ion_type}^{annotation.charge}"]
+        )
 
 
 def test_get_theoretical_fragments_mod_term():
@@ -182,9 +194,13 @@ def test_get_theoretical_fragments_mod_term():
         "y5": 695.335815,
         "y6": 792.388550,
     }
-    for fragment, calc_mass in get_theoretical_fragments(peptide):
-        fragment_mz = fragments[f"{fragment.ion_type}"]
-        assert calc_mass == pytest.approx(fragment_mz)
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(peptide):
+        assert fragment_mz == pytest.approx(
+            fragments[f"{annotation.ion_type}"]
+        )
 
 
 def test_get_theoretical_fragments_mod_multiple():
@@ -203,9 +219,13 @@ def test_get_theoretical_fragments_mod_multiple():
         "y5": 775.302185,
         "y6": 872.354980,
     }
-    for fragment, calc_mass in get_theoretical_fragments(peptide):
-        fragment_mz = fragments[f"{fragment.ion_type}"]
-        assert calc_mass == pytest.approx(fragment_mz)
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(peptide):
+        assert fragment_mz == pytest.approx(
+            fragments[f"{annotation.ion_type}"]
+        )
 
 
 def test_get_theoretical_fragments_neutral_loss():
@@ -255,16 +275,21 @@ def test_get_theoretical_fragments_neutral_loss():
         fragment = f"{fragment}-{neutral_loss[0]}"
         neutral_loss_fragments[fragment] = mz - (neutral_loss[1] / charge)
     fragments = {**fragments, **neutral_loss_fragments}
-    for fragment, calc_mass in get_theoretical_fragments(
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(
         peptide,
         max_charge=3,
         neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]},
     ):
-        fragment_mz = fragments[
-            f"""{fragment.ion_type}^{fragment.charge}{fragment.neutral_loss
-            if fragment.neutral_loss is not None else ''}"""
-        ]
-        assert fragment_mz == pytest.approx(calc_mass), repr(fragment)
+        assert fragment_mz == pytest.approx(
+            fragments[
+                f"""{annotation.ion_type}^{annotation.charge}{
+                annotation.neutral_loss if annotation.neutral_loss is not None
+                else ''}"""
+            ]
+        )
 
 
 def test_get_theoretical_fragments_mod_neutral_loss():
@@ -314,27 +339,36 @@ def test_get_theoretical_fragments_mod_neutral_loss():
         fragment = f"{fragment}-{neutral_loss[0]}"
         neutral_loss_fragments[fragment] = mz - (neutral_loss[1] / charge)
     fragments = {**fragments, **neutral_loss_fragments}
-    for fragment, calc_mass in get_theoretical_fragments(
+    for (
+        annotation,
+        fragment_mz,
+    ) in fragment_annotation.get_theoretical_fragments(
         peptide,
         max_charge=3,
         neutral_losses={None: 0, neutral_loss[0]: -neutral_loss[1]},
     ):
-        fragment_mz = fragments[
-            f"""{fragment.ion_type}^{fragment.charge}{fragment.neutral_loss
-            if fragment.neutral_loss is not None else ''}"""
-        ]
-        assert fragment_mz == pytest.approx(calc_mass), repr(fragment)
+        assert fragment_mz == pytest.approx(
+            fragments[
+                f"""{annotation.ion_type}^{annotation.charge}{
+                annotation.neutral_loss if annotation.neutral_loss is not None
+                else ''}"""
+            ]
+        )
 
 
 def test_get_theoretical_fragments_ambiguous():
     with pytest.raises(ValueError):
-        get_theoretical_fragments(proforma.parse("HPYLEBDR")[0])
+        fragment_annotation.get_theoretical_fragments(
+            proforma.parse("HPYLEBDR")[0]
+        )
     with pytest.raises(ValueError):
-        get_theoretical_fragments(proforma.parse("HPZYLEDR")[0])
+        fragment_annotation.get_theoretical_fragments(
+            proforma.parse("HPZYLEDR")[0]
+        )
 
 
-def test_get_theoretical_fragments_unsupported_fragment_type():
+def test_get_theoretical_fragments_unsupported_ion_type():
     with pytest.raises(ValueError):
-        out = get_theoretical_fragments(proforma.parse("HPYLEDR")[0], "l")
-        breakpoint()
-
+        fragment_annotation.get_theoretical_fragments(
+            proforma.parse("HPYLEDR")[0], "l"
+        )

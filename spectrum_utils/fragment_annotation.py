@@ -59,6 +59,8 @@ _neutral_loss = {
     "H3PO4": -97.976896,
 }
 
+_supported_ions = "abcxyzImpr"
+
 
 class FragmentAnnotation:
     def __init__(
@@ -265,6 +267,11 @@ def get_theoretical_fragments(
         All possible fragment annotations and their theoretical m/z in
         ascending m/z order.
     """
+    for ion_type in ion_types:
+        if ion_type not in _supported_ions:
+            raise ValueError(
+                f"{ion_type} is not a supported ion type ({_supported_ions})"
+            )
     if "B" in proteoform.sequence:
         raise ValueError(
             "Explicitly specify aspartic acid (D) or asparagine (N) instead of"

@@ -1,11 +1,12 @@
 import copy
+import functools
 from typing import Dict, Iterable, Optional, Union
 
 import numba as nb
 import numpy as np
 import pyteomics.usi
 
-from spectrum_utils import fragment_annotation, proforma, utils
+from spectrum_utils import fragment_annotation as fa, proforma, utils
 
 
 class GnpsBackend(pyteomics.usi._PROXIBackend):
@@ -654,6 +655,10 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
+        mass_diff = functools.partial(
+            utils.mass_diff, mode_is_da=fragment_tol_mode == "Da"
+        )
+
         self.proforma = proforma_str
         self._annotation = np.full_like(self.mz, None, object)
         # By default, peak charges are assumed to be smaller than the precursor
@@ -669,67 +674,38 @@ class MsmsSpectrum:
         proteoforms = proforma.parse(self.proforma)
         analyte_number = 1 if len(proteoforms) > 1 else None
         for proteoform in proteoforms:
-            fragments = fragment_annotation.get_theoretical_fragments(
-                proteoform,
-                ion_types,
-                max_ion_charge,
-                neutral_losses,
+            fragments = fa.get_theoretical_fragments(
+                proteoform, ion_types, max_ion_charge, neutral_losses
             )
             fragment_i = 0
-            for peak_i in range(len(self.mz)):
-                self.annotation[
-                    peak_i
-                ] = fragment_annotation.PeakInterpretation()
+            for peak_i, peak_mz in enumerate(self.mz):
+                pi = fa.PeakInterpretation()
                 while (
                     fragment_i < len(fragments)
-                    and utils.mass_diff(
-                        self.mz[peak_i],
-                        fragments[fragment_i][1],
-                        fragment_tol_mode == "Da",
-                    )
+                    and mass_diff(peak_mz, fragments[fragment_i][1])
                     > fragment_tol_mass
                 ):
                     fragment_i += 1
                 i = 0
                 while (
                     fragment_i + i < len(fragments)
-                    and -fragment_tol_mass
-                    <= utils.mass_diff(
-                        self.mz[peak_i],
-                        fragments[fragment_i + i][1],
-                        fragment_tol_mode == "Da",
-                    )
+                    and abs(mass_diff(peak_mz, fragments[fragment_i + i][1]))
                     <= fragment_tol_mass
                 ):
                     # FIXME: Annotations should not be duplicated across
                     #   multiple peaks.
                     fragment = copy.copy(fragments[fragment_i + i][0])
                     fragment.analyte_number = analyte_number
-                    if fragment_tol_mode == "ppm":
-                        fragment.mz_delta = (
-                            round(
-                                (
-                                    self.mz[peak_i]
-                                    - fragments[fragment_i + i][1]
-                                )
-                                / fragments[fragment_i + i][1]
-                                * 10 ** 6,
-                                1,
-                            ),
-                            "ppm",
-                        )
-                    else:
-                        fragment.mz_delta = (
-                            round(
-                                self.mz[peak_i] - fragments[fragment_i + i][1],
-                                5,
-                            ),
-                            "Da",
-                        )
-                    self.annotation[peak_i].fragment_annotations.append(
-                        fragment
+                    fragment.mz_delta = (
+                        round(
+                            mass_diff(peak_mz, fragments[fragment_i + i][1]),
+                            ndigits=5 if fragment_tol_mode == "Da" else 1,
+                        ),
+                        fragment_tol_mode,
                     )
+                    pi.fragment_annotations.append(fragment)
                     i += 1
+                self.annotation[peak_i] = pi
             if analyte_number is not None:
                 analyte_number += 1
         return self

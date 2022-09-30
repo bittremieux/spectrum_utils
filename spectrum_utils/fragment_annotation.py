@@ -262,7 +262,7 @@ def get_theoretical_fragments(
     Returns
     -------
     List[Tuple[FragmentAnnotation, float]]
-        All possible fragments annotations and their theoretical m/z in
+        All possible fragment annotations and their theoretical m/z in
         ascending m/z order.
     """
     if "B" in proteoform.sequence:
@@ -451,15 +451,17 @@ def get_theoretical_fragments(
             continue
         neutral_loss = f"{'-' if mass_diff < 0 else '+'}{neutral_loss}"
         for fragment, mass in fragments_masses:
-            neutral_loss_fragments.append(
-                (
-                    FragmentAnnotation(
-                        ion_type=fragment.ion_type,
-                        neutral_loss=neutral_loss,
-                        charge=fragment.charge,
-                    ),
-                    mass + mass_diff / fragment.charge,
-                )
+            fragment_mass = mass + mass_diff / fragment.charge
+            if fragment_mass > 0:
+                neutral_loss_fragments.append(
+                    (
+                        FragmentAnnotation(
+                            ion_type=fragment.ion_type,
+                            neutral_loss=neutral_loss,
+                            charge=fragment.charge,
+                        ),
+                        fragment_mass,
+                    )
             )
     fragments_masses.extend(neutral_loss_fragments)
 

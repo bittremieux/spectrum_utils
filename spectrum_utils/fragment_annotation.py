@@ -59,7 +59,7 @@ _neutral_loss = {
     "H3PO4": -97.976896,
 }
 
-_supported_ions = "abcxyzImpr"
+_supported_ions = "?abcxyzIm_prf"
 
 
 class FragmentAnnotation:
@@ -125,7 +125,7 @@ class FragmentAnnotation:
             raise NotImplementedError(
                 "Advanced ion types are not yet supported"
             )
-        elif ion_type[0] not in "?abcxyzIm_prf":
+        elif ion_type[0] not in _supported_ions:
             raise ValueError("Unknown ion type")
         if ion_type == "?" and (
             neutral_loss is not None

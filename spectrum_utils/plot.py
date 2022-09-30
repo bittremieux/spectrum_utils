@@ -41,6 +41,7 @@ def _annotate_ion(
     annotate_ions: bool,
     annotation_kws: Dict[str, object],
     ax: plt.Axes,
+    annot_fmt: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Annotate a specific fragment peak.
@@ -62,6 +63,11 @@ def _annotate_ion(
         Keyword arguments for `ax.text` to customize peak annotations.
     ax : plt.Axes
         Axes instance on which to plot the annotation.
+    annot_fmt : Optional[str]
+        Formatting string for peak annotations. Supported elements are
+        '{ion_type}", '{neutral_loss}", '{isotope}", '{charge}", '{adduct}",
+        '{analyte_number}", and '{mz_delta}". Example:
+        "{ion_type}{neutral_loss}^{charge}".
 
     Returns
     -------
@@ -69,34 +75,28 @@ def _annotate_ion(
         A tuple of the annotation's color as a hex string and the annotation's
         zorder.
     """
-    # No annotation -> Just return peak styling information.
-    if annotation is None:
-        return colors.get(None), zorders.get(None)
-    # Else: Add the textual annotation.
-    else:
-        color = (
-            colors.get(annotation.ion_type[0])
-            if color_ions
-            else colors.get(None)
-        )
-        zorder = zorders.get(annotation.ion_type[0])
-
-        if annotate_ions:
-            annotation_pos = intensity
-            if annotation_pos > 0:
-                annotation_pos += 0.02
-            kws = annotation_kws.copy()
-            del kws["zorder"]
-            ax.text(
-                mz,
-                annotation_pos,
-                str(annotation),
-                color=color,
-                zorder=zorder,
-                **kws,
+    ion_type = annotation.ion_type[0] if annotation is not None else None
+    color = colors.get(ion_type if color_ions else None)
+    zorder = zorders.get(ion_type)
+    if annotate_ions and ion_type is not None and ion_type != "?":
+        y = intensity + 0.02 * (intensity > 0)
+        if annot_fmt is None:
+            annot_str = str(annotation)
+        else:
+            annot_str = annot_fmt.format(
+                ion_type=annotation.ion_type,
+                neutral_loss=annotation.neutral_loss if annotation.neutral_loss is not None else "",
+                isotope=annotation.isotope,
+                charge=annotation.charge,
+                adduct=annotation.adduct,
+                analyte_number=annotation.analyte_number,
+                mz_delta="".join(map(str, annotation.mz_delta)),
             )
+        kws = annotation_kws.copy()
+        kws.update(dict(color=color, zorder=zorder))
+        ax.text(mz, y, annot_str, **kws)
 
-        return color, zorder
+    return color, zorder
 
 
 def spectrum(
@@ -104,6 +104,7 @@ def spectrum(
     color_ions: bool = True,
     annotate_ions: bool = True,
     annot_kws: Optional[Dict] = None,
+    annot_fmt: Optional[str] = None,
     mirror_intensity: bool = False,
     grid: Union[bool, str] = True,
     ax: Optional[plt.Axes] = None,
@@ -123,6 +124,11 @@ def spectrum(
         is True.
     annot_kws : Optional[Dict], optional
         Keyword arguments for `ax.text` to customize peak annotations.
+    annot_fmt : Optional[str]
+        Formatting string for peak annotations. Supported elements are
+        '{ion_type}", '{neutral_loss}", '{isotope}", '{charge}", '{adduct}",
+        '{analyte_number}", and '{mz_delta}". Example:
+        "{ion_type}{neutral_loss}^{charge}".
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
     grid : Union[bool, str], optional
@@ -171,11 +177,13 @@ def spectrum(
         color, zorder = _annotate_ion(
             mz,
             peak_intensity,
-            annotation,
+            # Use the first annotation in case there are multiple options.
+            annotation[0],
             color_ions,
             annotate_ions,
             annotation_kws,
             ax,
+            annot_fmt,
         )
         ax.plot([mz, mz], [0, peak_intensity], color=color, zorder=zorder)
 

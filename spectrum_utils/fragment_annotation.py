@@ -216,10 +216,10 @@ class PeakInterpretation:
         """
         self.fragment_annotations = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         # If no fragment annotations have been specified, interpret as an
         # unknown ion.
         if len(self.fragment_annotations) > 0:
@@ -231,6 +231,12 @@ class PeakInterpretation:
         return isinstance(other, PeakInterpretation) and str(self) == str(
             other
         )
+
+    def __getitem__(self, key) -> FragmentAnnotation:
+        if len(self.fragment_annotations) > 0:
+            return self.fragment_annotations[key]
+        else:
+            return self._unknown
 
 
 def get_theoretical_fragments(

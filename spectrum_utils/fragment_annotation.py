@@ -2,15 +2,12 @@ import operator
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-import numba as nb
-import numpy as np
-
 try:
     import pyteomics.cmass as pmass
 except ImportError:
     import pyteomics.mass as pmass
 
-from spectrum_utils import proforma, utils
+from spectrum_utils import proforma
 
 
 # Amino acid and special amino acid masses.
@@ -62,18 +59,7 @@ _neutral_loss = {
     "H3PO4": -97.976896,
 }
 
-
-class PeakInterpretation:
-    def __init__(self):
-        """
-        Fragment annotation(s) to interpret a specific peak.
-        """
-        self.annotations = []
-
-    def __str__(self):
-        # If no fragment annotations have been specified, interpret as an
-        # unknown ion.
-        return ",".join(self.annotations) if len(self.annotations) > 0 else "?"
+_supported_ions = "abcxyzImpr"
 
 
 class FragmentAnnotation:
@@ -221,6 +207,32 @@ class FragmentAnnotation:
         )
 
 
+class PeakInterpretation:
+    _unknown = FragmentAnnotation("?")
+
+    def __init__(self):
+        """
+        Fragment annotation(s) to interpret a specific peak.
+        """
+        self.fragment_annotations = []
+
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        # If no fragment annotations have been specified, interpret as an
+        # unknown ion.
+        if len(self.fragment_annotations) > 0:
+            return ",".join([str(a) for a in self.fragment_annotations])
+        else:
+            return str(self._unknown)
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, PeakInterpretation) and str(self) == str(
+            other
+        )
+
+
 def get_theoretical_fragments(
     proteoform: proforma.Proteoform,
     ion_types: str = "by",
@@ -251,9 +263,14 @@ def get_theoretical_fragments(
     Returns
     -------
     List[Tuple[FragmentAnnotation, float]]
-        All possible fragments annotations and their theoretical m/z in
+        All possible fragment annotations and their theoretical m/z in
         ascending m/z order.
     """
+    for ion_type in ion_types:
+        if ion_type not in _supported_ions:
+            raise ValueError(
+                f"{ion_type} is not a supported ion type ({_supported_ions})"
+            )
     if "B" in proteoform.sequence:
         raise ValueError(
             "Explicitly specify aspartic acid (D) or asparagine (N) instead of"
@@ -437,15 +454,17 @@ def get_theoretical_fragments(
             continue
         neutral_loss = f"{'-' if mass_diff < 0 else '+'}{neutral_loss}"
         for fragment, mass in fragments_masses:
-            neutral_loss_fragments.append(
-                (
-                    FragmentAnnotation(
-                        ion_type=fragment.ion_type,
-                        neutral_loss=neutral_loss,
-                        charge=fragment.charge,
-                    ),
-                    mass + mass_diff / fragment.charge,
-                )
+            fragment_mass = mass + mass_diff / fragment.charge
+            if fragment_mass > 0:
+                neutral_loss_fragments.append(
+                    (
+                        FragmentAnnotation(
+                            ion_type=fragment.ion_type,
+                            neutral_loss=neutral_loss,
+                            charge=fragment.charge,
+                        ),
+                        fragment_mass,
+                    )
             )
     fragments_masses.extend(neutral_loss_fragments)
 

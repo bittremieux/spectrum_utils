@@ -206,7 +206,6 @@ class FragmentAnnotation:
             other
         )
 
-__SUPPORTED_IONS = "abcxyzImpr"
 
 class PeakInterpretation:
     _unknown = FragmentAnnotation("?")
@@ -282,9 +281,6 @@ def get_theoretical_fragments(
             "Explicitly specify glutamic acid (E) or glutamine (Q) instead of "
             "the ambiguous Z to compute the fragment annotations"
         )
-    for it in ion_types:
-        if it not in __SUPPORTED_IONS:
-            raise ValueError(f"{it} is not a supported ion type ({__SUPPORTED_IONS})")
 
     neutral_losses = {None: 0} if neutral_losses is None else neutral_losses
 

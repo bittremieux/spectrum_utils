@@ -666,9 +666,9 @@ class MsmsSpectrum:
             neutral_losses[None] = 0
         # Parse the ProForma string and find peaks that match the theoretical
         # fragments.
-        for analyte_number, proteoform in enumerate(
-            proforma.parse(self.proforma), 1
-        ):
+        proteoforms = proforma.parse(self.proforma)
+        analyte_number = 1 if len(proteoforms) > 1 else None
+        for proteoform in proteoforms:
             fragments = fragment_annotation.get_theoretical_fragments(
                 proteoform,
                 ion_types,
@@ -701,6 +701,8 @@ class MsmsSpectrum:
                     )
                     <= fragment_tol_mass
                 ):
+                    # FIXME: Annotations should not be duplicated across
+                    #   multiple peaks.
                     fragment = copy.copy(fragments[fragment_i + i][0])
                     fragment.analyte_number = analyte_number
                     if fragment_tol_mode == "ppm":
@@ -728,4 +730,6 @@ class MsmsSpectrum:
                         fragment
                     )
                     i += 1
+            if analyte_number is not None:
+                analyte_number += 1
         return self

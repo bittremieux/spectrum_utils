@@ -289,8 +289,8 @@ def get_theoretical_fragments(
     # Generate all peptide fragments ('a', 'b', 'c', 'x', 'y', 'z') and
     # calculate their theoretical masses.
     # Generate all N-terminal peptide fragments.
-    mod_i, mod_mass = 0, 0
     for ion_type in set("abc") & set(ion_types):
+        mod_i, mod_mass = 0, 0
         for fragment_i in range(1, len(proteoform.sequence)):
             fragment_sequence = proteoform.sequence[:fragment_i]
             # Ignore unlocalized modifications.
@@ -322,11 +322,11 @@ def get_theoretical_fragments(
                 (fragment_sequence, ion_type, fragment_i, mod_mass)
             )
     # Generate all C-terminal peptide fragments.
-    if proteoform.modifications is not None:
-        mod_i, mod_mass = len(proteoform.modifications) - 1, 0
-    else:
-        mod_i, mod_mas = None, 0
     for ion_type in set("xyz") & set(ion_types):
+        if proteoform.modifications is not None:
+            mod_i, mod_mass = len(proteoform.modifications) - 1, 0
+        else:
+            mod_i, mod_mass = None, 0
         for fragment_i in range(len(proteoform.sequence) - 1, 0, -1):
             fragment_sequence = proteoform.sequence[fragment_i:]
             # Include suffix modifications.

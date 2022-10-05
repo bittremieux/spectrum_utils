@@ -35,7 +35,7 @@ maxdepth: 1
 
 install
 quickstart
-processing
+annotating
 plotting
 runtime
 api

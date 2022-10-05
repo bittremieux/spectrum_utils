@@ -1,33 +1,23 @@
 # Spectrum visualization
 
-The [quickstart](quickstart.md) and [spectrum processing](processing.md) pages
-include several examples that demonstrate the spectrum_utils plotting
-functionality. Often, nice spectrum graphics can be created with a single line
-of code; it's as easy as using `spectrum_utils.plot.spectrum(...)` to visualize
-a single spectrum. Additionally, these examples show how peaks will be
-annotated with peptide fragments, molecule structures, their _m_/_z_ values, or
-custom strings.
+The [quickstart](quickstart.md) briefly introduced the spectrum_utils plotting functionality.
+Often, nice spectrum graphics can be created with only a single line of code; it's as easy as using `spectrum_utils.plot.spectrum(...)` to visualize a single spectrum.
+Additionally, these examples show how peaks can be annotated based on the the [ProForma 2.0](https://www.psidev.info/proforma) specification.
 
-Here we will briefly describe some functionality to customize your spectrum
-plots. Some of the arguments that can be provided to
-`spectrum_utils.plot.spectrum(...)` are:
+Here we will briefly describe some functionality to customize your spectrum plots.
+Some of the arguments that can be provided to `spectrum_utils.plot.spectrum(...)` are:
 
-- `color_ions` and `annotate_ions`: Boolean flags indicating whether the peaks
-should be colored and/or annotated.
+- `color_ions` and `annotate_ions`: Boolean flags indicating whether the peaks should be colored and/or annotated.
 - `annot_kws`: A dictionary with options to customize textual peak annotations.
-See the
-[`matplotlib.text.Text` documentation](https://matplotlib.org/3.1.1/api/text_api.html#matplotlib.text.Text)
-for available options.
+See the [`matplotlib.text.Text` documentation](https://matplotlib.org/3.1.1/api/text_api.html#matplotlib.text.Text) for available options.
 - `grid`: Enable/disable the grid.
 
 See the [API reference](api.md) for more information.
 
 ## Mirror plot
 
-A mirror plot can be used to visualize matching spectra, for example, to
-plot identifications from spectral library searching. Again, only a single line
-of code is required to do the actual plotting:
-`spectrum_utils.plot.mirror(...)`
+A mirror plot can be used to visualize matching spectra, for example, to plot identifications from spectral library searching.
+Again, only a single line of code is required to do the actual plotting: `spectrum_utils.plot.mirror(...)`
 
 ```python
 import matplotlib.pyplot as plt
@@ -65,15 +55,12 @@ plt.close()
 
 ![](mirror.png)
 
-All of the advanced plotting arguments described above can be provided for the
-mirror plot as well using the `spectrum_kws` argument.
+All of the advanced plotting arguments described above can be provided for the mirror plot as well using the `spectrum_kws` argument.
 
 ## Interactive plotting
 
-Besides the standard plotting functionality in `spectrum_utils.plot`,
-spectrum_utils also contains dynamic plotting functionality in
-`spectrum_utils.iplot`. `iplot` is a drop-in replacement for `plot`; only the
-import statement needs to be changed to generate interactive plots.
+Besides the standard plotting functionality in `spectrum_utils.plot`, spectrum_utils also contains dynamic plotting functionality in `spectrum_utils.iplot`.
+`iplot` is a drop-in replacement for `plot`; only the import statement needs to be changed to generate interactive plots.
 
 See below for example interactive plots of a single spectrum and a mirror plot.
 
@@ -158,15 +145,16 @@ spectrum_bottom = sus.MsmsSpectrum(usi_bottom, 507.7484, 2,
   }).catch(console.error);
 </script>
 
-For more information on how to manipulate these interactive plots, see the
-[Altair documentation](https://altair-viz.github.io/index.html).
+For more information on how to manipulate these interactive plots, see the [Vega-Altair documentation](https://altair-viz.github.io/index.html).
 
-Interactive plots can be
-[saved](https://altair-viz.github.io/user_guide/saving_charts.html) as html
-files or other output formats. [Vega-Embed](https://github.com/vega/vega-embed)
-makes it easy to embed plots exported as JSON into web pages.
+Interactive plots can be [saved](https://altair-viz.github.io/user_guide/saving_charts.html) as html files or other output formats.
+[Vega-Embed](https://github.com/vega/vega-embed) makes it easy to embed plots exported as JSON into web pages.
 
 ## Advanced functionality
+
+### Peak annotation
+
+**TODO:** Describe how to modify which ion types are displayed in spectrum plots.
 
 ### Peak colors
 
@@ -180,8 +168,7 @@ By default, peaks are colored as follows:
 - <svg width="10" height="10"><rect width="10" height="10" style="fill:#F57C00;stroke-width:1;stroke:rgb(0,0,0)" /></svg> z-ions
 - <svg width="10" height="10"><rect width="10" height="10" style="fill:#212121;stroke-width:1;stroke:rgb(0,0,0)" /></svg> unknown and unannotated ions
 
-To change these colors, simply overwrite values in the
-`spectrum_utils.plot.colors` dictionary with your preferred colors:
+To change these colors, simply overwrite values in the `spectrum_utils.plot.colors` dictionary with your preferred colors:
 
 ```python
 import spectrum_utils.plot as sup

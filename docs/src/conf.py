@@ -22,7 +22,7 @@ import spectrum_utils
 # -- Project information -----------------------------------------------------
 
 project = "spectrum_utils"
-copyright = "2019, Wout Bittremieux"
+copyright = "2019–2022, Wout Bittremieux"
 author = "Wout Bittremieux"
 
 # The short X.Y version

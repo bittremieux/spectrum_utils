@@ -18,16 +18,15 @@ spectrum_utils contains the following features:
 
 ## Installation
 
-spectrum_utils requires Python version 3.6+ and can be installed with pip or
-conda.
+spectrum_utils requires Python version 3.8+ and can be installed with pip or conda.
+
+Using pip:
+
+    pip install spectrum_utils[iplot]
 
 Using conda:
 
     conda install -c bioconda spectrum_utils
-
-Using pip:
-
-    pip install spectrum_utils
 
 ## Documentation
 

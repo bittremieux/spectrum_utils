@@ -7,44 +7,37 @@
 
 ## About spectrum_utils
 
-spectrum_utils is a Python package for efficient MS/MS spectrum processing and
-visualization.
+spectrum_utils is a Python package for efficient mass spectrometry data processing and visualization.
 
 spectrum_utils contains the following features:
 
-- Spectrum processing
-    - Precursor & noise peak removal
-    - Intensity filtering
-    - Intensity scaling
-    - Peak annotations
-        - Modification-aware (static & variable) peptide fragments
-        - SMILES-based molecules
-        - Mass-over-charge values
-- Spectrum plotting
-    - Fully customizable individual spectrum plots
-    - Mirror plot of matching spectra
-    - Interactive spectrum plots
+- Spectrum loading from online proteomics and metabolomics data resources using the [Universal Spectrum Identifier (USI)](https://www.psidev.info/usi) mechanism.
+- Common spectrum processing operations (precursor & noise peak removal, intensity filtering, intensity scaling) optimized for computational efficiency.
+- Annotating observed spectrum fragments using the [ProForma 2.0 specification](https://www.psidev.info/proforma) for (modified) peptidoforms.
+- Publication-quality, fully customizable spectrum plotting.
  
- See the documentation for more information and detailed examples on how to use
- this functionality.
+See the documentation for more information and detailed examples on how to get started with spectrum_utils for versatile mass spectrometry data manipulation in Python.
  
- ## Citation
+## Citation
  
-spectrum_utils is freely available as open source under the
-[Apache 2.0 license](http://opensource.org/licenses/Apache-2.0).
+spectrum_utils is freely available as open source under the [Apache 2.0 license](http://opensource.org/licenses/Apache-2.0).
 
-When using spectrum_utils please cite the following manuscript:
+When using spectrum_utils, please cite the following manuscripts:
  
-Wout Bittremieux. "spectrum_utils: A Python package for mass spectrometry data
-processing and visualization." _Analytical Chemistry_ 92 (1) 659-661 (2020)
-doi:[10.1021/acs.analchem.9b04884](https://doi.org/10.1021/acs.analchem.9b04884).
+- Wout Bittremieux. "spectrum_utils: A Python package for mass spectrometry data processing and visualization." _Analytical Chemistry_ **92**, 659--661 (2020) doi:[10.1021/acs.analchem.9b04884](https://doi.org/10.1021/acs.analchem.9b04884).
+- Wout Bittremieux, Lev Levitsky, Matteo Pilz, Timo Sachsenberg, Florian Huber, Mingxun Wang, Pieter C. Dorrestein. "Unified and standardized mass spectrometry data processing in Python using spectrum_utils" _bioRxiv_ (2022).
 
-## Contents
+```{toctree}
+---
+caption: Contents
+maxdepth: 1
+---
 
-- [Install](install.md)
-- [Quickstart](quickstart.md)
-- [Spectrum processing](processing.md)
-- [Spectrum visualization](plotting.md)
-- [Computational efficiency](runtime.md)
-- [API reference](api.md)
-- [Contact](contact.md)
+install
+quickstart
+processing
+plotting
+runtime
+api
+contact
+```

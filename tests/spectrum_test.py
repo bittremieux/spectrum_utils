@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pyteomics import mass
 
-from spectrum_utils import proforma, spectrum
+from spectrum_utils import fragment_annotation as fa, proforma, spectrum
 
 
 @pytest.fixture(autouse=True)
@@ -485,3 +485,92 @@ def test_pickle():
     assert spec.proforma == spec_pickled.proforma
     np.testing.assert_equal(spec.annotation, spec_pickled.annotation)
     os.remove("temp.pkl")
+
+
+def test_annotate_proforma():
+    fragment_tol_mass, fragment_tol_mode = 0.02, "Da"
+    peptides = [
+        "SYELPDGQVITIGNER",
+        "MFLSFPTTK",
+        "DLYANTVLSGGTTMYPGIADR",
+        "YLYEIAR",
+        "VAPEEHPVLLTEAPLNPK",
+    ]
+    for charge, peptide in enumerate(peptides, 2):
+        fragment_mz = np.asarray(
+            [
+                fragment_mz
+                for fragment, fragment_mz in fa.get_theoretical_fragments(
+                    proforma.parse(peptide)[0], max_charge=2
+                )
+            ]
+        )
+        fragment_mz += np.random.uniform(
+            -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass, len(fragment_mz)
+        )
+        fragment_mz = np.random.choice(
+            fragment_mz, min(50, len(fragment_mz)), False
+        )
+        num_peaks = 150
+        mz = np.random.uniform(100, 1400, num_peaks)
+        mz[: len(fragment_mz)] = fragment_mz
+        intensity = np.random.lognormal(0, 1, num_peaks)
+        spec = spectrum.MsmsSpectrum(
+            "test_spectrum",
+            mass.calculate_mass(sequence=peptide, charge=charge),
+            charge,
+            mz,
+            intensity,
+        )
+        spec.annotate_proforma(peptide, fragment_tol_mass, fragment_tol_mode)
+        assert np.count_nonzero(spec.annotation) >= len(fragment_mz)
+
+
+def test_annotate_proforma_neutral_loss():
+    fragment_tol_mass, fragment_tol_mode = 0.02, "Da"
+    neutral_loss = "H2O", 18.010565  # water
+    n_peaks = 150
+    peptides = [
+        "SYELPDGQVITIGNER",
+        "MFLSFPTTK",
+        "DLYANTVLSGGTTMYPGIADR",
+        "YLYEIAR",
+        "VAPEEHPVLLTEAPLNPK",
+    ]
+    for charge, peptide in enumerate(peptides, 2):
+        fragment_mz = np.asarray(
+            [
+                fragment_mz
+                for fragment, fragment_mz in fa.get_theoretical_fragments(
+                    proforma.parse(peptide)[0],
+                    max_charge=2,
+                    neutral_losses={
+                        None: 0,
+                        neutral_loss[0]: -neutral_loss[1],
+                    },
+                )
+            ]
+        )
+        fragment_mz += np.random.uniform(
+            -0.9 * fragment_tol_mass, 0.9 * fragment_tol_mass, len(fragment_mz)
+        )
+        fragment_mz = np.random.choice(
+            fragment_mz, min(50, len(fragment_mz)), False
+        )
+        mz = np.random.uniform(100, 1400, n_peaks)
+        mz[: len(fragment_mz)] = fragment_mz
+        intensity = np.random.lognormal(0, 1, n_peaks)
+        spec = spectrum.MsmsSpectrum(
+            "test_spectrum",
+            mass.calculate_mass(sequence=peptide, charge=charge),
+            charge,
+            mz,
+            intensity,
+        )
+        spec.annotate_proforma(
+            peptide,
+            fragment_tol_mass,
+            fragment_tol_mode,
+            neutral_losses={neutral_loss[0]: -neutral_loss[1]},
+        )
+        assert np.count_nonzero(spec.annotation) >= len(fragment_mz)

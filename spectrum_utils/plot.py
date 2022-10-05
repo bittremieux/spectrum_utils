@@ -157,8 +157,7 @@ def spectrum(
     max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
     ax.set_xlim(0, max_mz)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
-    y_max = 1.15 if annotate_ions else 1.05
-    ax.set_ylim(*(0, y_max) if not mirror_intensity else (-y_max, 0))
+    ax.set_ylim(*(0, 1) if not mirror_intensity else (-1, 0))
 
     max_intensity = spec.intensity.max()
     annotations = (
@@ -204,8 +203,6 @@ def spectrum(
     ax.set_axisbelow(True)
 
     ax.tick_params(axis="both", which="both", labelsize="small")
-    y_ticks = ax.get_yticks()
-    ax.set_yticks(y_ticks[y_ticks <= 1.0])
 
     ax.set_xlabel("m/z", style="italic")
     ax.set_ylabel("Intensity")

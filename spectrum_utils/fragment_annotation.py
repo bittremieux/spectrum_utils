@@ -471,7 +471,7 @@ def get_theoretical_fragments(
                         ),
                         fragment_mass,
                     )
-            )
+                )
     fragments_masses.extend(neutral_loss_fragments)
 
     # Sort the fragment annotations by their theoretical masses.

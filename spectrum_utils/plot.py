@@ -111,10 +111,10 @@ def annotate_ion_type(
         The peak's annotation string.
     """
     if (
-            annotation.ion_type[0] in ion_types
-            and annotation.neutral_loss is None
-            and annotation.isotope == 0
-            and annotation.charge == 1
+        annotation.ion_type[0] in ion_types
+        and annotation.neutral_loss is None
+        and annotation.isotope == 0
+        and annotation.charge == 1
     ):
         return f"{annotation.ion_type}"
     else:

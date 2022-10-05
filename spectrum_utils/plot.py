@@ -252,10 +252,11 @@ def mirror(
     ax.axhline(0, color="#9E9E9E", zorder=10)
 
     # Update axes so that both spectra fit.
+    round_mz = 50
     max_mz = max(
         [
-            math.ceil(spec_top.mz[-1] / 100 + 1) * 100,
-            math.ceil(spec_bottom.mz[-1] / 100 + 1) * 100,
+            math.ceil(spec_top.mz[-1] / round_mz + 1) * round_mz,
+            math.ceil(spec_bottom.mz[-1] / round_mz + 1) * round_mz,
         ]
     )
     ax.set_xlim(0, max_mz)

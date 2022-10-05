@@ -188,3 +188,13 @@ epub_exclude_files = ["search.html"]
 
 
 # -- Extension configuration -------------------------------------------------
+
+autodoc_mock_imports = [
+    "fastobo",
+    "lark",
+    "matplotlib",
+    "numba",
+    "numpy",
+    "pandas",
+    "pyteomics",
+]

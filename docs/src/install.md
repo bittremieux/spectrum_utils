@@ -30,6 +30,8 @@ spectrum_utils has the following third-party dependencies:
 
 Missing dependencies will be automatically installed when you install spectrum_utils using pip or conda.
 
+Additionally, we recommend manually installing [pyteomics.cythonize](https://pypi.org/project/pyteomics.cythonize/) as a plug-in replacement for faster fragment ion mass calculations.
+
 ## Advanced installation instructions
 
 spectrum_utils provides modular installation capabilities to minimize the number of third-party dependencies that will be installed when only a subset of the spectrum_utils functionality is required.

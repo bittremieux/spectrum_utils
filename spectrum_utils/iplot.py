@@ -22,7 +22,7 @@ def spectrum(
     annot_kws: Optional[Dict] = None,
     mirror_intensity: bool = False,
     grid: bool = True,
-    *_
+    *_,
 ) -> altair.LayerChart:
     """
     Plot an MS/MS spectrum.
@@ -137,7 +137,7 @@ def mirror(
     spec_top: MsmsSpectrum,
     spec_bottom: MsmsSpectrum,
     spectrum_kws: Optional[Dict] = None,
-    *_
+    *_,
 ) -> altair.LayerChart:
     """
     Mirror plot two MS/MS spectra.

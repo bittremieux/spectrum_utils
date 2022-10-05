@@ -167,11 +167,30 @@ def spectrum(
     if ax is None:
         ax = plt.gca()
 
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
+    ax.set_ylim(*(0, 1) if not mirror_intensity else (-1, 0))
+
+    ax.xaxis.set_minor_locator(mticker.AutoLocator())
+    ax.yaxis.set_minor_locator(mticker.AutoLocator())
+    ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
+    if grid in (True, "both", "major"):
+        ax.grid(b=True, which="major", color="#9E9E9E", linewidth=0.2)
+    if grid in (True, "both", "minor"):
+        ax.grid(b=True, which="minor", color="#9E9E9E", linewidth=0.2)
+    ax.set_axisbelow(True)
+
+    ax.tick_params(axis="both", which="both", labelsize="small")
+
+    ax.set_xlabel("m/z", style="italic")
+    ax.set_ylabel("Intensity")
+
+    if len(spec.mz) == 0:
+        return ax
+
     round_mz = 50
     max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
     ax.set_xlim(0, max_mz)
-    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
-    ax.set_ylim(*(0, 1) if not mirror_intensity else (-1, 0))
 
     max_intensity = spec.intensity.max()
     annotations = (
@@ -204,21 +223,6 @@ def spectrum(
             ax,
         )
         ax.plot([mz, mz], [0, peak_intensity], color=color, zorder=zorder)
-
-    ax.xaxis.set_minor_locator(mticker.AutoLocator())
-    ax.yaxis.set_minor_locator(mticker.AutoLocator())
-    ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
-    ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
-    if grid in (True, "both", "major"):
-        ax.grid(b=True, which="major", color="#9E9E9E", linewidth=0.2)
-    if grid in (True, "both", "minor"):
-        ax.grid(b=True, which="minor", color="#9E9E9E", linewidth=0.2)
-    ax.set_axisbelow(True)
-
-    ax.tick_params(axis="both", which="both", labelsize="small")
-
-    ax.set_xlabel("m/z", style="italic")
-    ax.set_ylabel("Intensity")
 
     return ax
 
@@ -264,12 +268,14 @@ def mirror(
 
     ax.axhline(0, color="#9E9E9E", zorder=10)
 
+    max_mz_top = spec_top.mz[-1] if len(spec_top.mz) > 0 else 1
+    max_mz_bottom = spec_bottom.mz[-1] if len(spec_bottom.mz) > 0 else 1
     # Update axes so that both spectra fit.
     round_mz = 50
     max_mz = max(
         [
-            math.ceil(spec_top.mz[-1] / round_mz + 1) * round_mz,
-            math.ceil(spec_bottom.mz[-1] / round_mz + 1) * round_mz,
+            math.ceil(max_mz_top / round_mz + 1) * round_mz,
+            math.ceil(max_mz_bottom / round_mz + 1) * round_mz,
         ]
     )
     ax.set_xlim(0, max_mz)

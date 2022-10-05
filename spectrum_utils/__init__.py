@@ -14,4 +14,11 @@ except ImportError:
         pass
 
 
-__all__ = ["iplot", "plot", "spectrum", "proforma", "utils"]
+__all__ = [
+    "fragment_annotation",
+    "iplot",
+    "plot",
+    "proforma",
+    "spectrum",
+    "utils",
+]

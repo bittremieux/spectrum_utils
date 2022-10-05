@@ -153,9 +153,9 @@ def spectrum(
     if ax is None:
         ax = plt.gca()
 
-    min_mz = max(0, math.floor(spec.mz[0] / 100 - 1) * 100)
-    max_mz = math.ceil(spec.mz[-1] / 100 + 1) * 100
-    ax.set_xlim(min_mz, max_mz)
+    round_mz = 50
+    max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
+    ax.set_xlim(0, max_mz)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
     y_max = 1.15 if annotate_ions else 1.05
     ax.set_ylim(*(0, y_max) if not mirror_intensity else (-y_max, 0))
@@ -255,20 +255,13 @@ def mirror(
     ax.axhline(0, color="#9E9E9E", zorder=10)
 
     # Update axes so that both spectra fit.
-    min_mz = max(
-        [
-            0,
-            math.floor(spec_top.mz[0] / 100 - 1) * 100,
-            math.floor(spec_bottom.mz[0] / 100 - 1) * 100,
-        ]
-    )
     max_mz = max(
         [
             math.ceil(spec_top.mz[-1] / 100 + 1) * 100,
             math.ceil(spec_bottom.mz[-1] / 100 + 1) * 100,
         ]
     )
-    ax.set_xlim(min_mz, max_mz)
+    ax.set_xlim(0, max_mz)
     ax.yaxis.set_major_locator(mticker.AutoLocator())
     ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
     ax.yaxis.set_major_formatter(

@@ -1,11 +1,12 @@
+import functools
 import itertools
 import math
-from typing import Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
-from spectrum_utils.fragment_annotation import FragmentAnnotation
+import spectrum_utils.fragment_annotation as fa
 from spectrum_utils.spectrum import MsmsSpectrum
 
 
@@ -42,12 +43,11 @@ zorders = {
 def _annotate_ion(
     mz: float,
     intensity: float,
-    annotation: Optional[FragmentAnnotation],
+    annotation: Optional[fa.FragmentAnnotation],
     color_ions: bool,
-    annotate_ions: bool,
-    annotation_kws: Dict[str, object],
+    annot_fmt: Optional[Callable],
+    annot_kws: Dict[str, object],
     ax: plt.Axes,
-    annot_fmt: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Annotate a specific fragment peak.
@@ -58,22 +58,18 @@ def _annotate_ion(
         The peak's m/z value (position of the annotation on the x axis).
     intensity : float
         The peak's intensity (position of the annotation on the y axis).
-    annotation : Optional[MoleculeFragmentAnnotation,
-                          PeptideFragmentAnnotation]
+    annotation : Optional[fa.FragmentAnnotation]
         The annotation that will be plotted.
     color_ions : bool
         Flag whether to color the peak annotation or not.
-    annotate_ions : bool
-        Flag whether to annotation the peak or not.
-    annotation_kws : Dict
+    annot_fmt : Optional[Callable]
+        Function to format the peak annotations. See `FragmentAnnotation` for
+        supported elements. By default, only canonical b and y peptide fragments
+        are annotated. If `None`, no peaks are annotated.
+    annot_kws : Dict[str, object]
         Keyword arguments for `ax.text` to customize peak annotations.
     ax : plt.Axes
         Axes instance on which to plot the annotation.
-    annot_fmt : Optional[str]
-        Formatting string for peak annotations. Supported elements are
-        '{ion_type}", '{neutral_loss}", '{isotope}", '{charge}", '{adduct}",
-        '{analyte_number}", and '{mz_delta}". Example:
-        "{ion_type}{neutral_loss}^{charge}".
 
     Returns
     -------
@@ -84,33 +80,55 @@ def _annotate_ion(
     ion_type = annotation.ion_type[0] if annotation is not None else None
     color = colors.get(ion_type if color_ions else None)
     zorder = zorders.get(ion_type)
-    if annotate_ions and ion_type is not None and ion_type != "?":
+    if annot_fmt is not None:
         y = intensity + 0.02 * (intensity > 0)
-        if annot_fmt is None:
-            annot_str = str(annotation)
-        else:
-            annot_str = annot_fmt.format(
-                ion_type=annotation.ion_type,
-                neutral_loss=annotation.neutral_loss if annotation.neutral_loss is not None else "",
-                isotope=annotation.isotope,
-                charge=annotation.charge,
-                adduct=annotation.adduct,
-                analyte_number=annotation.analyte_number,
-                mz_delta="".join(map(str, annotation.mz_delta)),
-            )
-        kws = annotation_kws.copy()
+        kws = annot_kws.copy()
         kws.update(dict(color=color, zorder=zorder))
-        ax.text(mz, y, annot_str, **kws)
-
+        ax.text(mz, y, annot_fmt(annotation), **kws)
     return color, zorder
+
+
+def annotate_ion_type(
+    annotation: fa.FragmentAnnotation, ion_types: Iterable[str]
+) -> str:
+    """
+    Convert a `FragmentAnnotation` to a string for annotating peaks in a
+    spectrum plot.
+
+    This function will only annotate singly-charged, mono-isotopic canonical
+    peaks with the given ion type(s).
+
+    Parameters
+    ----------
+    annotation : fa.FragmentAnnotation
+        The peak's fragment annotation.
+    ion_types : Iterable[str]
+        Accepted ion types to annotate.
+
+    Returns
+    -------
+    str
+        The peak's annotation string.
+    """
+    if (
+            annotation.ion_type[0] in ion_types
+            and annotation.neutral_loss is None
+            and annotation.isotope == 0
+            and annotation.charge == 1
+    ):
+        return f"{annotation.ion_type}"
+    else:
+        return ""
 
 
 def spectrum(
     spec: MsmsSpectrum,
+    *,
     color_ions: bool = True,
-    annotate_ions: bool = True,
+    annot_fmt: Optional[Callable] = functools.partial(
+        annotate_ion_type, ion_types="by"
+    ),
     annot_kws: Optional[Dict] = None,
-    annot_fmt: Optional[str] = None,
     mirror_intensity: bool = False,
     grid: Union[bool, str] = True,
     ax: Optional[plt.Axes] = None,
@@ -125,16 +143,12 @@ def spectrum(
     color_ions : bool, optional
         Flag indicating whether or not to color annotated fragment ions. The
         default is True.
-    annotate_ions : bool, optional
-        Flag indicating whether or not to annotate fragment ions. The default
-        is True.
+    annot_fmt : Optional[Callable]
+        Function to format the peak annotations. See `FragmentAnnotation` for
+        supported elements. By default, only canonical b and y peptide fragments
+        are annotated. If `None`, no peaks are annotated.
     annot_kws : Optional[Dict], optional
         Keyword arguments for `ax.text` to customize peak annotations.
-    annot_fmt : Optional[str]
-        Formatting string for peak annotations. Supported elements are
-        '{ion_type}", '{neutral_loss}", '{isotope}", '{charge}", '{adduct}",
-        '{analyte_number}", and '{mz_delta}". Example:
-        "{ion_type}{neutral_loss}^{charge}".
     mirror_intensity : bool, optional
         Flag indicating whether to flip the intensity axis or not.
     grid : Union[bool, str], optional
@@ -185,10 +199,9 @@ def spectrum(
             # Use the first annotation in case there are multiple options.
             annotation[0],
             color_ions,
-            annotate_ions,
+            annot_fmt,
             annotation_kws,
             ax,
-            annot_fmt,
         )
         ax.plot([mz, mz], [0, peak_intensity], color=color, zorder=zorder)
 

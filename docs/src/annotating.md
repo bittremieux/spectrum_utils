@@ -14,7 +14,7 @@ ProForma also supports special modification use cases, including support for mod
 The following are (non-exhaustive) examples to demonstrate how ProForma can be used to annotate peaks in spectra:
 
 - Specify modifications by their name: `EM[Oxidation]EVEES[Phospho]PEK`.
-    ```
+    ```python
     import matplotlib.pyplot as plt
     import spectrum_utils.plot as sup
     import spectrum_utils.spectrum as sus
@@ -40,7 +40,7 @@ The following are (non-exhaustive) examples to demonstrate how ProForma can be u
     ![ProForma example spectrum plot](proforma_ex1.png)
 
 - Specify modifications by their CV accession: `EM[MOD:00719]EVEES[MOD:00046]PEK`.
-    ```
+    ```python
     import matplotlib.pyplot as plt
     import spectrum_utils.plot as sup
     import spectrum_utils.spectrum as sus
@@ -66,7 +66,7 @@ The following are (non-exhaustive) examples to demonstrate how ProForma can be u
     ![ProForma example spectrum plot](proforma_ex2.png)
 
 - Specify modifications by their delta mass: `EM[+15.9949]EVEES[+79.9663]PEK`.
-    ```
+    ```python
     import matplotlib.pyplot as plt
     import spectrum_utils.plot as sup
     import spectrum_utils.spectrum as sus
@@ -161,7 +161,7 @@ Additionally, spectrum_utils supports several other ion types:
 Specify the desired ion types when annotating a spectrum using its ProForma string.
 For example, `MsmsSpectrum.annotate_proforma(..., ion_types="abyIm")` will find matching peaks for the a, b, and y peptide fragments, immonium ions, and internal fragment ions.
 
-```
+```python
 import matplotlib.pyplot as plt
 import spectrum_utils.plot as sup
 import spectrum_utils.spectrum as sus
@@ -188,19 +188,44 @@ Besides the canonical peptide fragments, we can also observe several immomium io
 Each of the above ions can also be automatically considered with a neutral loss (or gain).
 Neutral losses need to be specified by their molecular formula and mass difference:
 
+The following example demonstrates how the number of observed peaks that can be interpreted increases by considering fragments with an optional ammonia (NH3) or water (H2O) neutral loss:
+
 ```python
+import matplotlib.pyplot as plt
+import spectrum_utils.plot as sup
+import spectrum_utils.spectrum as sus
+
+
+usi = "mzspec:PXD014834:TCGA-AA-3518-01A-11_W_VU_20120915_A0218_3F_R_FR01:scan:8370"
+peptide = "WNQLQAFWGTGK"
+spectrum = sus.MsmsSpectrum.from_usi(usi)
 spectrum.annotate_proforma(
-    "WNQLQAFWGTGK",
+    peptide,
     fragment_tol_mass=0.05,
     fragment_tol_mode="Da",
     ion_types="aby",
     neutral_losses={"NH3": -17.026549, "H2O": -18.010565},
 )
+
+fig, ax = plt.subplots(figsize=(12, 6))
+sup.spectrum(spectrum, grid=False, ax=ax)
+ax.set_title(peptide, fontdict={"fontsize": "xx-large"})
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+plt.savefig("neutral_losses_1.png", dpi=300, bbox_inches="tight")
 ```
 
-The above example will consider all peaks with an optional ammonia (NH3) or water (H2O) neutral loss.
+![Neutral losses example spectrum plot](neutral_losses_1.png)
 
-Common neutral losses that can be used are:
+Peaks that correspond to peptide fragments with a neutral loss are highlighted in the matching color.
+
+In contrast, the same peptide--spectrum match without considering neutral losses is able to explain far fewer peaks:
+
+![Neutral losses example spectrum plot](neutral_losses_2.png)
+
+### Common neutral losses
+
+Overview of common neutral losses:
 
 | Neutral loss/gain | Molecular formula | Mass difference |
 | --- | --- | --- |
@@ -221,6 +246,4 @@ Common neutral losses that can be used are:
 Note that typically the neutral _loss_ mass difference should be negative.
 
 By default, no neutral losses are considered.
-If `neutral_losses` is set to `True`, all above mass differences will be considered as neutral losses (negative).
-
-**TODO:** Include full code and plot example.
+If the `neutral_losses` argument of `MsmsSpectrum.annotate_proforma(...)` is set to `True`, all above mass differences will be considered as neutral losses (negative).

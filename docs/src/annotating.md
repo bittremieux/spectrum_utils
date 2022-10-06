@@ -159,9 +159,29 @@ Additionally, spectrum_utils supports several other ion types:
 - Reporter ions from isobaric labeling `"r"`.
 
 Specify the desired ion types when annotating a spectrum using its ProForma string.
-For example, `MsmsSpectrum.annotate_proforma(..., ion_types="abym")` will find matching peaks for the a, b, and y peptide fragments and internal fragment ions.
+For example, `MsmsSpectrum.annotate_proforma(..., ion_types="abyIm")` will find matching peaks for the a, b, and y peptide fragments, immonium ions, and internal fragment ions.
 
-**TODO:** Include full code and plot example.
+```
+import matplotlib.pyplot as plt
+import spectrum_utils.plot as sup
+import spectrum_utils.spectrum as sus
+
+
+usi = "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555"
+peptide = "VLHPLEGAVVIIFK"
+spectrum = sus.MsmsSpectrum.from_usi(usi)
+spectrum.annotate_proforma(peptide, 10, "ppm", ion_types="abyIm")
+
+fig, ax = plt.subplots(figsize=(12, 6))
+sup.spectrum(spectrum, grid=False, ax=ax)
+ax.set_title(peptide, fontdict={"fontsize": "xx-large"})
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+plt.savefig("ion_types.png", dpi=300, bbox_inches="tight")
+```
+![Ion types example spectrum plot](ion_types.png)
+
+Besides the canonical peptide fragments, we can also observe several immomium ions (dark gray) and several internal fragment ions (yellow).
 
 ## Neutral losses
 

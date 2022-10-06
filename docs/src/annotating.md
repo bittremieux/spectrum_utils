@@ -12,9 +12,16 @@ As demonstrated in the [quickstart](quickstart.md), fragment ions can be annotat
 ## Ion types
 
 During fragment ion annotation, by default peptide b and y ions will be annotated.
-Additionally, spectrum_utils supports several other types of fragment ions:
+Additionally, spectrum_utils supports several other ion types:
 
-- **TODO:** List of supported ion types.
+- Primary `"a"`, `"b"`, `"c"`, `"x"`, `"y"`, and `"z"` peptide fragments.
+- Internal fragment ions `"m"`, which result from two amide bond cleavages and thus do not contain either terminus.
+- Immonium ions `"I"`, which are internal fragments for individual amino acids formed by a b/y cleavage on the N-terminal side and an a/x cleavage on the C-terminal side.
+- Intact precursor ions `"p"`.
+- Reporter ions from isobaric labeling `"r"`.
+
+Specify the desired ion types when annotating a spectrum using its ProForma string.
+For example, `MsmsSpectrum.annotate_proforma(..., ion_types="abym"`) will find matching peaks for the a, b, and y peptide fragments and internal fragment ions.
 
 ## Neutral losses
 

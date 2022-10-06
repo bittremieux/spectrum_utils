@@ -1,29 +1,32 @@
 # Python API
 
-## spectrum\_utils.spectrum module
+## spectrum_utils.spectrum module
 
 ```{eval-rst}
-.. automodule:: spectrum_utils.spectrum
+.. autoclass:: spectrum_utils.spectrum.MsmsSpectrum
     :members:
     :undoc-members:
+    :private-members:
     :show-inheritance:
 ```
 
-## spectrum\_utils.proforma module
+## spectrum_utils.proforma module
 
 ```{eval-rst}
 .. automodule:: spectrum_utils.proforma
     :members:
     :undoc-members:
+    :private-members:
     :show-inheritance:
 ```
 
-## spectrum\_utils.fragment_annotation module
+## spectrum_utils.fragment_annotation module
 
 ```{eval-rst}
 .. automodule:: spectrum_utils.fragment_annotation
     :members:
     :undoc-members:
+    :private-members:
     :show-inheritance:
 ```
 
@@ -33,6 +36,7 @@
 .. automodule:: spectrum_utils.plot
     :members:
     :undoc-members:
+    :private-members:
     :show-inheritance:
 ```
 
@@ -42,6 +46,7 @@
 .. automodule:: spectrum_utils.iplot
     :members:
     :undoc-members:
+    :private-members:
     :show-inheritance:
 ```
 
@@ -51,5 +56,6 @@
 .. automodule:: spectrum_utils.utils
     :members:
     :undoc-members:
+    :private-members:
     :show-inheritance:
 ```

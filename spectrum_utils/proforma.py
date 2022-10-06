@@ -596,7 +596,7 @@ def _modification_sort_key(mod: Modification):
     2. Labile modifications.
     3. C-terminal modifications.
     4. Modifications on specific amino acids and modification ranges based on
-       the start of the range.
+    the start of the range.
     5. N-terminal modifications.
     """
     if isinstance(mod.position, int):

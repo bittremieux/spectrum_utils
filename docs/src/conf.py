@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join("..", "..")))
 
+import pyteomics.usi
 import spectrum_utils
 
 
@@ -42,7 +43,10 @@ release = spectrum_utils.__version__
 extensions = [
     "myst_parser",  # Use Markdown instead of reStructuredText.
     "sphinx_markdown_tables",  # Support tables in Markdown.
-    "sphinx.ext.autosummary",  # Generate documentation summary one-liners.
+    "sphinx.ext.autodoc",  # Include documentation from docstrings.
+    # "sphinx.ext.autosummary",  # Generate documentation summary one-liners.
+    # "sphinx.ext.doctest",  # Test code in the documentation.
+    # "sphinx.ext.coverage",  # Collect documentation coverage statistics.
     "sphinx.ext.napoleon",  # Support NumPy and Google style docstrings.
     "sphinx.ext.viewcode",  # Add links to the source code.
     "sphinx_rtd_theme",  # Read-the-docs theme.
@@ -55,7 +59,7 @@ autodoc_default_options = {
     "undoc-members": True,  # Include methods without a docstring.
 }
 # Prevent import errors from these modules.
-autodoc_mock_imports = ["altair", "matplotlib", "pandas", "pyteomics"]
+# autodoc_mock_imports = []
 # Scan all found documents for autosummary directives and generate stub pages
 # for each.
 autosummary_generate = True

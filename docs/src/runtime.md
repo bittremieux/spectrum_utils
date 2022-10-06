@@ -2,7 +2,7 @@
 
 Spectrum processing in spectrum_utils has been optimized for computational efficiency using [NumPy](https://www.numpy.org/) and [Numba](http://numba.pydata.org/) to be able to process thousands of spectra per second.
 
-As shown below, spectrum_utils (version 0.3.0) is faster than alternative libraries, such as [pymzML](https://github.com/pymzml/pymzML/) (version 2.4.4) and [pyOpenMS](https://pyopenms.readthedocs.io/) (version 2.4.0), when performing typical spectrum processing tasks, including the following steps:
+As shown below, spectrum_utils (version 0.4.0) is faster than alternative libraries, such as [pymzML](https://github.com/pymzml/pymzML/) (version 2.5.2) and [pyOpenMS](https://pyopenms.readthedocs.io/) (version 2.7.0), when performing typical spectrum processing tasks, including the following steps:
 
 - The _m_/_z_ range is set to 100–1400 _m_/_z_.
 - The precursor peak is removed.
@@ -15,7 +15,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pyopenms
-import pyteomics
+import pyteomics.mgf
 import seaborn as sns
 import spectrum_utils.spectrum as sus
 from pymzml.spec import Spectrum
@@ -37,28 +37,22 @@ def time_spectrum_utils(mgf_filename):
             or "charge" not in spec_dict["params"]
         ):
             continue
-        mz = spec_dict["m/z array"]
-        intensity = spec_dict["intensity array"]
-        retention_time = float(spec_dict["params"]["rtinseconds"])
-        precursor_mz = spec_dict["params"]["pepmass"][0]
-        precursor_charge = spec_dict["params"]["charge"][0]
-        identifier = spec_dict["params"]["title"]
 
         spectrum = sus.MsmsSpectrum(
-            identifier,
-            precursor_mz,
-            precursor_charge,
-            mz,
-            intensity,
-            retention_time=retention_time,
-        )
+            spec_dict["params"]["title"],
+            spec_dict["params"]["pepmass"][0],
+            spec_dict["params"]["charge"][0],
+            spec_dict["m/z array"],
+            spec_dict["intensity array"],
+            float(spec_dict["params"]["rtinseconds"]),
+        )._inner
 
         start_time = time.time()
 
         spectrum.set_mz_range(min_mz, max_mz)
         spectrum.remove_precursor_peak(fragment_tol_mass, fragment_tol_mode)
         spectrum.filter_intensity(min_intensity, max_num_peaks)
-        spectrum.scale_intensity(scaling="root", max_intensity=1)
+        spectrum.scale_intensity("root", 1)
 
         runtimes.append(time.time() - start_time)
 
@@ -160,7 +154,7 @@ ax.set_yscale("log")
 ax.xaxis.set_ticklabels(("spectrum_utils", "pymzML", "pyOpenMS"))
 ax.set_ylabel("Processing time per spectrum (s)")
 sns.despine()
-plt.show()
+plt.savefig("runtime.png", bbox_inches="tight", dpi=300, transparent=True)
 plt.close()
 ```
 

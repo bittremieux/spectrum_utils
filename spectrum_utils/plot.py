@@ -116,7 +116,7 @@ def annotate_ion_type(
         and annotation.isotope == 0
         and annotation.charge == 1
     ):
-        return f"{annotation.ion_type}"
+        return annotation.ion_type
     else:
         return ""
 

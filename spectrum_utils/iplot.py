@@ -1,28 +1,31 @@
-from typing import Dict, Optional
+import functools
+import operator
+from typing import Callable, Dict, Optional
 
 try:
     import altair
     import pandas as pd
 except ImportError:
     raise ImportError(
-        "Missing dependencies for interactive plotting. Install "
-        "using `pip install spectrum_utils[iplot]`, manually "
-        "install Altair and Pandas, or use the default "
-        "Matplotlib (`spectrum_utils.plot`) plotting backend."
+        "Missing dependencies for interactive plotting. Install using `pip "
+        "install spectrum_utils[iplot]`, manually install Altair and Pandas, or"
+        " use the default Matplotlib (`spectrum_utils.plot`) plotting backend."
     )
 
-from spectrum_utils.plot import colors
+from spectrum_utils.plot import annotate_ion_type, colors
 from spectrum_utils.spectrum import MsmsSpectrum
 
 
 def spectrum(
     spec: MsmsSpectrum,
+    *_,
     color_ions: bool = True,
-    annotate_ions: bool = True,
+    annot_fmt: Optional[Callable] = functools.partial(
+        annotate_ion_type, ion_types="by"
+    ),
     annot_kws: Optional[Dict] = None,
     mirror_intensity: bool = False,
     grid: bool = True,
-    *_,
 ) -> altair.LayerChart:
     """
     Plot an MS/MS spectrum.
@@ -34,9 +37,10 @@ def spectrum(
     color_ions : bool, optional
         Flag indicating whether or not to color annotated fragment ions. The
         default is True.
-    annotate_ions : bool, optional
-        Flag indicating whether or not to annotate fragment ions. The default
-        is True.
+    annot_fmt : Optional[Callable]
+        Function to format the peak annotations. See `FragmentAnnotation` for
+        supported elements. By default, only canonical b and y peptide fragments
+        are annotated. If `None`, no peaks are annotated.
     annot_kws : Optional[Dict], optional
         Keyword arguments for `altair.Chart.mark_text` to customize peak
         annotations.
@@ -44,8 +48,6 @@ def spectrum(
         Flag indicating whether to flip the intensity axis or not.
     grid : bool, optional
         Draw grid lines or not.
-    *_
-        Ignored, for consistency with the `plot.spectrum` API.
 
     Returns
     -------
@@ -56,52 +58,59 @@ def spectrum(
     if mirror_intensity:
         intensity *= -1
     if spec.annotation is not None:
-        annotation = (
-            spec.annotation if annotate_ions else [None] * len(spec.mz)
-        )
-        color = [
-            colors[a.ion_type[0] if a is not None and color_ions else None]
-            for a in spec.annotation
+        annotations = list(map(operator.itemgetter(0), spec.annotation))
+        peak_labels = map(annot_fmt, annotations)
+        peak_colors = [
+            colors.get(a.ion_type[0] if color_ions else None)
+            for a in annotations
         ]
+        mz_delta = [
+            None if a.mz_delta is None else "".join(map(str, a.mz_delta))
+            for a in annotations
+        ]
+        spec_df = pd.DataFrame(
+            {
+                "mz": spec.mz,
+                "intensity": intensity,
+                "fragment": peak_labels,
+                "mz_delta": mz_delta,
+                "color": peak_colors,
+            }
+        )
     else:
-        annotation = [None] * len(spec.mz)
-        color = [colors[None]] * len(spec.mz)
-    calc_mz = [a.calc_mz if a is not None else None for a in annotation]
-    fragment = [str(a) if a is not None else None for a in annotation]
-    spec_df = pd.DataFrame(
-        {
-            "exp_mz": spec.mz,
-            "intensity": intensity,
-            "calc_mz": calc_mz,
-            "fragment": fragment,
-            "color": color,
-        }
-    )
+        spec_df = pd.DataFrame(
+            {
+                "mz": spec.mz,
+                "intensity": intensity,
+                "color": [colors[None]] * len(spec.mz),
+            }
+        )
 
     x_axis = altair.X(
-        "exp_mz",
+        "mz",
         axis=altair.Axis(title="m/z", titleFontStyle="italic", grid=grid),
-        scale=altair.Scale(nice=True, padding=5, zero=False),
+        scale=altair.Scale(nice=True, padding=5),
     )
     y_axis = altair.Y(
         "intensity",
         axis=altair.Axis(title="Intensity", format="%", grid=grid),
-        scale=altair.Scale(nice=True, padding=5),
+        scale=altair.Scale(nice=True),
     )
     color = altair.Color("color", scale=None, legend=None)
     tooltip_not_annotated = [
-        altair.Tooltip("exp_mz", format=".4f", title="Experimental m/z"),
-        altair.Tooltip("intensity", format=".0%", title="Intensity"),
+        altair.Tooltip("mz", format=".4f", title="m/z"),
+        altair.Tooltip("intensity", format=".1%", title="Intensity"),
     ]
     tooltip_annotated = [
+        altair.Tooltip("mz", format=".4f", title="m/z"),
+        altair.Tooltip("intensity", format=".1%", title="Intensity"),
         altair.Tooltip("fragment", title="Fragment"),
-        altair.Tooltip("exp_mz", format=".4f", title="Experimental m/z"),
-        altair.Tooltip("calc_mz", format=".4f", title="Theoretical m/z"),
-        altair.Tooltip("intensity", format=".0%", title="Intensity"),
+        altair.Tooltip("mz_delta", title="m/z deviation"),
     ]
     # Unannotated peaks.
+    mask_unannotated = spec_df["fragment"] == ""
     spec_plot = (
-        altair.Chart(spec_df[spec_df["fragment"].isna()])
+        altair.Chart(spec_df[mask_unannotated])
         .mark_rule(size=2)
         .encode(x=x_axis, y=y_axis, color=color, tooltip=tooltip_not_annotated)
     )
@@ -114,12 +123,12 @@ def spectrum(
     if annot_kws is not None:
         annotation_kws.update(annot_kws)
     spec_plot += (
-        altair.Chart(spec_df[~spec_df["fragment"].isna()])
+        altair.Chart(spec_df[~mask_unannotated])
         .mark_rule(size=2)
         .encode(x=x_axis, y=y_axis, color=color, tooltip=tooltip_annotated)
     )
     spec_plot += (
-        altair.Chart(spec_df[~spec_df["fragment"].isna()])
+        altair.Chart(spec_df[~mask_unannotated])
         .mark_text(dx=-5 if mirror_intensity else 5, **annotation_kws)
         .encode(
             x=x_axis,

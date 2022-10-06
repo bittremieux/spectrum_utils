@@ -178,7 +178,8 @@ sup.spectrum(spectrum, grid=False, ax=ax)
 ax.set_title(peptide, fontdict={"fontsize": "xx-large"})
 ax.spines["right"].set_visible(False)
 ax.spines["top"].set_visible(False)
-plt.savefig("ion_types.png", dpi=300, bbox_inches="tight")
+plt.savefig("ion_types.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.close()
 ```
 ![Ion types example spectrum plot](ion_types.png)
 
@@ -213,7 +214,8 @@ sup.spectrum(spectrum, grid=False, ax=ax)
 ax.set_title(peptide, fontdict={"fontsize": "xx-large"})
 ax.spines["right"].set_visible(False)
 ax.spines["top"].set_visible(False)
-plt.savefig("neutral_losses_1.png", dpi=300, bbox_inches="tight")
+plt.savefig("neutral_losses_1.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.close()
 ```
 
 ![Neutral losses example spectrum plot](neutral_losses_1.png)
@@ -221,6 +223,28 @@ plt.savefig("neutral_losses_1.png", dpi=300, bbox_inches="tight")
 Peaks that correspond to peptide fragments with a neutral loss are highlighted in the matching color.
 
 In contrast, the same peptide--spectrum match without considering neutral losses is able to explain far fewer peaks:
+
+```python
+import matplotlib.pyplot as plt
+import spectrum_utils.plot as sup
+import spectrum_utils.spectrum as sus
+
+
+usi = "mzspec:PXD014834:TCGA-AA-3518-01A-11_W_VU_20120915_A0218_3F_R_FR01:scan:8370"
+peptide = "WNQLQAFWGTGK"
+spectrum = sus.MsmsSpectrum.from_usi(usi)
+spectrum.annotate_proforma(
+    peptide, fragment_tol_mass=0.05, fragment_tol_mode="Da", ion_types="aby",
+)
+
+fig, ax = plt.subplots(figsize=(12, 6))
+sup.spectrum(spectrum, grid=False, ax=ax)
+ax.set_title(peptide, fontdict={"fontsize": "xx-large"})
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+plt.savefig("neutral_losses_2.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.close()
+```
 
 ![Neutral losses example spectrum plot](neutral_losses_2.png)
 

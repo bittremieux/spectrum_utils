@@ -86,7 +86,8 @@ sup.spectrum(spectrum, annot_fmt=annotate_ion_type, grid=False, ax=ax)
 ax.set_title(peptide, fontdict={"fontsize": "xx-large"})
 ax.spines["right"].set_visible(False)
 ax.spines["top"].set_visible(False)
-plt.savefig("annot_fmt.png", dpi=300, bbox_inches="tight")
+plt.savefig("annot_fmt.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.close()
 ```
 
 ![Spectrum plot with neutral losses labeled](annot_fmt.png)
@@ -112,7 +113,7 @@ spectrum_bottom.annotate_proforma(peptide, 0.5, "Da", ion_types="aby")
 
 fig, ax = plt.subplots(figsize=(12, 6))
 sup.mirror(spectrum_top, spectrum_bottom, ax=ax)
-plt.savefig("mirror.png", dpi=300, bbox_inches="tight")
+plt.savefig("mirror.png", dpi=300, bbox_inches="tight", transparent=True)
 plt.close()
 ```
 

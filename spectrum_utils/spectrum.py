@@ -622,7 +622,7 @@ class MsmsSpectrum:
         fragment_tol_mode: str,
         ion_types: str = "by",
         max_ion_charge: Optional[int] = None,
-        neutral_losses: Optional[Dict[Optional[str], float]] = None,
+        neutral_losses: Union[bool, Dict[Optional[str], float]] = False,
     ) -> "MsmsSpectrum":
         """
         Assign fragment ion labels to the peaks from a ProForma annotation.
@@ -646,10 +646,27 @@ class MsmsSpectrum:
             All fragments up to and including the given charge will be
             annotated (by default all fragments with a charge up to the
             precursor minus one (minimum charge one) will be annotated).
-        neutral_losses : Dict[Optional[str], float], optional
-            Neutral losses to consider, specified as a dictionary with as keys
-            the description (molecular formula) and as value the neutral loss.
-            Note that the value should typically be negative.
+        neutral_losses : Union[bool, Dict[Optional[str], float]], optional
+            Neutral losses to consider for each peak. If `None` or `False`, no
+            neutral losses are considered. If specified as a dictionary, keys
+            should be the molecular formulas of the neutral losses and values
+            the corresponding mass differences. Note that mass differences
+            should typically be negative. If `True`, all of the following
+            neutral losses are considered:
+
+            - Loss of hydrogen (H): -1.007825.
+            - Loss of ammonia (NH3): -17.026549.
+            - Loss of water (H2O): -18.010565.
+            - Loss of carbon monoxide (CO): -27.994915.
+            - Loss of carbon dioxide (CO2): -43.989829.
+            - Loss of formamide (HCONH2): -45.021464.
+            - Loss of formic acid (HCOOH): -46.005479.
+            - Loss of methanesulfenic acid (CH4OS): -63.998301.
+            - Loss of sulfur trioxide (SO3): -79.956818.
+            - Loss of metaphosphoric acid (HPO3): -79.966331.
+            - Loss of mercaptoacetamide (C2H5NOS): -91.009195.
+            - Loss of mercaptoacetic acid (C2H4O2S): -91.993211.
+            - Loss of phosphoric acid (H3PO4): -97.976896.
 
         Returns
         -------
@@ -667,6 +684,11 @@ class MsmsSpectrum:
             max_ion_charge = max(1, self.precursor_charge - 1)
         # Make sure the standard peaks (without a neutral loss) are always
         # considered.
+        if isinstance(neutral_losses, bool):
+            if not neutral_losses:
+                neutral_losses = {None: 0}
+            else:
+                neutral_losses = fa._neutral_loss
         if neutral_losses is not None and None not in neutral_losses:
             neutral_losses[None] = 0
         # Parse the ProForma string and find peaks that match the theoretical

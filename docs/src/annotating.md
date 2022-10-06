@@ -26,7 +26,7 @@ For example, `MsmsSpectrum.annotate_proforma(..., ion_types="abym"`) will find m
 ## Neutral losses
 
 Each of the above ions can also be automatically considered with a neutral loss (or gain).
-Neutral losses need to be specified by their identifier (molecular formula) and their mass difference:
+Neutral losses need to be specified by their molecular formula and mass difference:
 
 ```python
 spectrum.annotate_proforma(
@@ -59,3 +59,6 @@ Common neutral losses that can be used are:
 | Phosphoric acid | H3PO4 | 97.976896 |
 
 Note that typically the neutral _loss_ mass difference should be negative.
+
+By default, no neutral losses are considered.
+If `neutral_losses` is set to `True`, all above mass differences will be considered as neutral losses (negative).

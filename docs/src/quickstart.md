@@ -36,7 +36,6 @@ spectrum = (
     )
 )
 
-
 # Plot the spectrum.
 fig, ax = plt.subplots(figsize=(12, 6))
 sup.spectrum(spectrum, grid=False, ax=ax)

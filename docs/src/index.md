@@ -14,7 +14,7 @@ spectrum_utils contains the following features:
 - Spectrum loading from online proteomics and metabolomics data resources using the [Universal Spectrum Identifier (USI)](https://www.psidev.info/usi) mechanism.
 - Common spectrum processing operations (precursor & noise peak removal, intensity filtering, intensity scaling) optimized for computational efficiency.
 - Annotating observed spectrum fragments using the [ProForma 2.0 specification](https://www.psidev.info/proforma) for (modified) peptidoforms.
-- Publication-quality, fully customizable spectrum plotting.
+- Publication-quality, fully customizable spectrum plotting and interactive spectrum plotting.
  
 See the documentation for more information and detailed examples on how to get started with spectrum_utils for versatile mass spectrometry data manipulation in Python.
  

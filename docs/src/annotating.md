@@ -182,12 +182,12 @@ plt.savefig("ion_types.png", dpi=300, bbox_inches="tight")
 ```
 ![Ion types example spectrum plot](ion_types.png)
 
-Besides the canonical peptide fragments, we can also observe several immomium ions (dark gray) and several internal fragment ions (yellow).
+Besides the canonical peptide fragments, we can also observe immomium ions (dark gray) and several internal fragment ions (yellow).
 
 ## Neutral losses
 
 Each of the above ions can also be automatically considered with a neutral loss (or gain).
-Neutral losses need to be specified by their molecular formula and mass difference:
+Neutral losses need to be specified by a concise label (preferably their molecular formula) and mass difference:
 
 The following example demonstrates how the number of observed peaks that can be interpreted increases by considering fragments with an optional ammonia (NH3) or water (H2O) neutral loss:
 

@@ -6,9 +6,9 @@ Often, nice spectrum graphics can be created with only a single line of code; it
 Here we will briefly describe some advanced functionality to customize your spectrum plots.
 Some of the arguments that can be provided to `spectrum_utils.plot.spectrum(...)` are:
 
-- `color_ions`: Boolean flag indicating whether the peaks should be colored.
+- `color_ions`: Boolean flag indicating whether the annotated peaks should be colored.
 - `annot_fmt`: A function that converts a `FragmentAnnotation` to a label to annotate the corresponding peak (see below).
-- `annot_kws`: A dictionary with options to customize textual peak annotations.
+- `annot_kws`: A dictionary with options to customize peak label texts.
 See the [`matplotlib.text.Text` documentation](https://matplotlib.org/3.1.1/api/text_api.html#matplotlib.text.Text) for available options.
 - `grid`: Enable/disable the grid.
 

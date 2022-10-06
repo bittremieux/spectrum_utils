@@ -147,6 +147,7 @@ Example abstract syntax tree for `{Glycan:HexNAcHex2}[Acetyl]-EM[UNIMOD:35]EVNES
 
 ![ProForma abstract syntax tree](proforma_ast.png)
 
+(ion_types)=
 ## Ion types
 
 During fragment ion annotation, by default peptide b and y ions will be annotated.

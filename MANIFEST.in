@@ -1,1 +1,2 @@
+include spectrum_utils/monosaccharide.lark
 include spectrum_utils/proforma.ebnf

@@ -80,7 +80,7 @@ def _annotate_ion(
     ion_type = annotation.ion_type[0] if annotation is not None else None
     color = colors.get(ion_type if color_ions else None)
     zorder = zorders.get(ion_type)
-    if annot_fmt is not None:
+    if annot_fmt is not None and annotation is not None:
         y = intensity + 0.02 * (intensity > 0)
         kws = annot_kws.copy()
         kws.update(dict(color=color, zorder=zorder))
@@ -116,7 +116,7 @@ def annotate_ion_type(
         and annotation.isotope == 0
         and annotation.charge == 1
     ):
-        return annotation.ion_type
+        return str(annotation.ion_type)
     else:
         return ""
 
@@ -216,7 +216,7 @@ def spectrum(
             mz,
             peak_intensity,
             # Use the first annotation in case there are multiple options.
-            annotation[0],
+            annotation[0] if annotation is not None else None,
             color_ions,
             annot_fmt,
             annotation_kws,

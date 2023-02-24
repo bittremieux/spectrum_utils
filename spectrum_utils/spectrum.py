@@ -520,7 +520,7 @@ class MsmsSpectrum:
         """
         if fragment_tol_mode not in ("Da", "ppm"):
             raise ValueError(
-                'Unknown fragment mass tolerance unit specified. Supported '
+                "Unknown fragment mass tolerance unit specified. Supported "
                 'values are "Da" or "ppm".'
             )
         self.proforma, self._annotation = None, None
@@ -679,7 +679,7 @@ class MsmsSpectrum:
         """
         if fragment_tol_mode not in ("Da", "ppm"):
             raise ValueError(
-                'Unknown fragment mass tolerance unit specified. Supported '
+                "Unknown fragment mass tolerance unit specified. Supported "
                 'values are "Da" or "ppm".'
             )
         mass_diff = functools.partial(

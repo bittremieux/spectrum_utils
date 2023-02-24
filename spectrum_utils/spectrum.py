@@ -518,6 +518,11 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
+        if fragment_tol_mode not in ("Da", "ppm"):
+            raise ValueError(
+                'Unknown fragment mass tolerance unit specified. Supported '
+                'values are "Da" or "ppm".'
+            )
         self.proforma, self._annotation = None, None
         self._inner.remove_precursor_peak(
             fragment_tol_mass, fragment_tol_mode, isotope
@@ -672,6 +677,11 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
+        if fragment_tol_mode not in ("Da", "ppm"):
+            raise ValueError(
+                'Unknown fragment mass tolerance unit specified. Supported '
+                'values are "Da" or "ppm".'
+            )
         mass_diff = functools.partial(
             utils.mass_diff, mode_is_da=fragment_tol_mode == "Da"
         )

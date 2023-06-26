@@ -241,7 +241,7 @@ def mass_errors(
     ax: Optional[plt.Axes] = None,
 ) -> plt.Axes:
     """
-    Plot mass errors for a given spectrum.
+    Plot mass error bubble plot for a given spectrum.
 
     Parameters
     ----------
@@ -264,6 +264,18 @@ def mass_errors(
     -------
     plt.Axes
         The matplotlib Axes instance on which the mass errors are plotted.
+
+    Notes
+    -----
+    The mass error bubble plot was first introduced in [1]_.
+
+    References
+    ----------
+    .. [1] Barsnes,H., Eidhammer,I. and Martens,L. (2010)
+       FragmentationAnalyzer: An open-source tool to analyze MS/MS
+       fragmentation data. PROTEOMICS, 10, 1087–1090.
+       doi:10.1002/pmic.200900681
+
     """
     if ax is None:
         ax = plt.gca()
@@ -289,7 +301,7 @@ def mass_errors(
     for ann in annotations:
         # Use the first annotation in case there are multiple options.
         ion_type = ann[0].ion_type[0] if ann is not None else None
-        is_known_ion.append(ion_type is not "?" and ion_type is not None)
+        is_known_ion.append(ion_type != "?" and ion_type != None)
         color = colors.get(ion_type if color_ions else None)
         dot_colors.append(color)
     dot_colors = np.array(dot_colors)

@@ -235,6 +235,7 @@ def spectrum(
 def mass_errors(
     spec: MsmsSpectrum,
     *,
+    plot_unknown: bool = True,
     color_ions: bool = True,
     grid: Union[bool, str] = True,
     ax: Optional[plt.Axes] = None,
@@ -246,6 +247,8 @@ def mass_errors(
     ----------
     spec : MsmsSpectrum
         The spectrum with mass errors to be plotted.
+    plot_unknown : bool, optional
+        Flag indicating whether or not to plot mass errors for unknown peaks.
     color_ions : bool, optional
         Flag indicating whether or not to color dots for annotated fragment
         ions. The default is True.
@@ -282,11 +285,20 @@ def mass_errors(
     )
 
     dot_colors = []
+    is_known_ion = []
     for ann in annotations:
         # Use the first annotation in case there are multiple options.
         ion_type = ann[0].ion_type[0] if ann is not None else None
+        is_known_ion.append(ion_type is not "?" and ion_type is not None)
         color = colors.get(ion_type if color_ions else None)
         dot_colors.append(color)
+    dot_colors = np.array(dot_colors)
+
+    mask = (
+        np.ones_like(spec.mz, dtype=bool)
+        if plot_unknown
+        else np.array(is_known_ion)
+    )
 
     get_mz_delta = np.vectorize(
         lambda a: a.fragment_annotations[0].mz_delta[0]
@@ -302,10 +314,10 @@ def mass_errors(
     ax.set_ylim(-max_abs_error, max_abs_error)
 
     ax.scatter(
-        spec.mz,
-        mz_deltas,
-        s=intensity_scaled,
-        c=dot_colors,
+        spec.mz[mask],
+        mz_deltas[mask],
+        s=intensity_scaled[mask],
+        c=dot_colors[mask],
         alpha=0.5,
         edgecolors="none",
     )

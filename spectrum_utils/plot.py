@@ -5,10 +5,10 @@ from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 
 import spectrum_utils.fragment_annotation as fa
 from spectrum_utils.spectrum import MsmsSpectrum
-
 
 colors = {
     "a": "#388E3C",
@@ -38,6 +38,24 @@ zorders = {
     "f": 5,
     None: 1,
 }
+
+
+def _format_ax(
+    ax: plt.Axes,
+    grid: Union[bool, str],
+):
+    """Set ax formatting options that are common to all plot types."""
+    ax.xaxis.set_minor_locator(mticker.AutoLocator())
+    ax.yaxis.set_minor_locator(mticker.AutoLocator())
+    ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
+    if grid in (True, "both", "major"):
+        ax.grid(True, "major", color="#9E9E9E", linewidth=0.2)
+    if grid in (True, "both", "minor"):
+        ax.grid(True, "minor", color="#9E9E9E", linewidth=0.2)
+    ax.set_axisbelow(True)
+    ax.tick_params(axis="both", which="both", labelsize="small")
+    ax.set_xlabel("m/z", style="italic")
 
 
 def _annotate_ion(
@@ -167,22 +185,9 @@ def spectrum(
     if ax is None:
         ax = plt.gca()
 
+    _format_ax(ax, grid)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
     ax.set_ylim(*(0, 1) if not mirror_intensity else (-1, 0))
-
-    ax.xaxis.set_minor_locator(mticker.AutoLocator())
-    ax.yaxis.set_minor_locator(mticker.AutoLocator())
-    ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
-    ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
-    if grid in (True, "both", "major"):
-        ax.grid(True, "major", color="#9E9E9E", linewidth=0.2)
-    if grid in (True, "both", "minor"):
-        ax.grid(True, "minor", color="#9E9E9E", linewidth=0.2)
-    ax.set_axisbelow(True)
-
-    ax.tick_params(axis="both", which="both", labelsize="small")
-
-    ax.set_xlabel("m/z", style="italic")
     ax.set_ylabel("Intensity")
 
     if len(spec.mz) == 0:
@@ -223,6 +228,87 @@ def spectrum(
             ax,
         )
         ax.plot([mz, mz], [0, peak_intensity], color=color, zorder=zorder)
+
+    return ax
+
+
+def mass_errors(
+    spec: MsmsSpectrum,
+    *,
+    color_ions: bool = True,
+    grid: Union[bool, str] = True,
+    ax: Optional[plt.Axes] = None,
+) -> plt.Axes:
+    """
+    Plot mass errors for a given spectrum.
+
+    Parameters
+    ----------
+    spec : MsmsSpectrum
+        The spectrum with mass errors to be plotted.
+    color_ions : bool, optional
+        Flag indicating whether or not to color dots for annotated fragment
+        ions. The default is True.
+    grid : Union[bool, str], optional
+        Draw grid lines or not. Either a boolean to enable/disable both major
+        and minor grid lines or 'major'/'minor' to enable major or minor grid
+        lines respectively.
+    ax : Optional[plt.Axes], optional
+        Axes instance on which to plot the mass errors. If None the current
+        Axes instance is used.
+
+    Returns
+    -------
+    plt.Axes
+        The matplotlib Axes instance on which the mass errors are plotted.
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    _format_ax(ax, grid)
+    ax.set_ylabel("mass error")
+
+    if len(spec.mz) == 0:
+        return ax
+
+    round_mz = 50
+    max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
+    ax.set_xlim(0, max_mz)
+
+    annotations = (
+        spec.annotation
+        if spec.annotation is not None
+        else itertools.repeat(None)
+    )
+
+    dot_colors = []
+    for ann in annotations:
+        # Use the first annotation in case there are multiple options.
+        ion_type = ann[0].ion_type[0] if ann is not None else None
+        color = colors.get(ion_type if color_ions else None)
+        dot_colors.append(color)
+
+    get_mz_delta = np.vectorize(
+        lambda a: a.fragment_annotations[0].mz_delta[0]
+        if a.fragment_annotations
+        else 0.0
+    )
+
+    mz_deltas = get_mz_delta(spec.annotation)
+    max_intensity = spec.intensity.max()
+    intensity_scaled = 500 * (spec.intensity / max_intensity)
+
+    max_abs_error = max(abs(mz_deltas))
+    ax.set_ylim(-max_abs_error, max_abs_error)
+
+    ax.scatter(
+        spec.mz,
+        mz_deltas,
+        s=intensity_scaled,
+        c=dot_colors,
+        alpha=0.5,
+        edgecolors="none",
+    )
 
     return ax
 

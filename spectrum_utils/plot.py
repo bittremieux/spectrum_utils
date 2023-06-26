@@ -187,7 +187,7 @@ def spectrum(
 
     _format_ax(ax, grid)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
-    ax.set_ylim(*(0, 1) if not mirror_intensity else (-1, 0))
+    ax.set_ylim(*(0, 1.1) if not mirror_intensity else (-1.1, 0))
     ax.set_ylabel("Intensity")
 
     if len(spec.mz) == 0:

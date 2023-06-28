@@ -10,7 +10,6 @@ from spectrum_utils import fragment_annotation as fa, proforma, utils
 
 
 class GnpsBackend(pyteomics.usi._PROXIBackend):
-
     _url_template = (
         "https://metabolomics-usi.ucsd.edu/proxi/v{version}/spectra?usi={usi}"
     )

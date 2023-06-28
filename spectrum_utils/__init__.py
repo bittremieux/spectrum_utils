@@ -2,14 +2,14 @@ try:
     from importlib.metadata import version, PackageNotFoundError
 
     try:
-        __version__ = version(__name__)
+        __version__ = version("spectrum_utils")
     except PackageNotFoundError:
         pass
 except ImportError:
     from pkg_resources import get_distribution, DistributionNotFound
 
     try:
-        __version__ = get_distribution(__name__).version
+        __version__ = get_distribution("spectrum_utils").version
     except DistributionNotFound:
         pass
 

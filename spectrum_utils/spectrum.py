@@ -1,5 +1,6 @@
 import copy
 import functools
+import urllib.parse
 from typing import Dict, Iterable, Optional, Union
 
 import numba as nb
@@ -330,7 +331,9 @@ class MsmsSpectrum:
             precursor charge values can be provided using the `precursor_mz`
             and `precursor_charge` keyword arguments respectively.
         """
-        spectrum_dict = pyteomics.usi.proxi(usi, backend, **kwargs)
+        spectrum_dict = pyteomics.usi.proxi(
+            urllib.parse.quote_plus(usi), backend, **kwargs
+        )
         if "precursor_mz" not in kwargs:
             for attr in spectrum_dict["attributes"]:
                 if attr["accession"] in (

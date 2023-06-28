@@ -37,4 +37,4 @@ spectrum_utils is freely available as open source under the [Apache 2.0 license]
 When using spectrum_utils, please cite the following manuscripts:
  
 - Wout Bittremieux. "spectrum_utils: A Python package for mass spectrometry data processing and visualization." _Analytical Chemistry_ **92**, 659--661 (2020) doi:[10.1021/acs.analchem.9b04884](https://doi.org/10.1021/acs.analchem.9b04884).
-- Wout Bittremieux, Lev Levitsky, Matteo Pilz, Timo Sachsenberg, Florian Huber, Mingxun Wang, Pieter C. Dorrestein. "Unified and standardized mass spectrometry data processing in Python using spectrum_utils" _bioRxiv_ (2022).
+- Wout Bittremieux, Lev Levitsky, Matteo Pilz, Timo Sachsenberg, Florian Huber, Mingxun Wang, Pieter C. Dorrestein. "Unified and standardized mass spectrometry data processing in Python using spectrum_utils" _Journal of Proteome Research_ **22**, 625--631 (2023) doi:[10.1021/acs.jproteome.2c00632](https://doi.org/10.1021/acs.jproteome.2c00632).

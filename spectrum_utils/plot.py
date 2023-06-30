@@ -9,6 +9,8 @@ import numpy as np
 
 import spectrum_utils.fragment_annotation as fa
 from spectrum_utils.spectrum import MsmsSpectrum
+from spectrum_utils.utils import da_to_ppm, ppm_to_da
+
 
 colors = {
     "a": "#388E3C",
@@ -56,6 +58,13 @@ def _format_ax(
     ax.set_axisbelow(True)
     ax.tick_params(axis="both", which="both", labelsize="small")
     ax.set_xlabel("m/z", style="italic")
+
+
+def _get_xlim(spec: MsmsSpectrum) -> Tuple[float, float]:
+    """Get plot x-axis limits for a given spectrum."""
+    round_mz = 50
+    max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
+    return 0.0, max_mz
 
 
 def _annotate_ion(
@@ -193,9 +202,7 @@ def spectrum(
     if len(spec.mz) == 0:
         return ax
 
-    round_mz = 50
-    max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
-    ax.set_xlim(0, max_mz)
+    ax.set_xlim(*_get_xlim(spec))
 
     max_intensity = spec.intensity.max()
     annotations = (
@@ -235,6 +242,7 @@ def spectrum(
 def mass_errors(
     spec: MsmsSpectrum,
     *,
+    unit: Optional[str] = None,
     plot_unknown: bool = True,
     color_ions: bool = True,
     grid: Union[bool, str] = True,
@@ -243,10 +251,19 @@ def mass_errors(
     """
     Plot mass error bubble plot for a given spectrum.
 
+    A mass error bubble plot shows the error between observed and theoretical
+    mass (y-axis) in function of the **m/z** (x-axis) for each peak in the
+    spectrum. The size of the bubble is proportional to the intensity of the
+    peak.
+
     Parameters
     ----------
     spec : MsmsSpectrum
         The spectrum with mass errors to be plotted.
+    unit : str, optional
+        The unit of the mass errors, either 'ppm', 'Da', or None. If None,
+        the unit that was used for spectrum annotation is used. The default is
+        None.
     plot_unknown : bool, optional
         Flag indicating whether or not to plot mass errors for unknown peaks.
     color_ions : bool, optional
@@ -281,49 +298,57 @@ def mass_errors(
         ax = plt.gca()
 
     _format_ax(ax, grid)
-    ax.set_ylabel("mass error")
 
     if len(spec.mz) == 0:
+        ax.set_ylabel("Mass error")
+        ax.set_ylim(-1, 1)
         return ax
-
-    round_mz = 50
-    max_mz = math.ceil(spec.mz[-1] / round_mz + 1) * round_mz
-    ax.set_xlim(0, max_mz)
 
     annotations = (
         spec.annotation
         if spec.annotation is not None
-        else itertools.repeat(None)
+        else itertools.repeat(None, len(spec.mz))
     )
 
+    known_ions = []
     dot_colors = []
-    is_known_ion = []
+    mz_deltas = []
+    mz_delta_units = []
     for ann in annotations:
         # Use the first annotation in case there are multiple options.
         ion_type = ann[0].ion_type[0] if ann is not None else None
-        is_known_ion.append(ion_type != "?" and ion_type != None)
-        color = colors.get(ion_type if color_ions else None)
-        dot_colors.append(color)
-    dot_colors = np.array(dot_colors)
+        is_known_ion = ion_type is not None and ion_type != "?"
+        known_ions.append(is_known_ion)
+        dot_colors.append(colors.get(ion_type if color_ions else None))
+        mz_deltas.append(ann[0].mz_delta[0] if is_known_ion else 0.0)
+        mz_delta_units.append(ann[0].mz_delta[1] if is_known_ion else None)
 
+    dot_colors = np.array(dot_colors)
+    mz_deltas = np.array(mz_deltas)
+    intensity_scaled = 500 * (spec.intensity / np.max(spec.intensity))
     mask = (
         np.ones_like(spec.mz, dtype=bool)
         if plot_unknown
-        else np.array(is_known_ion)
+        else np.array(known_ions)
     )
 
-    get_mz_delta = np.vectorize(
-        lambda a: a.fragment_annotations[0].mz_delta[0]
-        if a.fragment_annotations
-        else 0.0
-    )
+    for known_unit in ["ppm", "Da"]:
+        # Use `not any` instead of `all` to fail fast
+        if not any(u and u != known_unit for u in mz_delta_units):
+            annotation_unit = known_unit
+            break
+    else:
+        raise ValueError("Inconsistent or unknown mass units in annotations.")
+    if unit == "Da" and annotation_unit == "ppm":
+        mz_deltas = ppm_to_da(mz_deltas, spec.mz)
+    elif unit == "ppm" and annotation_unit == "Da":
+        mz_deltas = da_to_ppm(mz_deltas, spec.mz)
 
-    mz_deltas = get_mz_delta(spec.annotation)
-    max_intensity = spec.intensity.max()
-    intensity_scaled = 500 * (spec.intensity / max_intensity)
-
-    max_abs_error = max(abs(mz_deltas))
-    ax.set_ylim(-max_abs_error, max_abs_error)
+    y_lim = 1.1 * np.max(np.abs(mz_deltas))
+    if y_lim != 0:
+        ax.set_ylim(-y_lim, y_lim)
+    ax.set_xlim(*_get_xlim(spec))
+    ax.set_ylabel(f"Mass error ({unit or annotation_unit})")
 
     ax.scatter(
         spec.mz[mask],

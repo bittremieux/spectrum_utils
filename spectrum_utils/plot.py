@@ -1,7 +1,16 @@
 import functools
 import itertools
 import math
-from typing import Callable, Dict, Iterable, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -196,7 +205,7 @@ def spectrum(
 
     _format_ax(ax, grid)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
-    ax.set_ylim(*(0, 1.1) if not mirror_intensity else (-1.1, 0))
+    ax.set_ylim(*(0, 1.15) if not mirror_intensity else (-1.15, 0))
     ax.set_ylabel("Intensity")
 
     if len(spec.mz) == 0:
@@ -344,7 +353,7 @@ def mass_errors(
     elif unit == "ppm" and annotation_unit == "Da":
         mz_deltas = da_to_ppm(mz_deltas, spec.mz)
 
-    y_lim = 1.1 * np.max(np.abs(mz_deltas))
+    y_lim = 1.2 * np.max(np.abs(mz_deltas))
     if y_lim != 0:
         ax.set_ylim(-y_lim, y_lim)
     ax.set_xlim(*_get_xlim(spec))
@@ -421,3 +430,83 @@ def mirror(
     )
 
     return ax
+
+
+def full_mirror(
+    spec_top: MsmsSpectrum,
+    spec_mass_errors: Optional[MsmsSpectrum] = None,
+    spec_bottom: Optional[MsmsSpectrum] = None,
+    spectrum_kws: Optional[Mapping[str, Any]] = None,
+    mass_errors_kws: Optional[Mapping[str, Any]] = None,
+    height: Optional[float] = None,
+    ratio: Optional[float] = None,
+) -> plt.Figure:
+    """
+    Plot a spectrum, mass errors, and a mirror spectrum.
+
+    Parameters
+    ----------
+    spec_top : MsmsSpectrum
+        The spectrum to be plotted on the top.
+    spec_mass_errors : Optional[MsmsSpectrum], optional
+        The spectrum for which mass errors are to be plotted in the middle.
+    spec_bottom : Optional[MsmsSpectrum], optional
+        The spectrum to be plotted on the bottom.
+    spectrum_kws : Optional[Mapping[str, Any]], optional
+        Keyword arguments for `plot.spectrum` for the top and bottom spectra.
+    mass_errors_kws : Optional[Mapping[str, Any]], optional
+        Keyword arguments for `plot.mass_errors`.
+    height : Optional[float], optional
+        The height of the figure in inches.
+    ratio : Optional[float], optional
+        The width of the figure as a ratio of the height.
+
+    Returns
+    -------
+    plt.Figure
+        The matplotlib Figure instance on which the spectra and mass errors
+        are plotted.
+    """
+
+    n_rows = 1 + (spec_mass_errors is not None) + (spec_bottom is not None)
+    height_ratios = [1]
+    if spec_mass_errors is not None:
+        height_ratios.append(0.5)
+    if spec_bottom is not None:
+        height_ratios.append(1)
+
+    fig, axes = plt.subplots(
+        *(n_rows, 1),
+        figsize=(10, 8 if spec_bottom is not None else 5),
+        sharex=True,
+        gridspec_kw={"height_ratios": height_ratios},
+    )
+    axes = np.array(axes).flatten()
+
+    spectrum(spec_top, ax=axes[0], **spectrum_kws or {})
+
+    if spec_mass_errors is not None:
+        mass_errors(spec_mass_errors, ax=axes[1], **mass_errors_kws or {})
+        axes[0].get_xaxis().get_label().set_visible(False)
+
+    if spec_bottom is not None:
+        spectrum(
+            spec_bottom,
+            mirror_intensity=True,
+            ax=axes[-1],
+            **spectrum_kws or {},
+        )
+        for ax in axes[:-1]:
+            ax.get_xaxis().get_label().set_visible(False)
+
+        axes[-1].yaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, pos: f"{abs(x):.0%}")
+        )
+
+    height = height or (3.75 if spec_bottom is None else 6)
+    ratio = ratio or (2 if spec_bottom is None else 1.25)
+    fig.set_size_inches(height * ratio, height)
+    fig.align_ylabels(axes)
+    fig.tight_layout()
+
+    return fig

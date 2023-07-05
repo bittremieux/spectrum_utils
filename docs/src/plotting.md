@@ -121,6 +121,75 @@ plt.close()
 
 All of the advanced plotting arguments described above can be provided for the mirror plot as well using the `spectrum_kws` argument.
 
+## Mass error plot
+
+The difference between the observed and the theoretical mass of annotated fragment ions can be visualized in a mass error plot. In these bubble plots, the size of the bubbles corresponds to the intensity of the fragment ions, the x-axis shows the observed _m/z_, and the y-axis shows the mass error either ppm or in Dalton. Use `spectrum_utils.plot.mass_errors(...)` to plot mass errors:
+
+```python
+import matplotlib.pyplot as plt
+import spectrum_utils.plot as sup
+import spectrum_utils.spectrum as sus
+
+usi = "mzspec:PXD022531:j12541_C5orf38:scan:12368"
+peptide = "VAATLEILTLK/2"
+spectrum = sus.MsmsSpectrum.from_usi(usi)
+spectrum.annotate_proforma(
+    peptide,
+    fragment_tol_mass=0.05,
+    fragment_tol_mode="Da",
+    ion_types="aby",
+    max_ion_charge=2,
+    neutral_losses={"NH3": -17.026549, "H2O": -18.010565},
+)
+
+fig, ax = plt.subplots(figsize=(10.5, 3))
+sup.mass_errors(spectrum, plot_unknown=False, ax=ax)
+plt.savefig("annot_fmt.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.close()
+```
+
+![Mass error plot](mass_errors.png)
+
+## Figure-level facet plot
+
+The figure-level `spectrum_utils.plot.facet` function combines the `spectrum_utils.plot.mirror` and `spectrum_utils.plot.mass_errors` functionality:
+
+```python
+import matplotlib.pyplot as plt
+import spectrum_utils.plot as sup
+import spectrum_utils.spectrum as sus
+
+peptide = "VAATLEILTLK/2"
+annotation_settings = {
+    "fragment_tol_mass": 0.05,
+    "fragment_tol_mode": "Da",
+    "ion_types": "aby",
+    "max_ion_charge": 2,
+    "neutral_losses": {"NH3": -17.026549, "H2O": -18.010565},
+}
+
+usi_top = "mzspec:PXD022531:j12541_C5orf38:scan:12368"
+spectrum_top = sus.MsmsSpectrum.from_usi(usi_top)
+spectrum_top.annotate_proforma(peptide, **annotation_settings)
+
+usi_bottom = "mzspec:PXD022531:b11156_PRAMEF17:scan:22140"
+spectrum_bottom = sus.MsmsSpectrum.from_usi(usi_bottom)
+spectrum_bottom.annotate_proforma(peptide, **annotation_settings)
+
+fig = sup.facet(
+    spec_top=spectrum_top,
+    spec_mass_errors=spectrum_top,
+    spec_bottom=spectrum_bottom,
+    mass_errors_kws={"plot_unknown": False},
+    height=7,
+    aspect=1.5,
+)
+plt.savefig("facet.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.close()
+```
+
+![Mass error plot](facet.png)
+
 ## Interactive plotting
 
 Besides the standard plotting functionality in `spectrum_utils.plot`, spectrum_utils also contains interactive plotting functionality in `spectrum_utils.iplot`.

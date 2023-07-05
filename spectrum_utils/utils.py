@@ -33,10 +33,14 @@ def da_to_ppm(
 
     Parameters
     ----------
-    delta_mz
+    delta_mz : int or np.ndarray
         Mass difference in Dalton.
-    mz
+    mz : int or np.ndarray
         m/z value of peak.
+
+    Returns
+    -------
+    int or np.ndarray
 
     """
     return delta_mz / mz * 1e6
@@ -50,10 +54,14 @@ def ppm_to_da(
 
     Parameters
     ----------
-    delta_mz
+    delta_mz : int or np.ndarray
         Mass difference in ppm.
-    mz
+    mz : int or np.ndarray
         m/z value of peak.
+
+    Returns
+    -------
+    int or np.ndarray
 
     """
     return delta_mz / 1e6 * mz

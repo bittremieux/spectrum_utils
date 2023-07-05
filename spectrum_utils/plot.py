@@ -354,7 +354,7 @@ def mass_errors(
         mz_deltas = da_to_ppm(mz_deltas, spec.mz)
 
     y_lim = 1.2 * np.max(np.abs(mz_deltas))
-    if y_lim != 0:
+    if y_lim > 0.0:
         ax.set_ylim(-y_lim, y_lim)
     ax.set_xlim(*_get_xlim(spec))
     ax.set_ylabel(f"Mass error ({unit or annotation_unit})")
@@ -432,17 +432,17 @@ def mirror(
     return ax
 
 
-def full_mirror(
+def facet(
     spec_top: MsmsSpectrum,
     spec_mass_errors: Optional[MsmsSpectrum] = None,
     spec_bottom: Optional[MsmsSpectrum] = None,
     spectrum_kws: Optional[Mapping[str, Any]] = None,
     mass_errors_kws: Optional[Mapping[str, Any]] = None,
     height: Optional[float] = None,
-    ratio: Optional[float] = None,
+    aspect: Optional[float] = None,
 ) -> plt.Figure:
     """
-    Plot a spectrum, mass errors, and a mirror spectrum.
+    Plot a spectrum, and optionally mass errors, and a mirror spectrum.
 
     Parameters
     ----------
@@ -458,8 +458,8 @@ def full_mirror(
         Keyword arguments for `plot.mass_errors`.
     height : Optional[float], optional
         The height of the figure in inches.
-    ratio : Optional[float], optional
-        The width of the figure as a ratio of the height.
+    aspect : Optional[float], optional
+        The width of the figure as an aspect ratio of the height.
 
     Returns
     -------
@@ -504,8 +504,8 @@ def full_mirror(
         )
 
     height = height or (3.75 if spec_bottom is None else 6)
-    ratio = ratio or (2 if spec_bottom is None else 1.25)
-    fig.set_size_inches(height * ratio, height)
+    aspect = aspect or (2 if spec_bottom is None else 1.25)
+    fig.set_size_inches(height * aspect, height)
     fig.align_ylabels(axes)
     fig.tight_layout()
 

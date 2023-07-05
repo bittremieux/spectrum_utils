@@ -439,7 +439,7 @@ def facet(
     spectrum_kws: Optional[Mapping[str, Any]] = None,
     mass_errors_kws: Optional[Mapping[str, Any]] = None,
     height: Optional[float] = None,
-    aspect: Optional[float] = None,
+    width: Optional[float] = None,
 ) -> plt.Figure:
     """
     Plot a spectrum, and optionally mass errors, and a mirror spectrum.
@@ -458,8 +458,8 @@ def facet(
         Keyword arguments for `plot.mass_errors`.
     height : Optional[float], optional
         The height of the figure in inches.
-    aspect : Optional[float], optional
-        The width of the figure as an aspect ratio of the height.
+    width : Optional[float], optional
+        The width of the figure in inches.
 
     Returns
     -------
@@ -477,7 +477,7 @@ def facet(
 
     fig, axes = plt.subplots(
         *(n_rows, 1),
-        figsize=(10, 8 if spec_bottom is not None else 5),
+        figsize=(width or 7.5, height or (3.75 if spec_bottom is None else 6)),
         sharex=True,
         gridspec_kw={"height_ratios": height_ratios},
     )
@@ -503,9 +503,6 @@ def facet(
             mticker.FuncFormatter(lambda x, pos: f"{abs(x):.0%}")
         )
 
-    height = height or (3.75 if spec_bottom is None else 6)
-    aspect = aspect or (2 if spec_bottom is None else 1.25)
-    fig.set_size_inches(height * aspect, height)
     fig.align_ylabels(axes)
     fig.tight_layout()
 

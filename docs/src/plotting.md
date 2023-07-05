@@ -144,7 +144,7 @@ spectrum.annotate_proforma(
 
 fig, ax = plt.subplots(figsize=(10.5, 3))
 sup.mass_errors(spectrum, plot_unknown=False, ax=ax)
-plt.savefig("annot_fmt.png", dpi=300, bbox_inches="tight", transparent=True)
+plt.savefig("mass_errors.png", dpi=300, bbox_inches="tight", transparent=True)
 plt.close()
 ```
 

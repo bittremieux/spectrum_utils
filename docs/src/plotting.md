@@ -188,7 +188,7 @@ plt.savefig("facet.png", dpi=300, bbox_inches="tight", transparent=True)
 plt.close()
 ```
 
-![Mass error plot](facet.png)
+![Facet plot](facet.png)
 
 ## Interactive plotting
 

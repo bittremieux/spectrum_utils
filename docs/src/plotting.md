@@ -9,7 +9,7 @@ Some of the arguments that can be provided to `spectrum_utils.plot.spectrum(...)
 - `color_ions`: Boolean flag indicating whether the annotated peaks should be colored.
 - `annot_fmt`: A function that converts a `FragmentAnnotation` to a label to annotate the corresponding peak (see below).
 - `annot_kws`: A dictionary with options to customize peak label texts.
-See the [`matplotlib.text.Text` documentation](https://matplotlib.org/3.1.1/api/text_api.html#matplotlib.text.Text) for available options.
+  See the [`matplotlib.text.Text` documentation](https://matplotlib.org/3.1.1/api/text_api.html#matplotlib.text.Text) for available options.
 - `grid`: Enable/disable the grid.
 
 See the [API reference](api.md) for full details on how to use these settings.
@@ -182,7 +182,7 @@ fig = sup.facet(
     spec_bottom=spectrum_bottom,
     mass_errors_kws={"plot_unknown": False},
     height=7,
-    aspect=1.5,
+    width=10.5,
 )
 plt.savefig("facet.png", dpi=300, bbox_inches="tight", transparent=True)
 plt.close()

@@ -14,6 +14,8 @@ spectrum_utils contains the following features:
 - Annotating observed spectrum fragments using the [ProForma 2.0 specification](https://www.psidev.info/proforma) for (modified) peptidoforms.
 - Publication-quality, fully customizable spectrum plotting and interactive spectrum plotting.
 
+![spectrum_utils logo](spectrum_utils.png)
+
 ## Installation
 
 spectrum_utils requires Python version 3.8+ and can be installed with pip or conda.

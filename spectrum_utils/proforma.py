@@ -378,9 +378,9 @@ class ProFormaTransformer(lark.Transformer):
         self._modifications.sort(key=_modification_sort_key)
         proteoform = Proteoform(
             sequence=sequence,
-            modifications=self._modifications
-            if len(self._modifications) > 0
-            else None,
+            modifications=(
+                self._modifications if len(self._modifications) > 0 else None
+            ),
             charge=charge,
         )
         # Reset class variables.
@@ -615,7 +615,32 @@ def _modification_sort_key(mod: Modification):
         return -4
 
 
-def parse(proforma: str) -> List[Proteoform]:
+@functools.lru_cache(2)
+def _build_parser(parser="full"):
+    if parser == "full":
+        file = "proforma.ebnf"
+    elif parser == "simple":
+        file = "proforma_simple.ebnf"
+    else:
+        raise NotImplementedError(
+            f"Unknown parser type: {parser}, options are 'full' or 'simple'"
+        )
+    dir_name = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_name, file)) as f_in:
+        parser = lark.Lark(
+            f_in.read(),
+            start="proforma",
+            parser="earley",
+            lexer="dynamic_complete",
+            import_paths=[dir_name],
+        )
+    return parser
+
+
+UNMODIFIED_PEPTIDE_REGEX = re.compile(r"^([A-Z]+)(/[0-9]+)?$")
+
+
+def parse(proforma: str, parser="full") -> List[Proteoform]:
     """
     Parse a ProForma-encoded string.
 
@@ -646,27 +671,30 @@ def parse(proforma: str) -> List[Proteoform]:
         supported by Pyteomics mass calculation).
     ValueError
         If no mass was specified for a GNO term or its parent terms.
+    NotImplementedError
+        If the passed parser is not one of the supported ones ("full" or
+        "simple").
     """
-    dir_name = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(dir_name, "proforma.ebnf")) as f_in:
-        parser = lark.Lark(
-            f_in.read(),
-            start="proforma",
-            parser="earley",
-            lexer="dynamic_complete",
-            import_paths=[dir_name],
-        )
+    match_unmod = UNMODIFIED_PEPTIDE_REGEX.match(proforma)
+    if match_unmod is not None:
+        # Fast path for unmodified peptides.
+        charge = match_unmod.group(2)
+        if charge is not None:
+            charge = Charge(int(charge[1:]))
+        return [Proteoform(sequence=match_unmod.group(1), charge=charge)]
+
+    parser = _build_parser(parser)
     # noinspection PyUnresolvedReferences
     try:
-        return ProFormaTransformer().transform(parser.parse(proforma))
+        parsed = parser.parse(proforma)
+        parsed = ProFormaTransformer().transform(parsed)
+        return parsed
     except lark.visitors.VisitError as e:
         raise e.orig_exc
 
 
 @functools.lru_cache
-def _import_cv(
-    cv_id: str, cache: Optional[str]
-) -> Union[
+def _import_cv(cv_id: str, cache: Optional[str]) -> Union[
     Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]],
     Dict[str, float],
 ]:

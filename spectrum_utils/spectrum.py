@@ -622,6 +622,81 @@ class MsmsSpectrum:
         )
         return self
 
+    def _annotate_proteoforms(
+        self,
+        proteoforms,
+        fragment_tol_mass: float,
+        fragment_tol_mode: str,
+        ion_types: str = "by",
+        max_ion_charge: Optional[int] = None,
+        neutral_losses: Union[bool, Dict[Optional[str], float]] = False,
+        proforma_str: Optional[str] = None,
+    ):
+        if proforma_str is not None:
+            self.proforma = proforma_str
+        if fragment_tol_mode not in ("Da", "ppm"):
+            raise ValueError(
+                "Unknown fragment mass tolerance unit specified. Supported "
+                'values are "Da" or "ppm".'
+            )
+        mass_diff = functools.partial(
+            utils.mass_diff, mode_is_da=fragment_tol_mode == "Da"
+        )
+
+        self._annotation = np.full_like(self.mz, None, object)
+        # By default, peak charges are assumed to be smaller than the precursor
+        # charge.
+        if max_ion_charge is None:
+            max_ion_charge = max(1, self.precursor_charge - 1)
+        # Make sure the standard peaks (without a neutral loss) are always
+        # considered.
+        if isinstance(neutral_losses, bool):
+            if not neutral_losses:
+                neutral_losses = {None: 0}
+            else:
+                neutral_losses = fa._neutral_loss
+        if neutral_losses is not None and None not in neutral_losses:
+            neutral_losses[None] = 0
+
+        analyte_number = 1 if len(proteoforms) > 1 else None
+        for proteoform in proteoforms:
+            fragments = fa.get_theoretical_fragments(
+                proteoform, ion_types, max_ion_charge, neutral_losses
+            )
+            fragment_i = 0
+            for peak_i, peak_mz in enumerate(self.mz):
+                pi = fa.PeakInterpretation()
+                while (
+                    fragment_i < len(fragments)
+                    and mass_diff(peak_mz, fragments[fragment_i][1])
+                    > fragment_tol_mass
+                ):
+                    fragment_i += 1
+                i = 0
+                while (
+                    fragment_i + i < len(fragments)
+                    and abs(mass_diff(peak_mz, fragments[fragment_i + i][1]))
+                    <= fragment_tol_mass
+                ):
+                    # FIXME: Annotations should not be duplicated across
+                    #   multiple peaks.
+                    fragment = copy.copy(fragments[fragment_i + i][0])
+                    fragment.analyte_number = analyte_number
+                    fragment.mz_delta = (
+                        round(
+                            mass_diff(peak_mz, fragments[fragment_i + i][1]),
+                            ndigits=5 if fragment_tol_mode == "Da" else 1,
+                        ),
+                        fragment_tol_mode,
+                    )
+                    pi.fragment_annotations.append(fragment)
+                    i += 1
+                self.annotation[peak_i] = pi
+            if analyte_number is not None:
+                analyte_number += 1
+
+        return self
+
     def annotate_proforma(
         self,
         proforma_str: str,
@@ -679,67 +754,14 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
-        if fragment_tol_mode not in ("Da", "ppm"):
-            raise ValueError(
-                "Unknown fragment mass tolerance unit specified. Supported "
-                'values are "Da" or "ppm".'
-            )
-        mass_diff = functools.partial(
-            utils.mass_diff, mode_is_da=fragment_tol_mode == "Da"
-        )
-
-        self.proforma = proforma_str
-        self._annotation = np.full_like(self.mz, None, object)
-        # By default, peak charges are assumed to be smaller than the precursor
-        # charge.
-        if max_ion_charge is None:
-            max_ion_charge = max(1, self.precursor_charge - 1)
-        # Make sure the standard peaks (without a neutral loss) are always
-        # considered.
-        if isinstance(neutral_losses, bool):
-            if not neutral_losses:
-                neutral_losses = {None: 0}
-            else:
-                neutral_losses = fa._neutral_loss
-        if neutral_losses is not None and None not in neutral_losses:
-            neutral_losses[None] = 0
-        # Parse the ProForma string and find peaks that match the theoretical
-        # fragments.
         proteoforms = proforma.parse(self.proforma)
-        analyte_number = 1 if len(proteoforms) > 1 else None
-        for proteoform in proteoforms:
-            fragments = fa.get_theoretical_fragments(
-                proteoform, ion_types, max_ion_charge, neutral_losses
-            )
-            fragment_i = 0
-            for peak_i, peak_mz in enumerate(self.mz):
-                pi = fa.PeakInterpretation()
-                while (
-                    fragment_i < len(fragments)
-                    and mass_diff(peak_mz, fragments[fragment_i][1])
-                    > fragment_tol_mass
-                ):
-                    fragment_i += 1
-                i = 0
-                while (
-                    fragment_i + i < len(fragments)
-                    and abs(mass_diff(peak_mz, fragments[fragment_i + i][1]))
-                    <= fragment_tol_mass
-                ):
-                    # FIXME: Annotations should not be duplicated across
-                    #   multiple peaks.
-                    fragment = copy.copy(fragments[fragment_i + i][0])
-                    fragment.analyte_number = analyte_number
-                    fragment.mz_delta = (
-                        round(
-                            mass_diff(peak_mz, fragments[fragment_i + i][1]),
-                            ndigits=5 if fragment_tol_mode == "Da" else 1,
-                        ),
-                        fragment_tol_mode,
-                    )
-                    pi.fragment_annotations.append(fragment)
-                    i += 1
-                self.annotation[peak_i] = pi
-            if analyte_number is not None:
-                analyte_number += 1
-        return self
+
+        return self._annotate_proteoforms(
+            proteoforms=proteoforms,
+            fragment_tol_mass=fragment_tol_mass,
+            fragment_tol_mode=fragment_tol_mode,
+            ion_types=ion_types,
+            max_ion_charge=max_ion_charge,
+            neutral_losses=neutral_losses,
+            proforma_str=proforma_str,
+        )

@@ -778,14 +778,14 @@ class MsmsSpectrum:
         -------
         MsmsSpectrum
         """
-        proteoforms = proforma.parse(self.proforma)
+        proteoforms = proforma.parse(proforma_str)
 
         return self._annotate_proteoforms(
+            proforma_str=proforma_str,
             proteoforms=proteoforms,
             fragment_tol_mass=fragment_tol_mass,
             fragment_tol_mode=fragment_tol_mode,
             ion_types=ion_types,
             max_ion_charge=max_ion_charge,
             neutral_losses=neutral_losses,
-            proforma_str=proforma_str,
         )

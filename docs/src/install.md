@@ -18,13 +18,13 @@ spectrum_utils supports Python version 3.8 and above.
 
 spectrum_utils has the following third-party dependencies:
 
-- [appdirs](https://github.com/ActiveState/appdirs)
 - [fastobo](https://fastobo.readthedocs.io/)
 - [Lark](https://lark-parser.readthedocs.io/)
 - [Matplotlib](https://matplotlib.org/)
 - [Numba](http://numba.pydata.org/)
 - [NumPy](https://www.numpy.org/)
 - [Pandas](https://pandas.pydata.org/)
+- [platformdirs](https://github.com/platformdirs/platformdirs)
 - [Pyteomics](https://pyteomics.readthedocs.io/)
 - [Vega-Altair](https://altair-viz.github.io/)
 

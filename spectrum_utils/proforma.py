@@ -24,7 +24,7 @@ from typing import (
 )
 from urllib.error import URLError
 
-import appdirs
+import platformdirs
 import fastobo
 import lark
 
@@ -35,7 +35,7 @@ except ImportError:
 
 
 # Set to None to disable caching.
-cache_dir = appdirs.user_cache_dir("spectrum_utils", False)
+cache_dir = platformdirs.user_cache_dir("spectrum_utils", False)
 
 
 # noinspection PyArgumentList

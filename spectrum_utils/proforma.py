@@ -674,7 +674,9 @@ def parse(proforma: str) -> List[Proteoform]:
         charge = match_unmod.group(2)
         if charge is not None:
             charge = Charge(int(charge[1:]))
-        return [Proteoform(sequence=match_unmod.group(1), charge=charge)]
+        return [
+            Proteoform(sequence=match_unmod.group(1).upper(), charge=charge)
+        ]
 
     parser = _build_parser()
     # noinspection PyUnresolvedReferences
@@ -806,7 +808,9 @@ def _import_cv(
                 for synonym in term.get("synonym", []):
                     cv[synonym] = mass
     # Save to the cache if enabled.
-    _store_in_cache(cache, f"{cv_id}.pkl", (cv, datetime.datetime.utcnow()))
+    _store_in_cache(
+        cache, f"{cv_id}.pkl", (cv, datetime.datetime.now(datetime.UTC))
+    )
     return cv
 
 

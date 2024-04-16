@@ -378,9 +378,9 @@ class ProFormaTransformer(lark.Transformer):
         self._modifications.sort(key=_modification_sort_key)
         proteoform = Proteoform(
             sequence=sequence,
-            modifications=self._modifications
-            if len(self._modifications) > 0
-            else None,
+            modifications=(
+                self._modifications if len(self._modifications) > 0 else None
+            ),
             charge=charge,
         )
         # Reset class variables.
@@ -664,9 +664,7 @@ def parse(proforma: str) -> List[Proteoform]:
 
 
 @functools.lru_cache
-def _import_cv(
-    cv_id: str, cache: Optional[str]
-) -> Union[
+def _import_cv(cv_id: str, cache: Optional[str]) -> Union[
     Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]],
     Dict[str, float],
 ]:

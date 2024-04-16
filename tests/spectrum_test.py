@@ -419,7 +419,7 @@ def test_scale_intensity_root():
         intensity_unscaled = spec.intensity.copy()
         spec.scale_intensity(scaling="root", degree=degree)
         np.testing.assert_allclose(
-            spec.intensity ** degree, intensity_unscaled, rtol=1e-5
+            spec.intensity**degree, intensity_unscaled, rtol=1e-5
         )
 
 
@@ -434,7 +434,7 @@ def test_scale_intensity_log():
         intensity_unscaled = spec.intensity.copy()
         spec.scale_intensity(scaling="log", base=base)
         np.testing.assert_allclose(
-            base ** spec.intensity - 1, intensity_unscaled, rtol=1e-5
+            base**spec.intensity - 1, intensity_unscaled, rtol=1e-5
         )
 
 

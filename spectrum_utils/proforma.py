@@ -715,8 +715,8 @@ def _import_cv(
         )
     elif cv_id == "XLMOD":
         url = (
-            "https://raw.githubusercontent.com/HUPO-PSI/mzIdentML/master/"
-            "cv/XLMOD.obo"
+            "https://raw.githubusercontent.com/HUPO-PSI/xlmod-CV/main/"
+            "XLMOD.obo"
         )
     elif cv_id == "GNO":
         url = (

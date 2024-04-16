@@ -5,12 +5,12 @@ channels:
   - conda-forge
 dependencies:
   - altair
-  - appdirs
   - fastobo
   - lark>=1.0
   - matplotlib
   - numba>=0.57
   - numpy
   - pandas
+  - platformdirs
   - pyteomics>=4.5
   - python>=3.8

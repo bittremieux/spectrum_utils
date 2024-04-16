@@ -22,8 +22,8 @@ jobs:
 
       - name: Lint with black
         uses: psf/black@stable
-      with:
-        options: "--check --diff --line-length 79"
+        with:
+            options: "--check --diff --line-length 79"
 
       - name: Check for debugging print statements
         run: |

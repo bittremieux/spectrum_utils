@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import functools
 import urllib.parse
@@ -624,21 +626,43 @@ class MsmsSpectrum:
 
     def _annotate_proteoforms(
         self,
-        proteoforms,
+        proteoforms: list[proforma.Proteoform],
+        proforma_str: str,
         fragment_tol_mass: float,
         fragment_tol_mode: str,
         ion_types: str = "by",
         max_ion_charge: Optional[int] = None,
         neutral_losses: Union[bool, Dict[Optional[str], float]] = False,
-        proforma_str: Optional[str] = None,
-    ):
-        if proforma_str is not None:
-            self.proforma = proforma_str
+    ) -> MsmsSpectrum:
+        """
+        Assign fragment ion labels to the peaks from a ProForma annotation.
+
+        This is meant to be an internal function that uses a pre-parsed proforma string
+        instead of parsing it internally. This can be useful when the same parsed
+        sequence is used multiple times (since parsing the sequence is a lot slower
+        than annotating the peaks)
+
+        >>> proforma_sequence = "MYPEPTIDEK/2"
+        >>> parsed_proforma = proforma.parse(proforma_sequence)
+        >>> spectrum.annotate_proforma(proforma_sequence, ...)
+
+        or
+
+        >>> spectrum._annotate_proteoforms(parsed_proforma, proforma_sequence, ...)
+
+        WARN:
+            This function does not check that the passed sequence corresponds to the
+            passed proteoforms.
+
+        For additional information on the arguments, see the
+        `MsmsSpectrum.annotate_proforma` documentation.
+        """
         if fragment_tol_mode not in ("Da", "ppm"):
             raise ValueError(
                 "Unknown fragment mass tolerance unit specified. Supported "
                 'values are "Da" or "ppm".'
             )
+        self.proforma = proforma_str
         mass_diff = functools.partial(
             utils.mass_diff, mode_is_da=fragment_tol_mode == "Da"
         )
@@ -705,7 +729,7 @@ class MsmsSpectrum:
         ion_types: str = "by",
         max_ion_charge: Optional[int] = None,
         neutral_losses: Union[bool, Dict[Optional[str], float]] = False,
-    ) -> "MsmsSpectrum":
+    ) -> MsmsSpectrum:
         """
         Assign fragment ion labels to the peaks from a ProForma annotation.
 

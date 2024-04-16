@@ -34,6 +34,8 @@ except ImportError:
     import pyteomics.mass as pmass
 
 
+UNMODIFIED_PEPTIDE_REGEX = re.compile(r"^([A-Za-z]+)(/-?[0-9]+)?$")
+
 # Set to None to disable caching.
 cache_dir = appdirs.user_cache_dir("spectrum_utils", False)
 
@@ -615,18 +617,15 @@ def _modification_sort_key(mod: Modification):
         return -4
 
 
-@functools.lru_cache(2)
-def _build_parser(parser="full"):
-    if parser == "full":
-        file = "proforma.ebnf"
-    elif parser == "simple":
-        file = "proforma_simple.ebnf"
-    else:
-        raise NotImplementedError(
-            f"Unknown parser type: {parser}, options are 'full' or 'simple'"
-        )
+@functools.lru_cache(1)
+def _build_parser() -> lark.Lark:
+    """Build a lark parser for proforma sequences.
+
+    This function also caches the parser in-memory, thus loading it only
+    once per process.
+    """
     dir_name = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(dir_name, file)) as f_in:
+    with open(os.path.join(dir_name, "proforma.ebnf")) as f_in:
         parser = lark.Lark(
             f_in.read(),
             start="proforma",
@@ -637,10 +636,7 @@ def _build_parser(parser="full"):
     return parser
 
 
-UNMODIFIED_PEPTIDE_REGEX = re.compile(r"^([A-Z]+)(/[0-9]+)?$")
-
-
-def parse(proforma: str, parser="full") -> List[Proteoform]:
+def parse(proforma: str) -> List[Proteoform]:
     """
     Parse a ProForma-encoded string.
 
@@ -671,9 +667,6 @@ def parse(proforma: str, parser="full") -> List[Proteoform]:
         supported by Pyteomics mass calculation).
     ValueError
         If no mass was specified for a GNO term or its parent terms.
-    NotImplementedError
-        If the passed parser is not one of the supported ones ("full" or
-        "simple").
     """
     match_unmod = UNMODIFIED_PEPTIDE_REGEX.match(proforma)
     if match_unmod is not None:
@@ -683,7 +676,7 @@ def parse(proforma: str, parser="full") -> List[Proteoform]:
             charge = Charge(int(charge[1:]))
         return [Proteoform(sequence=match_unmod.group(1), charge=charge)]
 
-    parser = _build_parser(parser)
+    parser = _build_parser()
     # noinspection PyUnresolvedReferences
     try:
         parsed = parser.parse(proforma)
@@ -694,7 +687,9 @@ def parse(proforma: str, parser="full") -> List[Proteoform]:
 
 
 @functools.lru_cache
-def _import_cv(cv_id: str, cache: Optional[str]) -> Union[
+def _import_cv(
+    cv_id: str, cache: Optional[str]
+) -> Union[
     Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]],
     Dict[str, float],
 ]:

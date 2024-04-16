@@ -12,7 +12,7 @@ from spectrum_utils import fragment_annotation as fa, proforma, utils
 
 class GnpsBackend(pyteomics.usi._PROXIBackend):
     _url_template = (
-        "https://metabolomics-usi.ucsd.edu/proxi/v{version}/spectra?usi={usi}"
+        "https://metabolomics-usi.gnps2.org/proxi/v{version}/spectra?usi={usi}"
     )
 
     def __init__(self, **kwargs):

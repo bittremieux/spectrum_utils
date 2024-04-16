@@ -808,9 +808,7 @@ def _import_cv(
                 for synonym in term.get("synonym", []):
                     cv[synonym] = mass
     # Save to the cache if enabled.
-    _store_in_cache(
-        cache, f"{cv_id}.pkl", (cv, datetime.datetime.now(datetime.UTC))
-    )
+    _store_in_cache(cache, f"{cv_id}.pkl", (cv, datetime.datetime.utcnow()))
     return cv
 
 

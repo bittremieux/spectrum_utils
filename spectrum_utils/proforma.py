@@ -34,6 +34,8 @@ except ImportError:
     import pyteomics.mass as pmass
 
 
+UNMODIFIED_PEPTIDE_REGEX = re.compile(r"^([A-Za-z]+)(/-?[0-9]+)?$")
+
 # Set to None to disable caching.
 cache_dir = platformdirs.user_cache_dir("spectrum_utils", False)
 
@@ -615,6 +617,25 @@ def _modification_sort_key(mod: Modification):
         return -4
 
 
+@functools.lru_cache(1)
+def _build_parser() -> lark.Lark:
+    """Build a lark parser for proforma sequences.
+
+    This function also caches the parser in-memory, thus loading it only
+    once per process.
+    """
+    dir_name = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_name, "proforma.ebnf")) as f_in:
+        parser = lark.Lark(
+            f_in.read(),
+            start="proforma",
+            parser="earley",
+            lexer="dynamic_complete",
+            import_paths=[dir_name],
+        )
+    return parser
+
+
 def parse(proforma: str) -> List[Proteoform]:
     """
     Parse a ProForma-encoded string.
@@ -647,18 +668,22 @@ def parse(proforma: str) -> List[Proteoform]:
     ValueError
         If no mass was specified for a GNO term or its parent terms.
     """
-    dir_name = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(dir_name, "proforma.ebnf")) as f_in:
-        parser = lark.Lark(
-            f_in.read(),
-            start="proforma",
-            parser="earley",
-            lexer="dynamic_complete",
-            import_paths=[dir_name],
-        )
+    match_unmod = UNMODIFIED_PEPTIDE_REGEX.match(proforma)
+    if match_unmod is not None:
+        # Fast path for unmodified peptides.
+        charge = match_unmod.group(2)
+        if charge is not None:
+            charge = Charge(int(charge[1:]))
+        return [
+            Proteoform(sequence=match_unmod.group(1).upper(), charge=charge)
+        ]
+
+    parser = _build_parser()
     # noinspection PyUnresolvedReferences
     try:
-        return ProFormaTransformer().transform(parser.parse(proforma))
+        parsed = parser.parse(proforma)
+        parsed = ProFormaTransformer().transform(parsed)
+        return parsed
     except lark.visitors.VisitError as e:
         raise e.orig_exc
 

@@ -2,13 +2,9 @@ name: Lint
 
 on:
   push:
-    branches:
-      - main
-      - dev
+    branches: [ main, dev ]
   pull_request:
-    branches:
-      - main
-      - dev
+    branches: [ main, dev ]
 
 jobs:
   lint:
@@ -20,13 +16,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Lint with black
-        uses: psf/black@stable
-
-      - name: Check for debugging print statements
+      - name: Install Ruff
         run: |
-          if grep -rq "print(" spectrum_utils; then
-              echo "Found the following print statements:"
-              grep -r "print(" spectrum_utils
-              exit 1
-          fi
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Lint with Ruff
+        run: |
+          ruff check . --output-format=github
+
+      - name: Check formatting with Ruff
+        run: |
+          ruff format --check .

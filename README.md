@@ -3,7 +3,7 @@
 [![conda](https://img.shields.io/conda/vn/bioconda/spectrum_utils?color=green)](http://bioconda.github.io/recipes/spectrum_utils/README.html)
 [![PyPI](https://img.shields.io/pypi/v/spectrum_utils?color=green)](https://pypi.org/project/spectrum_utils/)
 [![Build status](https://github.com/bittremieux/spectrum_utils/workflows/tests/badge.svg)](https://github.com/bittremieux/spectrum_utils/actions?query=workflow:tests)
-[![docs](https://readthedocs.org/projects/spectrum_utils/badge/?version=latest)](https://spectrum_utils.readthedocs.io/en/latest/?badge=latest)
+[![docs](https://readthedocs.org/projects/spectrum-utils/badge/?version=latest)](https://spectrum-utils.readthedocs.io/en/latest/?badge=latest)
 
 spectrum_utils is a Python package for efficient mass spectrometry data processing and visualization.
 
@@ -18,7 +18,7 @@ spectrum_utils contains the following features:
 
 ## Installation
 
-spectrum_utils requires Python version 3.8+ and can be installed with pip or conda.
+spectrum_utils requires Python version 3.10+ and can be installed with pip or conda.
 
 Using pip:
 

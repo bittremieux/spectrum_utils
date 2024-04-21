@@ -129,7 +129,7 @@ class MsmsSpectrumJit:
         fragment_tol_mass: float,
         fragment_tol_mode: str,
         isotope: int = 0,
-    ) -> "MsmsSpectrumJit":
+    ) -> MsmsSpectrumJit:
         # TODO: This assumes [M+H]x charged ions.
         adduct_mass = 1.007825
         neutral_mass = (
@@ -504,19 +504,19 @@ class MsmsSpectrum:
         """
         Remove fragment peak(s) close to the precursor m/z.
 
-        Note: This peak manipulation will reset any ProForma annotations that
-        were applied previously.
+        Note: This peak manipulation will reset any ProForma annotations
+        that were applied previously.
 
         Parameters
         ----------
         fragment_tol_mass : float
-            Fragment mass tolerance around the precursor mass to remove the
-            precursor peak.
+            Fragment mass tolerance around the precursor mass to remove
+            the precursor peak.
         fragment_tol_mode : {'Da', 'ppm'}
             Fragment mass tolerance unit. Either 'Da' or 'ppm'.
         isotope : int
-            The number of precursor isotopic peaks to be checked (the default
-            is 0 to check only the mono-isotopic peaks).
+            The number of precursor isotopic peaks to be checked (the
+            default is 0 to check only the mono-isotopic peaks).
 
         Returns
         -------

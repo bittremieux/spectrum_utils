@@ -1,28 +1,10 @@
 [build-system]
-requires = ['setuptools>=45', 'wheel', 'setuptools_scm[toml]>=6.0']
-build-backend = 'setuptools.build_meta'
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 
-[tool.black]
+[tool.ruff]
 line-length = 79
-target-version = ['py312']
-include = '\.pyi?$'
-exclude = '''
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-  )/
-  | foo.py           # also separately exclude a file named foo.py in
-                     # the root of the project
-)
-'''
+target-version = "py310"
+include = ["*.py"]

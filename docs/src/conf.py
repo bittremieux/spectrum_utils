@@ -16,7 +16,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join("..", "..")))
 
-import pyteomics.usi
 import spectrum_utils
 
 

@@ -689,7 +689,9 @@ def parse(proforma: str) -> List[Proteoform]:
 
 
 @functools.lru_cache
-def _import_cv(cv_id: str, cache: Optional[str]) -> Union[
+def _import_cv(
+    cv_id: str, cache: Optional[str]
+) -> Union[
     Tuple[Dict[str, Tuple[float, str]], Dict[str, Tuple[float, str]]],
     Dict[str, float],
 ]:
@@ -869,8 +871,9 @@ def _parse_obo(
                     ):
                         term_mass = float(
                             term_xref[
-                                term_xref.index('"')
-                                + 1 : term_xref.rindex('"')
+                                term_xref.index('"') + 1 : term_xref.rindex(
+                                    '"'
+                                )
                             ]
                         )
                 elif (

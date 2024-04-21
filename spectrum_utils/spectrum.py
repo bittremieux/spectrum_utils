@@ -631,28 +631,32 @@ class MsmsSpectrum:
         fragment_tol_mass: float,
         fragment_tol_mode: str,
         ion_types: str = "by",
+        *,
+        max_isotope: int = 0,
         max_ion_charge: Optional[int] = None,
         neutral_losses: Union[bool, Dict[Optional[str], float]] = False,
     ) -> MsmsSpectrum:
         """
-        Assign fragment ion labels to the peaks from a ProForma annotation.
+        Assign fragment ion labels to the peaks from a ProForma
+        annotation.
 
-        This is meant to be an internal function that uses a pre-parsed proforma string
-        instead of parsing it internally. This can be useful when the same parsed
-        sequence is used multiple times (since parsing the sequence is a lot slower
-        than annotating the peaks)
+        This is meant to be an internal function that uses a pre-parsed
+        ProForma string instead of parsing it internally. This can be
+        useful when the same parsed sequence is used multiple times
+        (since parsing the sequence is a lot slower than annotating the
+        peaks).
 
         >>> proforma_sequence = "MYPEPTIDEK/2"
-        >>> parsed_proforma = proforma.parse(proforma_sequence)
         >>> spectrum.annotate_proforma(proforma_sequence, ...)
 
         or
 
+        >>> parsed_proforma = proforma.parse(proforma_sequence)
         >>> spectrum._annotate_proteoforms(parsed_proforma, proforma_sequence, ...)
 
         WARN:
-            This function does not check that the passed sequence corresponds to the
-            passed proteoforms.
+            This function does not check that the passed sequence
+            corresponds to the passed proteoforms.
 
         For additional information on the arguments, see the
         `MsmsSpectrum.annotate_proforma` documentation.
@@ -668,24 +672,28 @@ class MsmsSpectrum:
         )
 
         self._annotation = np.full_like(self.mz, None, object)
-        # By default, peak charges are assumed to be smaller than the precursor
-        # charge.
+        # By default, peak charges are assumed to be smaller than the
+        # precursor charge.
         if max_ion_charge is None:
             max_ion_charge = max(1, self.precursor_charge - 1)
-        # Make sure the standard peaks (without a neutral loss) are always
-        # considered.
+        # Make sure the standard peaks (without a neutral loss) are
+        # always considered.
         if isinstance(neutral_losses, bool):
             if not neutral_losses:
                 neutral_losses = {None: 0}
             else:
-                neutral_losses = fa._neutral_loss
+                neutral_losses = fa.NEUTRAL_LOSS
         if neutral_losses is not None and None not in neutral_losses:
             neutral_losses[None] = 0
 
         analyte_number = 1 if len(proteoforms) > 1 else None
         for proteoform in proteoforms:
             fragments = fa.get_theoretical_fragments(
-                proteoform, ion_types, max_ion_charge, neutral_losses
+                proteoform,
+                ion_types,
+                max_isotope=max_isotope,
+                max_charge=max_ion_charge,
+                neutral_losses=neutral_losses,
             )
             fragment_i = 0
             for peak_i, peak_mz in enumerate(self.mz):
@@ -727,38 +735,46 @@ class MsmsSpectrum:
         fragment_tol_mass: float,
         fragment_tol_mode: str,
         ion_types: str = "by",
+        *,
+        max_isotope: int = 0,
         max_ion_charge: Optional[int] = None,
         neutral_losses: Union[bool, Dict[Optional[str], float]] = False,
     ) -> MsmsSpectrum:
         """
-        Assign fragment ion labels to the peaks from a ProForma annotation.
+        Assign fragment ion labels to the peaks from a ProForma
+        annotation.
 
         Parameters
         ----------
         proforma_str : str
             The ProForma spectrum annotation.
         fragment_tol_mass : float
-            Fragment mass tolerance to match spectrum peaks against theoretical
-            peaks.
+            Fragment mass tolerance to match spectrum peaks against
+            theoretical peaks.
         fragment_tol_mode : {'Da', 'ppm'}
             Fragment mass tolerance unit. Either 'Da' or 'ppm'.
         ion_types : str, optional
-            The ion types to generate. Can be any combination of 'a', 'b', 'c',
-            'x', 'y', and 'z' for peptide fragments, 'I' for immonium ions, 'm'
-            for internal fragment ions, 'p' for the precursor ion, and 'r' for
-            reporter ions. The default is 'by', which means that b and y
-            peptide ions will be generated.
+            The ion types to generate. Can be any combination of 'a',
+            'b', 'c', 'x', 'y', and 'z' for peptide fragments, 'I' for
+            immonium ions, 'm' for internal fragment ions, 'p' for the
+            precursor ion, and 'r' for reporter ions. The default is
+            'by', which means that b and y peptide ions will be
+            generated.
+        max_isotope : int
+            The maximum isotope to consider for the fragment ions (the
+            default is 0 to consider only monoisotopic peaks).
         max_ion_charge : Optional[int], optional
             All fragments up to and including the given charge will be
             annotated (by default all fragments with a charge up to the
             precursor minus one (minimum charge one) will be annotated).
         neutral_losses : Union[bool, Dict[Optional[str], float]], optional
-            Neutral losses to consider for each peak. If `None` or `False`, no
-            neutral losses are considered. If specified as a dictionary, keys
-            should be the molecular formulas of the neutral losses and values
-            the corresponding mass differences. Note that mass differences
-            should typically be negative. If `True`, all of the following
-            neutral losses are considered:
+            Neutral losses to consider for each peak. If `None` or
+            `False`, no neutral losses are considered. If specified as a
+            dictionary, keys should be the molecular formulas of the
+            neutral losses and values the corresponding mass
+            differences. Note that mass differences should typically be
+            negative. If `True`, all of the following neutral losses are
+            considered:
 
             - Loss of hydrogen (H): -1.007825.
             - Loss of ammonia (NH3): -17.026549.
@@ -786,6 +802,7 @@ class MsmsSpectrum:
             fragment_tol_mass=fragment_tol_mass,
             fragment_tol_mode=fragment_tol_mode,
             ion_types=ion_types,
+            max_isotope=max_isotope,
             max_ion_charge=max_ion_charge,
             neutral_losses=neutral_losses,
         )

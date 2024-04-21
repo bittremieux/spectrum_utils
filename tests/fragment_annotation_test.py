@@ -228,6 +228,46 @@ def test_get_theoretical_fragments_mod_multiple():
         )
 
 
+def test_get_theoretical_fragments_isotope():
+    peptide = proforma.parse("HPYLEDR")[0]
+    fragments = {
+        "b1^1": 138.066147,
+        "b2^1": 235.118912,
+        "b3^1": 398.182220,
+        "b4^1": 511.266266,
+        "b5^1": 640.308899,
+        "b6^1": 755.335815,
+        "y1^1": 175.118912,
+        "y2^1": 290.145844,
+        "y3^1": 419.188446,
+        "y4^1": 532.272522,
+        "y5^1": 695.335815,
+        "y6^1": 792.388550,
+        "b1^2": 69.536731,
+        "b2^2": 118.063111,
+        "b3^2": 199.594776,
+        "b4^2": 256.136806,
+        "b5^2": 320.658101,
+        "b6^2": 378.171571,
+        "y1^2": 88.063114,
+        "y2^2": 145.576584,
+        "y3^2": 210.097879,
+        "y4^2": 266.639909,
+        "y5^2": 348.171574,
+        "y6^2": 396.697954,
+    }
+    for num_isotopes in range(0, 3):
+        annotations = fragment_annotation.get_theoretical_fragments(
+            peptide, max_charge=2, max_isotope=num_isotopes
+        )
+        assert len(annotations) == len(fragments) * (num_isotopes + 1)
+        for annotation, fragment_mz in annotations:
+            assert fragment_mz == pytest.approx(
+                fragments[f"{annotation.ion_type}^{annotation.charge}"]
+                + 1.003_354 * annotation.isotope / annotation.charge
+            )
+
+
 def test_get_theoretical_fragments_neutral_loss():
     peptide = proforma.parse("HPYLEDR")[0]
     fragments = {

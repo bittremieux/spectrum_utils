@@ -11,14 +11,14 @@ from spectrum_utils import proforma
 
 
 # Amino acid and special amino acid masses.
-_aa_mass = {
+AA_MASS = {
     **pmass.std_aa_mass,
     # Aspartic acid / asparagine (ambiguous mass).
     # "B": 0,
     # Glutamic acid / glutamine (ambiguous mass).
     # "Z": 0,
     # Leucine / isoleucine.
-    "J": 113.08406,
+    "J": 113.084_064,
     # Selenocysteine (in Pyteomics).
     # "U": 150.95363,
     # Pyrrolysine (in Pyteomics).
@@ -27,39 +27,42 @@ _aa_mass = {
     "X": 0,
 }
 
+# Offset for isotopic peaks.
+C13_MASS_DIFF = 1.003_354
+
 # Common neutral losses.
-_neutral_loss = {
+NEUTRAL_LOSS = {
     # No neutral loss.
     None: 0,
     # Hydrogen.
-    "H": -1.007825,
+    "H": -1.007_825,
     # Ammonia.
-    "NH3": -17.026549,
+    "NH3": -17.026_549,
     # Water.
-    "H2O": -18.010565,
+    "H2O": -18.010_565,
     # Carbon monoxide.
-    "CO": -27.994915,
+    "CO": -27.994_915,
     # Carbon dioxide.
-    "CO2": -43.989829,
+    "CO2": -43.989_829,
     # Formamide.
-    "HCONH2": -45.021464,
+    "HCONH2": -45.021_464,
     # Formic acid.
-    "HCOOH": -46.005479,
+    "HCOOH": -46.005_479,
     # Methanesulfenic acid.
-    "CH4OS": -63.998301,
+    "CH4OS": -63.998_301,
     # Sulfur trioxide.
-    "SO3": -79.956818,
+    "SO3": -79.956_818,
     # Metaphosphoric acid.
-    "HPO3": -79.966331,
+    "HPO3": -79.966_331,
     # Mercaptoacetamide.
-    "C2H5NOS": -91.009195,
+    "C2H5NOS": -91.009_195,
     # Mercaptoacetic acid.
-    "C2H4O2S": -91.993211,
+    "C2H4O2S": -91.993_211,
     # Phosphoric acid.
-    "H3PO4": -97.976896,
+    "H3PO4": -97.976_896,
 }
 
-_supported_ions = "?abcxyzIm_prf"
+SUPPORTED_IONS = "?abcxyzIm_prf"
 
 
 class FragmentAnnotation:
@@ -125,7 +128,7 @@ class FragmentAnnotation:
             raise NotImplementedError(
                 "Advanced ion types are not yet supported"
             )
-        elif ion_type[0] not in _supported_ions:
+        elif ion_type[0] not in SUPPORTED_IONS:
             raise ValueError("Unknown ion type")
         if ion_type == "?" and (
             neutral_loss is not None
@@ -242,6 +245,8 @@ class PeakInterpretation:
 def get_theoretical_fragments(
     proteoform: proforma.Proteoform,
     ion_types: str = "by",
+    *,
+    max_isotope: int = 0,
     max_charge: int = 1,
     neutral_losses: Optional[Dict[Optional[str], float]] = None,
 ) -> List[Tuple[FragmentAnnotation, float]]:
@@ -252,19 +257,24 @@ def get_theoretical_fragments(
     Parameters
     ----------
     proteoform : proforma.Proteoform
-        The proteoform for which the fragment annotations will be generated.
+        The proteoform for which the fragment annotations will be
+        generated.
     ion_types : str
-        The ion types to generate. Can be any combination of 'a', 'b', 'c',
-        'x', 'y', and 'z' for peptide fragments, 'I' for immonium ions, 'm' for
-        internal fragment ions, 'p' for the precursor ion, and 'r' for reporter
-        ions. The default is 'by', which means that b and y peptide ions will
-        be generated.
+        The ion types to generate. Can be any combination of 'a', 'b',
+        'c', 'x', 'y', and 'z' for peptide fragments, 'I' for immonium
+        ions, 'm' for internal fragment ions, 'p' for the precursor ion,
+        and 'r' for reporter ions. The default is 'by', which means that
+        b and y peptide ions will be generated.
+    max_isotope : int
+        The maximum isotope to consider (the default is 0 to only
+        generate the monoisotopic peaks).
     max_charge : int
-        All fragments up to and including the given charge will be generated
-        (the default is 1 to only generate singly-charged fragments).
+        All fragments up to and including the given charge will be
+        generated (the default is 1 to only generate singly-charged
+        fragments).
     neutral_losses : Optional[Dict[Optional[str], float]]
-        A dictionary with neutral loss names and (negative) mass differences to
-        be considered.
+        A dictionary with neutral loss names and (negative) mass
+        differences to be considered.
 
     Returns
     -------
@@ -273,9 +283,9 @@ def get_theoretical_fragments(
         ascending m/z order.
     """
     for ion_type in ion_types:
-        if ion_type not in _supported_ions:
+        if ion_type not in SUPPORTED_IONS:
             raise ValueError(
-                f"{ion_type} is not a supported ion type ({_supported_ions})"
+                f"{ion_type} is not a supported ion type ({SUPPORTED_IONS})"
             )
     if "B" in proteoform.sequence:
         raise ValueError(
@@ -363,8 +373,8 @@ def get_theoretical_fragments(
 
     # Generate all internal fragment ions.
     if "m" in ion_types:
-        # Skip internal fragments with start position 1, which are actually
-        # b ions.
+        # Skip internal fragments with start position 1, which are
+        # actually b ions.
         for start_i in range(1, len(proteoform.sequence)):
             mod_i_start, mod_mass = 0, 0
             # Skip unlocalized and prefix modifications.
@@ -380,8 +390,8 @@ def get_theoretical_fragments(
             ):
                 mod_i_start += 1
             mod_i_stop = mod_i_start
-            # Internal fragments of only one residue are encoded as immonium
-            # ions.
+            # Internal fragments of only one residue are encoded as
+            # immonium ions.
             for stop_i in range(start_i + 2, len(proteoform.sequence)):
                 fragment_sequence = proteoform.sequence[start_i:stop_i]
                 # Include internal modifications.
@@ -392,8 +402,8 @@ def get_theoretical_fragments(
                 ):
                     mod_mass += proteoform.modifications[mod_i_stop].mass
                     mod_i_stop += 1
-                # Internal fragment mass calculation is equivalent to b ion
-                # mass calculation.
+                # Internal fragment mass calculation is equivalent to b
+                # ion mass calculation.
                 base_fragments.append(
                     (
                         fragment_sequence,
@@ -430,20 +440,20 @@ def get_theoretical_fragments(
                         sequence=fragment_sequence,
                         ion_type=ion_type,
                         charge=charge,
-                        aa_mass=_aa_mass,
+                        aa_mass=AA_MASS,
                     )
                     + mod_mass / charge,
                 )
             )
 
     # Generate all immonium ions (internal single amino acid from the
-    # combination of a type and y type cleavage.
+    # combination of a type and y type cleavage).
     if "I" in ion_types:
         # Amino acid mass minus CO plus charge 1.
         mass_diff = pmass.calculate_mass(formula="CO") - pmass.calculate_mass(
             formula="H"
         )
-        for aa, mass in _aa_mass.items():
+        for aa, mass in AA_MASS.items():
             if aa != "X":
                 fragments_masses.append(
                     (
@@ -451,6 +461,22 @@ def get_theoretical_fragments(
                         mass - mass_diff,
                     )
                 )
+
+    # Generate isotopic peaks for all fragments.
+    isotope_fragments = []
+    for isotope in range(1, max_isotope + 1):
+        for fragment, mass in fragments_masses:
+            isotope_fragments.append(
+                (
+                    FragmentAnnotation(
+                        ion_type=fragment.ion_type,
+                        isotope=isotope,
+                        charge=fragment.charge,
+                    ),
+                    mass + isotope * C13_MASS_DIFF / fragment.charge,
+                )
+            )
+    fragments_masses.extend(isotope_fragments)
 
     # Generate all fragments that differ by a neutral loss from the base
     # fragments.
@@ -460,13 +486,13 @@ def get_theoretical_fragments(
             continue
         neutral_loss = f"{'-' if mass_diff < 0 else '+'}{neutral_loss}"
         for fragment, mass in fragments_masses:
-            fragment_mass = mass + mass_diff / fragment.charge
-            if fragment_mass > 0:
+            if (fragment_mass := mass + mass_diff / fragment.charge) > 0:
                 neutral_loss_fragments.append(
                     (
                         FragmentAnnotation(
                             ion_type=fragment.ion_type,
                             neutral_loss=neutral_loss,
+                            isotope=fragment.isotope,
                             charge=fragment.charge,
                         ),
                         fragment_mass,
